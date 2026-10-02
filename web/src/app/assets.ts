@@ -9,9 +9,19 @@ export type AssetId =
   | 'veh_skateboard'
   | 'prop_streetlamp_01'
   | 'prop_bench_01'
+  | 'prop_bench_02'
   | 'prop_tree_01'
   | 'prop_trashbin_01'
-  | 'prop_busstop_01';
+  | 'prop_busstop_01'
+  | 'prop_trafficlight_01'
+  | 'veh_car_sedan'
+  | 'veh_car_hatch'
+  | 'veh_moto'
+  | 'veh_bus'
+  | 'ped_citizen'
+  | 'animal_cat'
+  | 'animal_dog'
+  | 'bird_pigeon';
 
 const PRELOAD: AssetId[] = [
   'char_hero_m',
@@ -21,6 +31,7 @@ const PRELOAD: AssetId[] = [
   'veh_skateboard',
   'prop_streetlamp_01',
   'prop_bench_01',
+  'prop_bench_02',
   'prop_tree_01',
   'prop_trashbin_01',
   'prop_busstop_01',
