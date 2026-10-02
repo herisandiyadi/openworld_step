@@ -61,12 +61,12 @@ Status: `[ ]` belum, `[~]` dikerjakan, `[x]` selesai.
 
 ## Fase B: Lalu Lintas (9.5 hari)
 
-- [ ] **B1. Bake graf lajur** (1.5 hari): `tools/world/lanes.ts` menghasilkan `public/world/lanes.json`
+- [x] **B1. Bake graf lajur** (1.5 hari): `tools/world/lanes.ts` menghasilkan `public/world/lanes.json`
   - Lajur kiri ±2 m dari garis tengah, node persimpangan, belokan lurus/kiri/kanan dengan kurva Bezier.
   - Selesai jika: test memastikan semua edge terhubung, tidak ada jalan buntu, dan tidak menembus gedung.
-- [ ] **B2. Query graf runtime** (0.5 hari): `src/ambient/laneGraph.ts`
+- [x] **B2. Query graf runtime** (0.5 hari): `src/ambient/laneGraph.ts`
   - Mencari edge terdekat, edge berikutnya acak per persimpangan, dan konversi posisi 1D ke dunia.
-- [ ] **B3. Simulasi lalu lintas** (1.5 hari): `src/ambient/trafficSim.ts`
+- [x] **B3. Simulasi lalu lintas** (1.5 hari): `src/ambient/trafficSim.ts`
   - Posisi 1D per edge, car-following (2 m + 0.8 detik x kecepatan), reservasi persimpangan, 15/5 Hz.
   - Selesai jika: test 10.000 tick tanpa tabrakan atau deadlock lulus.
 - [ ] **B4. Lampu lalu lintas** (1 hari)
@@ -76,7 +76,7 @@ Status: `[ ]` belum, `[~]` dikerjakan, `[x]` selesai.
   - `veh_car_sedan`, `veh_car_hatch`, `veh_moto`, `veh_bus` dengan roda sebagai node terpisah.
   - Mobil dan motor milik pemain dipindah dari `vehicleModels.tsx` ke GLB.
   - Selesai jika: lolos validator, anggaran segitiga terpenuhi, dan terdaftar di manifest.
-- [ ] **B6. Spawner dan pool** (0.75 hari): `src/ambient/spawner.ts`
+- [x] **B6. Spawner dan pool** (0.75 hari): `src/ambient/spawner.ts`
   - Cincin spawn 40-110 m di luar pandangan, despawn > 130 m, jumlah pool per preset (8/14/20).
   - Selesai jika: test memastikan tidak ada spawn di dalam frustum kamera.
 - [ ] **B7. Render instanced** (1 hari): `src/ambient/AmbientLayer.tsx`
@@ -93,7 +93,7 @@ Status: `[ ]` belum, `[~]` dikerjakan, `[x]` selesai.
 
 ## Fase C: Pejalan Kaki, Hewan, Chat Warga, dan Bangku (12.5 hari)
 
-- [ ] **C1. Graf trotoar dan zebra cross** (1 hari)
+- [x] **C1. Graf trotoar dan zebra cross** (1 hari)
   - Dibake ke `lanes.json`, dan surface zebra cross ditulis ke chunk serta peta.
 - [ ] **C2. Simulasi pejalan kaki** (1.5 hari): `src/ambient/pedestrianSim.ts`
   - Jalan di trotoar, menyeberang saat lampu pejalan hijau, duduk di bangku (memakai reservasi kursi dari C10), menghindari pemain.

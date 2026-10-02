@@ -26,6 +26,7 @@ import {
   WORLD_SIZE,
 } from '../../src/world/worldSpec';
 import { encodePng } from '../assets/lib/png';
+import { bakeLanes } from './lanes';
 
 const WEB_ROOT = resolve(dirname(fileURLToPath(import.meta.url)), '../..');
 const OUT_DIR = join(WEB_ROOT, 'public/world');
@@ -149,6 +150,14 @@ async function main(): Promise<void> {
     await writeFile(join(OUT_DIR, 'chunks', `${chunkKey(chunk.cx, chunk.cz)}.json`), json);
   }
   await writeFile(join(OUT_DIR, 'index.json'), JSON.stringify(index, null, 2));
+
+  const lanes = bakeLanes();
+  const lanesJson = JSON.stringify(lanes);
+  await writeFile(join(OUT_DIR, 'lanes.json'), lanesJson);
+  console.log(
+    `lanes: ${lanes.nodes.length} nodes, ${lanes.edges.length} edges, ${lanes.intersections.length} intersections, ` +
+      `sidewalk ${lanes.walkNodes.length}/${lanes.walkEdges.length} (${(lanesJson.length / 1024).toFixed(0)} KB)`,
+  );
 
   await init();
   const input = bakeNavMeshInput(chunks);
