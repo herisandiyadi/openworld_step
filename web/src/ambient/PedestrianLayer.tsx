@@ -1,7 +1,7 @@
 import { useEffect, useMemo, useRef, useState } from 'react';
 import { useFrame } from '@react-three/fiber';
 import { Html, useGLTF } from '@react-three/drei';
-import { Color, InstancedBufferAttribute, type InstancedMesh, type Material, type Mesh, Object3D } from 'three';
+import { Color, InstancedBufferAttribute, type InstancedMesh, type Material, Object3D, type SkinnedMesh } from 'three';
 import { create } from 'zustand';
 import { assetUrl } from '../app/assets';
 import { dayClock, playerState } from '../game/runtime';
@@ -13,7 +13,7 @@ import { chunkCoord, districtOf } from '../world/worldSpec';
 import type { LanesData } from './laneGraph';
 import { densityAt } from './density';
 import { generateResidents } from './residents';
-import { ANIM_CODE, PED_ANIM_GLSL, type PedAnim, STRIDE } from './pedAnim';
+import { ANIM_CODE, bakeBindPose, PED_ANIM_GLSL, type PedAnim, STRIDE } from './pedAnim';
 import {
   buildWalkGraph,
   createPedWorld,
@@ -82,11 +82,11 @@ export function PedestrianLayer() {
   const yaw = useRef(new Map<number, number>());
   const gltf = useGLTF(assetUrl('ped_citizen'));
   const source = useMemo(() => {
-    let found: Mesh | null = null;
+    let found: SkinnedMesh | null = null;
     gltf.scene.traverse((child) => {
-      if (!found && (child as Mesh).isMesh) found = child as Mesh;
+      if (!found && (child as SkinnedMesh).isSkinnedMesh) found = child as SkinnedMesh;
     });
-    return found as Mesh | null;
+    return found as SkinnedMesh | null;
   }, [gltf]);
   const max = PED_POOL.high;
   // Geometri di-clone supaya atribut instance tidak menempel ke cache useGLTF.
@@ -240,12 +240,13 @@ const VARIANTS: readonly (readonly [number, number, number])[][] = [
 ];
 
 /**
- * Geometri + material instanced warga. Atribut instance `pedAnim` = (kode animasi, fase, varian).
- * Vertex shader memilih pose dari `skinIndex.x` (rig kaku, satu bone per vertex) dan mengganti
- * warna region `_tint` (1 baju, 2 celana, 3 rambut) dengan palet varian.
+ * Geometri + material instanced warga. Bind pose dibakar ke ruang meter dulu (`bakeBindPose`),
+ * karena POSITION di GLB terkuantisasi ke -1..1. Atribut instance `pedAnim` = (kode animasi, fase,
+ * varian); vertex shader memilih pose dari atribut `bone` dan mengganti warna region `_tint`
+ * (1 baju, 2 celana, 3 rambut) dengan palet varian.
  */
-export function createPedMesh(source: Mesh, count: number) {
-  const geometry = source.geometry.clone();
+export function createPedMesh(source: SkinnedMesh, count: number) {
+  const geometry = bakeBindPose(source);
   const anim = new InstancedBufferAttribute(new Float32Array(count * 3), 3);
   geometry.setAttribute('pedAnim', anim);
   const material = (source.material as Material).clone();
@@ -258,7 +259,7 @@ export function createPedMesh(source: Mesh, count: number) {
         `#include <common>
 attribute vec3 pedAnim;
 attribute float _tint;
-attribute vec4 skinIndex;
+attribute float bone;
 uniform vec3 pedPalette[${palette.length}];
 ${PED_ANIM_GLSL}`,
       )
@@ -273,7 +274,7 @@ ${PED_ANIM_GLSL}`,
         '#include <begin_vertex>',
         `#include <begin_vertex>
   PedPose pedP = pedAnimPose(pedAnim.x, pedAnim.y);
-  transformed = pedPoseVertex(transformed, skinIndex.x, pedP);
+  transformed = pedPoseVertex(transformed, bone, pedP);
   transformed.y += pedP.bob;`,
       )
       // Normal ikut diputar kasar oleh bungkuk saja; cukup untuk low-poly flat shading.
