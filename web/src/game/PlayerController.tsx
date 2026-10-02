@@ -3,6 +3,7 @@ import { useFrame, useThree } from '@react-three/fiber';
 import { DirectionalLight, Group, MathUtils, Mesh, Object3D, Vector3 } from 'three';
 import { stepPlayer } from './movement';
 import { Hero } from './Hero';
+import { audio } from '../audio/audioEngine';
 import { PlayerVehicle } from './PlayerVehicle';
 import { MODE_RADIUS, MODE_SPEED, joystickInput, jumpState, keyboardInput, lighting, playerMotion, playerState } from './runtime';
 import { useGameStore } from '../state/gameStore';
@@ -52,6 +53,7 @@ export function PlayerController({ shadows }: { shadows: boolean }) {
       if (jumpState.y <= 0) {
         jumpState.y = 0;
         jumpState.vy = 0;
+        audio.land();
       }
     }
 

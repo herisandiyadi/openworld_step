@@ -4,6 +4,7 @@ import { Minimap } from './Minimap';
 import { ActionButtons } from './ActionButtons';
 import { NpcChat } from './NpcChat';
 import { BusMenu } from './BusMenu';
+import { AudioControls } from './AudioControls';
 import { type MoveMode, type Quality, useGameStore } from '../state/gameStore';
 import { DISTRICT_NAMES } from '../world/worldSpec';
 import { worldState } from '../world/worldState';
@@ -109,6 +110,7 @@ export function Hud() {
                 </button>
               ))}
             </div>
+            <AudioControls />
             <button type="button" className="overlay-button" onClick={() => setPaused(false)} autoFocus>
               Lanjutkan
             </button>

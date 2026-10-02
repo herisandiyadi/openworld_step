@@ -8,6 +8,7 @@ import {
   validateSettings,
 } from '../state/aiSettings';
 import { useGameStore } from '../state/gameStore';
+import { AudioControls } from './AudioControls';
 
 /** AI endpoint settings (base URL, API key, model), saved on the device with Capacitor Preferences. */
 export function SettingsScreen() {
@@ -116,6 +117,11 @@ export function SettingsScreen() {
             required
           />
         </label>
+
+        <fieldset className="audio-fieldset">
+          <legend>Audio</legend>
+          <AudioControls />
+        </fieldset>
 
         <p id={ids.status} className={`settings-status${error || (status && !status.ok) ? ' error' : ''}`} role="status" aria-live="polite">
           {error ?? status?.message ?? 'API key disimpan hanya di perangkat ini.'}

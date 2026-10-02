@@ -3,6 +3,7 @@ import { buildMessages, type ChatMessage, streamChat } from '../ai/chat';
 import { useAiSettings } from '../state/aiSettings';
 import { useGameStore } from '../state/gameStore';
 import { worldState } from '../world/worldState';
+import { audio } from '../audio/audioEngine';
 
 const MAX_INPUT = 500;
 /** Conversation per NPC survives closing the panel for the rest of the session. */
@@ -52,6 +53,7 @@ export function NpcChat() {
     setText('');
     setError(null);
     setPartial('');
+    audio.send();
     const controller = new AbortController();
     abortRef.current = controller;
     try {
@@ -59,6 +61,7 @@ export function NpcChat() {
       const withReply: ChatMessage[] = [...next, { role: 'assistant', content: reply }];
       histories.set(npcId, withReply);
       setMessages(withReply);
+      audio.message();
       addMet(npcId);
     } catch (chatError) {
       if (controller.signal.aborted) return;

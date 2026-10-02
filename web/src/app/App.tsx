@@ -10,6 +10,8 @@ import { Proximity } from '../game/Proximity';
 import { ParkedVehicles } from '../game/ParkedVehicles';
 import { DayNight } from '../game/DayNight';
 import { AutoSave } from '../game/AutoSave';
+import { AudioDirector, AudioFrame } from '../audio/AudioDirector';
+import { installAudio } from '../audio/install';
 import { useKeyboardInput } from '../game/useKeyboardInput';
 import { RenderStats } from './RenderStats';
 import { SOAK_FROM_URL, SoakTest } from './SoakTest';
@@ -22,6 +24,7 @@ import { QUALITY_PRESETS, type Quality, useGameStore } from '../state/gameStore'
 const SKY_COLOR = '#bcd3e6';
 preloadAssets();
 void useAiSettings.getState().load();
+installAudio();
 if (SOAK_FROM_URL) useGameStore.setState({ screen: 'game', soakActive: true });
 
 const DOWNGRADE: Record<Quality, Quality> = { high: 'medium', medium: 'low', low: 'low' };
@@ -64,11 +67,13 @@ function Game() {
         </Suspense>
         <TapToMove />
         <Proximity />
+        <AudioFrame />
         <RenderStats />
         {soakActive && <SoakTest />}
       </Canvas>
       <Hud />
       <LoadingScreen />
+      <AudioDirector />
       {!soakActive && <AutoSave />}
     </div>
   );

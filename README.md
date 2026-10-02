@@ -18,6 +18,9 @@ Godot lama dan tidak dipakai lagi.
 - Chat teks bebas dengan 5 NPC yang punya persona masing-masing. Balasan di-stream (SSE).
 - Quest "kenalan dengan warga", fog of war di minimap dan peta besar, serta siklus siang-malam.
 - Save/load otomatis (posisi, kendaraan, quest, area terjelajahi, jam) via Capacitor Preferences.
+- Audio prosedural (Web Audio API, tanpa file audio): BGM generatif yang lebih tenang di malam hari, langkah kaki,
+  suara roda skateboard/sepeda, mesin motor/mobil yang ikut kecepatan, serta SFX lompat, naik/turun, chat, bus, dan quest.
+  Volume musik dan efek serta tombol bisu ada di menu jeda dan Pengaturan.
 - Menu awal (Mulai/Lanjutkan, Main baru, Pengaturan), menu jeda, preset grafis, dan uji performa bawaan.
 
 ## Kontrol
@@ -83,6 +86,7 @@ Uninstall APK debug dulu sebelum memasang release karena signature-nya berbeda.
 - `world/`: spesifikasi data dunia, generator offline, chunk streamer + worker, terrain, navmesh
 - `ui/`: HUD, joystick, tombol aksi, minimap, peta besar, chat NPC, menu bus, title, settings
 - `ai/`: klien chat (persona NPC, parser SSE)
+- `audio/`: mesin audio prosedural (musik, SFX, loop gerak)
 - `state/`: store Zustand, pengaturan AI, save game
 - `web/tools/`: generator aset GLB dan bake dunia
 - `web/android/`: proyek Capacitor Android (termasuk plugin native `AiStreamPlugin`)
