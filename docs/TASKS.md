@@ -69,7 +69,7 @@ Status: `[ ]` belum, `[~]` dikerjakan, `[x]` selesai.
 - [x] **B3. Simulasi lalu lintas** (1.5 hari): `src/ambient/trafficSim.ts`
   - Posisi 1D per edge, car-following (2 m + 0.8 detik x kecepatan), reservasi persimpangan, 15/5 Hz.
   - Selesai jika: test 10.000 tick tanpa tabrakan atau deadlock lulus.
-- [ ] **B4. Lampu lalu lintas** (1 hari) — separuh aset selesai: `prop_trafficlight_01` (node `lamp_red/yellow/green`); siklus & berbagi status belum
+- [x] **B4. Lampu lalu lintas** (1 hari) — selesai: aset `prop_trafficlight_01` + siklus `src/ambient/trafficLights.ts` (12 detik, kuning 2 detik, satu arah hijau) yang menahan mobil di `trafficSim` lewat `gate`
   - Aset `prop_trafficlight_01`, siklus 12 detik dengan kuning 2 detik di Pusat Kota, emissive diatur shader.
   - Status lampu dibagi ke simulasi mobil dan pejalan kaki.
 - [x] **B5. Aset kendaraan GLB** (1.5 hari) — GLB selesai; wiring runtime `vehicleModels.tsx` -> GLB oleh lead
@@ -79,12 +79,12 @@ Status: `[ ]` belum, `[~]` dikerjakan, `[x]` selesai.
 - [x] **B6. Spawner dan pool** (0.75 hari): `src/ambient/spawner.ts`
   - Cincin spawn 40-110 m di luar pandangan, despawn > 130 m, jumlah pool per preset (8/14/20).
   - Selesai jika: test memastikan tidak ada spawn di dalam frustum kamera.
-- [ ] **B7. Render instanced** (1 hari): `src/ambient/AmbientLayer.tsx`
+- [x] **B7. Render instanced** (1 hari): `src/ambient/AmbientLayer.tsx` — 15 InstancedMesh (dihitung, belum diukur di HP); simulasi 15/5 Hz lewat `stepTrafficTiered`
   - InstancedMesh per bagian kendaraan, interpolasi antar tick, roda berputar, lampu depan menyala di malam hari.
   - Selesai jika: draw call ambient ≤ 15.
-- [ ] **B8. Interaksi dengan pemain** (0.5 hari)
+- [x] **B8. Interaksi dengan pemain** (0.5 hari) — `playerGap` di `trafficSim.ts` + dorong keluar di `AmbientLayer.tsx`
   - Berhenti jika pemain di depan < 6 m, klakson setelah 2 detik, dorong keluar saat tumpang tindih, tanpa kerusakan.
-- [ ] **B9. Bus kota** (0.5 hari)
+- [x] **B9. Bus kota** (0.5 hari) — `src/ambient/busRoute.ts`, halte sama dengan `busDestinations`
   - Rute melewati halte dengan jeda 4 detik, sinkron dengan menu fast travel.
 - [ ] **B10. Uji dan rilis fase B** (0.75 hari)
   - Soak test 10 menit: 0 tabrakan, 0 mobil macet permanen, plus pengukuran performa di HP.

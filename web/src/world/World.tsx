@@ -3,6 +3,7 @@ import { useFrame } from '@react-three/fiber';
 import { useGLTF } from '@react-three/drei';
 import type { Mesh } from 'three';
 import { assetUrl } from '../app/assets';
+import { AmbientLayer } from '../ambient/AmbientLayer';
 import { Npcs } from '../game/Npc';
 import { playerState, sceneRefs } from '../game/runtime';
 import { useGameStore } from '../state/gameStore';
@@ -83,6 +84,7 @@ export function World() {
       {streamer && <primitive object={streamer.root} />}
       <Impostors />
       <Npcs spawns={index.npcs} />
+      <AmbientLayer busStops={index.busStops} />
     </>
   );
 }

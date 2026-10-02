@@ -62,12 +62,21 @@ function gapAhead(graph: LaneGraph, state: TrafficState, vehicle: Vehicle): numb
   return gap - VEHICLE_LENGTH;
 }
 
+/**
+ * Lampu lalu lintas (B4): benar kalau kendaraan di lajur `edge` harus menunggu sebelum
+ * memasuki persimpangan lewat belokan `turn`. Pemanggil mengisinya dengan `signalBlocks`
+ * dari trafficLights.ts; tanpa itu semua persimpangan memakai reservasi saja.
+ */
+export type SignalGate = (edge: number, turn: number) => boolean;
+
 /** Reservasi persimpangan: satu kendaraan per persimpangan, dan hanya kalau lajur keluarnya lega. */
-function intersectionBlocked(graph: LaneGraph, state: TrafficState, vehicle: Vehicle): boolean {
+function intersectionBlocked(graph: LaneGraph, state: TrafficState, vehicle: Vehicle, gate?: SignalGate): boolean {
   const turn = edgeAt(graph, vehicle.next);
   if (turn.isec < 0) return false;
   const holder = state.reserved.get(turn.isec);
   if (holder !== undefined) return holder !== vehicle.id;
+  // Lampu merah/kuning: berhenti di garis, reservasi tidak diambil.
+  if (gate?.(vehicle.edge, vehicle.next)) return true;
   if (edgeAt(graph, vehicle.edge).length - vehicle.s > RESERVE_LOOKAHEAD) return true;
   // Hanya kendaraan terdepan di lajurnya yang boleh reservasi, kalau tidak yang di belakang
   // bisa mengunci persimpangan untuk yang di depannya (deadlock).
@@ -88,15 +97,27 @@ function intersectionBlocked(graph: LaneGraph, state: TrafficState, vehicle: Veh
   return false;
 }
 
+export interface StepOptions {
+  /** Lampu lalu lintas; lihat SignalGate. */
+  gate?: SignalGate;
+  /** Kendaraan yang maju di tick ini (pembagian 15/5 Hz dekat/jauh). */
+  active?: (vehicle: Vehicle) => boolean;
+  /** Celah tambahan ke penghalang bukan kendaraan ambient, mis. pemain (B8). */
+  obstacleGap?: (vehicle: Vehicle) => number;
+}
+
 /**
  * Satu tick simulasi. dt = 1/15 detik (atau 1/5 untuk agen jauh).
  * `random` dipakai untuk memilih belokan di persimpangan.
  */
-export function stepTraffic(graph: LaneGraph, state: TrafficState, dt: number, random: () => number): void {
+export function stepTraffic(graph: LaneGraph, state: TrafficState, dt: number, random: () => number, options: StepOptions = {}): void {
+  const { gate, active, obstacleGap } = options;
   for (const vehicle of state.vehicles) {
+    if (active && !active(vehicle)) continue;
     const edge = edgeAt(graph, vehicle.edge);
     let gap = gapAhead(graph, state, vehicle);
-    if (intersectionBlocked(graph, state, vehicle)) gap = Math.min(gap, edge.length - vehicle.s);
+    if (obstacleGap) gap = Math.min(gap, obstacleGap(vehicle));
+    if (intersectionBlocked(graph, state, vehicle, gate)) gap = Math.min(gap, edge.length - vehicle.s);
 
     // Kecepatan aman dari rumus celah: gap >= 2 m + 0.8 detik x kecepatan.
     const allowed = Number.isFinite(gap) ? Math.max(0, (gap - GAP_BASE) / GAP_TIME) : vehicle.maxSpeed;
@@ -117,6 +138,46 @@ export function stepTraffic(graph: LaneGraph, state: TrafficState, dt: number, r
     const entered = edgeAt(graph, vehicle.edge);
     if (entered.isec >= 0) state.reserved.set(entered.isec, vehicle.id);
   }
+}
+
+/** Rasio tick dekat per tick jauh (15 Hz / 5 Hz). */
+const FAR_EVERY = TICK_HZ_NEAR / TICK_HZ_FAR;
+
+/**
+ * Satu tick 15 Hz dengan pembagian dekat/jauh: kendaraan dekat maju tiap tick dengan dt 1/15,
+ * kendaraan jauh hanya tiap tick ke-3 dengan dt 1/5. `tick` adalah nomor tick yang terus naik.
+ */
+export function stepTrafficTiered(
+  graph: LaneGraph,
+  state: TrafficState,
+  tick: number,
+  random: () => number,
+  isNear: (vehicle: Vehicle) => boolean,
+  options: StepOptions = {},
+): void {
+  stepTraffic(graph, state, 1 / TICK_HZ_NEAR, random, { ...options, active: isNear });
+  if (tick % FAR_EVERY === 0) stepTraffic(graph, state, 1 / TICK_HZ_FAR, random, { ...options, active: (vehicle) => !isNear(vehicle) });
+}
+
+/** Setengah lebar lajur yang dianggap terhalang oleh pemain. */
+const PLAYER_LATERAL = 2.2;
+/** Kendaraan mulai mengerem untuk pemain dari jarak ini (NEXT_FEATURES 3.2). */
+export const PLAYER_BRAKE_DISTANCE = 6;
+
+/**
+ * Celah ke pemain di depan kendaraan (m), atau tak hingga kalau pemain tidak di jalurnya.
+ * Murni: pemain cukup diwakili titik + radius.
+ */
+export function playerGap(graph: LaneGraph, vehicle: Vehicle, player: { x: number; z: number; radius: number }): number {
+  const pose = vehiclePose(graph, vehicle);
+  const dx = player.x - pose.x;
+  const dz = player.z - pose.z;
+  const forward = dx * pose.dirX + dz * pose.dirZ;
+  const lateral = Math.abs(dx * pose.dirZ - dz * pose.dirX);
+  if (forward < 0 || forward > PLAYER_BRAKE_DISTANCE + VEHICLE_LENGTH || lateral > PLAYER_LATERAL + player.radius) {
+    return Number.POSITIVE_INFINITY;
+  }
+  return Math.max(0, forward - VEHICLE_LENGTH / 2 - player.radius);
 }
 
 /** Posisi dan arah hadap dunia untuk render/interpolasi. */

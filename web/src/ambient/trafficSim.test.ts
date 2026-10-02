@@ -2,7 +2,7 @@ import { describe, expect, it } from 'vitest';
 import { bakeLanes } from '../../tools/world/lanes';
 import { mulberry32 } from '../world/worldGen';
 import { buildLaneGraph, edgeAt } from './laneGraph';
-import { createTraffic, createVehicle, safeGap, stepTraffic, TICK_HZ_NEAR, VEHICLE_LENGTH, vehiclePose } from './trafficSim';
+import { createTraffic, createVehicle, safeGap, stepTraffic, stepTrafficTiered, TICK_HZ_NEAR, VEHICLE_LENGTH, vehiclePose } from './trafficSim';
 
 const graph = buildLaneGraph(bakeLanes());
 
@@ -67,5 +67,21 @@ describe('simulasi lalu lintas', () => {
     for (let tick = 0; tick < 300; tick++) stepTraffic(graph, state, 1 / TICK_HZ_NEAR, random);
     expect(front.s - back.s).toBeGreaterThanOrEqual(VEHICLE_LENGTH + 2 - 0.01);
     expect(back.speed).toBeLessThan(0.1);
+  });
+
+  it('kendaraan jauh maju 5 Hz, kendaraan dekat 15 Hz, jarak tempuh sama', () => {
+    const random = mulberry32(3);
+    const lanes = graph.data.edges.flatMap((edge, index) => (edge.kind === 'lane' && edge.length > 20 ? [index] : []));
+    const near = createVehicle(graph, 1, lanes[0] as number, 0, 6, random);
+    const far = createVehicle(graph, 2, lanes[1] as number, 0, 6, random);
+    const state = createTraffic([near, far]);
+    const moves: number[] = [];
+    for (let tick = 1; tick <= 6; tick++) {
+      const before = far.s;
+      stepTrafficTiered(graph, state, tick, random, (vehicle) => vehicle === near);
+      moves.push(far.s - before);
+    }
+    expect(moves.filter((move) => move > 0).length).toBe(2);
+    expect(near.s).toBeCloseTo(far.s, 5);
   });
 });
