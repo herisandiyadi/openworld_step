@@ -1,4 +1,6 @@
 import { Preferences } from '@capacitor/preferences';
+import { create } from 'zustand';
+import { type ChatMessage, HISTORY_TURNS } from '../ai/promptFacts';
 import { clearExplored, decodeExplored, encodeExplored } from '../game/exploration';
 import { dayClock, jumpState, playerState } from '../game/runtime';
 import { clearSeatReservations, playerSeat } from '../game/seating';
@@ -7,6 +9,56 @@ import { NO_NEARBY, useGameStore } from './gameStore';
 
 const SAVE_KEY = 'save_v1';
 const SAVE_VERSION = 1;
+
+/** Riwayat chat warga di save game: 10 giliran terakhir per warga, maks 30 warga (LRU). */
+export const MAX_RESIDENT_CHATS = 30;
+const MAX_MESSAGE_CHARS = 1000;
+
+/** [id warga, pesan]; urutan = LRU, yang paling baru diajak ngobrol di akhir. */
+export type ResidentChats = [string, ChatMessage[]][];
+
+interface ResidentChatState {
+  chats: ResidentChats;
+  /** Id semua warga yang pernah diajak ngobrol (statistik HUD; tidak ikut LRU). */
+  talked: string[];
+}
+
+/** Store kecil terpisah supaya HUD ikut ter-render saat statistik berubah. */
+export const useResidentChats = create<ResidentChatState>()(() => ({ chats: [], talked: [] }));
+
+/** Simpan riwayat satu warga: potong ke 10 giliran, pindah ke paling baru, buang yang tertua di atas 30. */
+export function rememberChat(chats: ResidentChats, id: string, messages: readonly ChatMessage[]): ResidentChats {
+  const next = chats.filter(([other]) => other !== id);
+  next.push([id, messages.slice(-HISTORY_TURNS * 2)]);
+  return next.slice(-MAX_RESIDENT_CHATS);
+}
+
+export function recordResidentChat(id: string, messages: readonly ChatMessage[]): void {
+  useResidentChats.setState((state) => ({
+    chats: rememberChat(state.chats, id, messages),
+    talked: state.talked.includes(id) ? state.talked : [...state.talked, id],
+  }));
+}
+
+export const residentHistory = (id: string): ChatMessage[] =>
+  useResidentChats.getState().chats.find(([other]) => other === id)?.[1] ?? [];
+
+const isMessage = (value: unknown): value is ChatMessage => {
+  const message = value as Partial<ChatMessage> | null;
+  return (message?.role === 'user' || message?.role === 'assistant') && typeof message.content === 'string';
+};
+
+/** Validasi data dari storage (batas kepercayaan): buang entri rusak, batasi panjang. */
+function parseChats(value: unknown): ResidentChats {
+  if (!Array.isArray(value)) return [];
+  let out: ResidentChats = [];
+  for (const entry of value) {
+    if (!Array.isArray(entry) || typeof entry[0] !== 'string' || !Array.isArray(entry[1])) continue;
+    const messages = (entry[1] as unknown[]).filter(isMessage).map((m) => ({ role: m.role, content: m.content.slice(0, MAX_MESSAGE_CHARS) }));
+    out = rememberChat(out, entry[0], messages);
+  }
+  return out;
+}
 
 /** Everything needed to resume: position, vehicles, quest progress, explored map, time of day. */
 export interface SaveData {
@@ -19,6 +71,9 @@ export interface SaveData {
   met: string[];
   explored: string;
   time: number;
+  /** Opsional supaya save lama tetap terbaca. */
+  chats?: ResidentChats;
+  talked?: string[];
 }
 
 export function captureSave(): SaveData {
@@ -33,6 +88,8 @@ export function captureSave(): SaveData {
     met: state.met,
     explored: encodeExplored(),
     time: Math.round(dayClock.t * 10000) / 10000,
+    chats: useResidentChats.getState().chats,
+    talked: useResidentChats.getState().talked,
   };
 }
 
@@ -53,6 +110,8 @@ export function parseSave(text: string | null): SaveData | null {
       met: data.met.filter((id): id is string => typeof id === 'string'),
       explored: typeof data.explored === 'string' ? data.explored : '',
       time: typeof data.time === 'number' ? data.time % 1 : 0.32,
+      chats: parseChats(data.chats),
+      talked: Array.isArray(data.talked) ? [...new Set(data.talked.filter((id): id is string => typeof id === 'string'))].slice(0, 200) : [],
     };
   } catch {
     return null;
@@ -77,6 +136,7 @@ export function applySave(data: SaveData): void {
   resetRuntime(data.x, data.z, data.heading);
   decodeExplored(data.explored);
   dayClock.t = data.time;
+  useResidentChats.setState({ chats: data.chats ?? [], talked: data.talked ?? [] });
   useGameStore.setState({
     mode: data.riding?.kind ?? 'walk',
     riding: data.riding,
@@ -91,6 +151,7 @@ export function resetGame(): void {
   resetRuntime(0, 0, 0);
   clearExplored();
   dayClock.t = 0.32;
+  useResidentChats.setState({ chats: [], talked: [] });
   useGameStore.setState({ mode: 'walk', riding: null, vehicles: [...INITIAL_VEHICLES], met: [], nearby: NO_NEARBY, seated: false });
 }
 

@@ -3,11 +3,9 @@ import { type AiSettings, normalizeSettings } from '../state/aiSettings';
 import { SseChatParser, visibleText } from './sse';
 import { appearanceSummary } from '../game/HeroAppearance';
 import type { Appearance } from '../state/profile';
+import { type ChatMessage, HISTORY_TURNS, playerLine, systemPrompt } from './promptFacts';
 
-export interface ChatMessage {
-  role: 'system' | 'user' | 'assistant';
-  content: string;
-}
+export { type ChatMessage, HISTORY_TURNS } from './promptFacts';
 
 /** Per-NPC persona; keeps answers in the city context. */
 export const NPC_PERSONAS: Record<string, string> = {
@@ -23,25 +21,8 @@ export const NPC_PERSONAS: Record<string, string> = {
     'Kamu adalah Mas Joko, pekerja gudang di Kawasan Industri sisi timur Openworld City. Kamu tahu soal gudang, truk, dan rute motor tercepat ke Pusat Kota.',
 };
 
-const WORLD_FACTS =
-  'Fakta kota: ada tiga kawasan (Pusat Kota di tengah, Perumahan di sisi barat/utara/selatan, Kawasan Industri di sisi timur). Pemain bisa jalan kaki, naik skateboard, sepeda, motor, dan mobil yang terparkir, serta naik bus dari halte untuk berpindah cepat. Tidak ada musuh.';
-const RULES =
-  'Jawab dalam bahasa Indonesia, singkat (maksimal 3 kalimat), tetap sebagai karakter. Hanya bahas hal seputar kota dan kehidupan sehari-hari di dalam game. Jika ditanya di luar konteks, arahkan kembali dengan sopan.';
-
-/** Last N turns sent to the model to keep requests small. */
-export const HISTORY_TURNS = 10;
-
-/**
- * The username is validated (letters, digits, space . _ -; max 20) before it is stored, so it cannot
- * carry quotes or instructions into the system prompt. Sapaan ikut gender profil (NEXT_FEATURES 9.5),
- * dan penampilan diringkas dari id opsi (bukan teks bebas pemain).
- */
-function playerLine(playerName: string | undefined, appearance?: Appearance): string {
-  if (!playerName) return '';
-  const greeting = appearance?.gender === 'f' ? 'Mbak' : 'Mas';
-  const look = appearance ? ` Dia memakai ${appearanceSummary(appearance)}.` : '';
-  return `Pemain yang sedang berbicara denganmu bernama "${playerName}". Panggil dia "${greeting} ${playerName}", terutama saat menyapa.${look}`;
-}
+/** Sapaan ikut gender profil (NEXT_FEATURES 9.5); penampilan diringkas dari id opsi, bukan teks bebas. */
+export const lookOf = (appearance?: Appearance): string | undefined => (appearance ? appearanceSummary(appearance) : undefined);
 
 export function buildMessages(
   npcId: string,
@@ -51,7 +32,12 @@ export function buildMessages(
   appearance?: Appearance,
 ): ChatMessage[] {
   const persona = NPC_PERSONAS[npcId] ?? `Kamu adalah ${npcName}, warga Openworld City.`;
-  const system = [persona, WORLD_FACTS, playerLine(playerName, appearance), RULES].filter(Boolean).join(' ');
+  const system = systemPrompt(persona, playerLine(playerName, appearance?.gender, lookOf(appearance)));
+  return withHistory(system, history);
+}
+
+/** System prompt + giliran terakhir saja, supaya request tetap kecil. */
+export function withHistory(system: string, history: readonly ChatMessage[]): ChatMessage[] {
   return [{ role: 'system', content: system }, ...history.slice(-HISTORY_TURNS * 2)];
 }
 
