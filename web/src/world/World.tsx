@@ -7,6 +7,7 @@ import { Npcs } from '../game/Npc';
 import { playerState, sceneRefs } from '../game/runtime';
 import { useGameStore } from '../state/gameStore';
 import { ChunkStreamer, type PropParts } from './chunkStreamer';
+import { Impostors } from './Impostors';
 import { loadNavigation } from './navigation';
 import { PROP_IDS } from './propSpec';
 import { chunkAt, loadWorldIndex, worldUrl } from './worldState';
@@ -80,6 +81,7 @@ export function World() {
   return (
     <>
       {streamer && <primitive object={streamer.root} />}
+      <Impostors />
       <Npcs spawns={index.npcs} />
     </>
   );

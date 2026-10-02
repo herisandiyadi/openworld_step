@@ -13,6 +13,8 @@ import { AudioControls } from './AudioControls';
 /** AI endpoint settings (base URL, API key, model), saved on the device with Capacitor Preferences. */
 export function SettingsScreen() {
   const setScreen = useGameStore((state) => state.setScreen);
+  const controls = useGameStore((state) => state.controls);
+  const setControls = useGameStore((state) => state.setControls);
   const stored = useAiSettings((state) => state.settings);
   const save = useAiSettings((state) => state.save);
   const [form, setForm] = useState<AiSettings>(stored);
@@ -121,6 +123,26 @@ export function SettingsScreen() {
         <fieldset className="audio-fieldset">
           <legend>Audio</legend>
           <AudioControls />
+        </fieldset>
+
+        <fieldset className="audio-fieldset">
+          <legend>Kontrol</legend>
+          <label className="audio-row">
+            <span>Ketuk untuk berjalan</span>
+            <input
+              type="checkbox"
+              checked={controls.tapToMove}
+              onChange={(event) => setControls({ tapToMove: event.target.checked })}
+            />
+          </label>
+          <label className="audio-row">
+            <span>Minimap ikut arah kamera</span>
+            <input
+              type="checkbox"
+              checked={controls.minimapRotate}
+              onChange={(event) => setControls({ minimapRotate: event.target.checked })}
+            />
+          </label>
         </fieldset>
 
         <p id={ids.status} className={`settings-status${error || (status && !status.ok) ? ' error' : ''}`} role="status" aria-live="polite">

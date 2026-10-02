@@ -5,16 +5,20 @@ import { followPath, resolveTarget } from './movement';
 import { PLAYER_RADIUS, playerState, sceneRefs } from './runtime';
 import { findPath } from '../world/navigation';
 import { worldState } from '../world/worldState';
+import { useGameStore } from '../state/gameStore';
 
 const TAP_MAX_MS = 350;
 const TAP_MAX_PX = 12;
 
-/** Converts quick taps on the canvas into navmesh click-to-move. Drags and long presses are ignored. */
+/** Converts quick taps on the canvas into navmesh click-to-move (when enabled). Drags and long presses are ignored. */
 export function TapToMove() {
   const camera = useThree((state) => state.camera);
   const element = useThree((state) => state.gl.domElement);
+  // Opsi "Ketuk untuk berjalan" di Pengaturan, default mati (bentrok dengan geser kamera).
+  const enabled = useGameStore((state) => state.controls.tapToMove);
 
   useEffect(() => {
+    if (!enabled) return;
     const raycaster = new Raycaster();
     const ndc = new Vector2();
     const groundPlane = new Plane(new Vector3(0, 1, 0), 0);
@@ -55,7 +59,7 @@ export function TapToMove() {
       element.removeEventListener('pointerup', onPointerUp);
       element.removeEventListener('pointercancel', onPointerCancel);
     };
-  }, [camera, element]);
+  }, [camera, element, enabled]);
 
   return null;
 }

@@ -5,6 +5,7 @@ import { animState, playerMotion } from './runtime';
 import { ANIM, BIKE } from './vehicleSpec';
 import { applyAppearance, heroAssetId } from './HeroAppearance';
 import { DEFAULT_APPEARANCE, usePlayerProfile } from '../state/profile';
+import { cameraState, HERO_HIDE_DISTANCE } from '../camera/followCamera';
 import type { MoveMode } from '../state/gameStore';
 
 const clamp = (value: number, min: number, max: number) => Math.min(max, Math.max(min, value));
@@ -35,6 +36,8 @@ export function Hero({ mode }: { mode: MoveMode }) {
       action.timeScale = timeScale;
     }
     mixer.update(Math.min(delta, 0.05));
+    // Kamera terlalu dekat (terdorong gedung): sembunyikan pemain supaya layar tidak tertutup badan.
+    scene.visible = cameraState.distance >= HERO_HIDE_DISTANCE;
     const bike = actions.get('anim_Bike');
     if (bike) animState.bikePhase = bike.time / bike.getClip().duration;
   });

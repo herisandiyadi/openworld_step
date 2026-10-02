@@ -1,6 +1,7 @@
 import { useEffect, useMemo, useRef } from 'react';
 import { useFrame, useThree } from '@react-three/fiber';
 import { playerState } from '../game/runtime';
+import { cameraState, HERO_HIDE_DISTANCE } from '../camera/followCamera';
 import { useGameStore } from '../state/gameStore';
 import { BLOCK_PITCH, HALF_WORLD } from '../world/worldSpec';
 import { worldState } from '../world/worldState';
@@ -58,6 +59,9 @@ export function SoakTest() {
     frames: 0,
     frameMs: [] as number[],
     hitches: 0,
+    /** Frame dengan kamera terdorong di bawah 1.2 m (gedung menghalangi); target: 0. */
+    cameraClips: 0,
+    minCameraDistance: Infinity,
     maxFrameMs: 0,
     longTasks: [] as number[],
     samples: [] as Sample[],
@@ -110,6 +114,8 @@ export function SoakTest() {
     state.frameMs.push(frameMs);
     state.maxFrameMs = Math.max(state.maxFrameMs, frameMs);
     if (frameMs > HITCH_MS) state.hitches += 1;
+    state.minCameraDistance = Math.min(state.minCameraDistance, cameraState.distance);
+    if (cameraState.distance < HERO_HIDE_DISTANCE) state.cameraClips += 1;
     state.elapsed += delta;
 
     let travel = SPEED * Math.min(delta, 0.1);
@@ -175,6 +181,8 @@ export function SoakTest() {
       avgFps: Math.round(state.frames / state.elapsed),
       frameMs: { p50: pct(0.5), p95: pct(0.95), p99: pct(0.99), max: Math.round(state.maxFrameMs) },
       hitchesOver50ms: state.hitches,
+      cameraClips: state.cameraClips,
+      minCameraDistanceM: Math.round(Math.min(state.minCameraDistance, 99) * 100) / 100,
       longTasks: { count: state.longTasks.length, max: Math.max(0, ...state.longTasks) },
       stream: { ...stream, maxApplyMs: Math.round(stream.applyMs * 10) / 10 },
       lapEnd: state.lapEnd,
@@ -188,6 +196,7 @@ export function SoakTest() {
         `Rata-rata ${report.avgFps} FPS selama ${report.seconds} s (${report.distanceM} m)`,
         `Frame: p50 ${report.frameMs.p50} ms, p95 ${report.frameMs.p95} ms, maks ${report.frameMs.max} ms`,
         `Hitch > 50 ms: ${report.hitchesOver50ms} dari ${report.frames} frame`,
+        `Klip kamera (< ${HERO_HIDE_DISTANCE} m): ${report.cameraClips} frame, jarak terdekat ${report.minCameraDistanceM} m`,
         `Pasang chunk (main thread) maks: ${report.stream.maxApplyMs} ms`,
         'Memori per putaran:',
         lapText,

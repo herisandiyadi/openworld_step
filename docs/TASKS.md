@@ -25,32 +25,32 @@ Status: `[ ]` belum, `[~]` dikerjakan, `[x]` selesai.
 
 ## Fase A: Kamera ala GTA V (6 hari)
 
-- [ ] **A1. Logika kamera murni** (0.75 hari): `src/camera/followCamera.ts`
+- [x] **A1. Logika kamera murni** (0.75 hari): `src/camera/followCamera.ts`
   - yaw/pitch, jarak per mode, batas pitch -5° sampai 40°, zoom ±30%, auto-recenter (1.5 detik jalan kaki,
     0.6 detik berkendara), look-ahead maks 2 m, FOV +6° di kecepatan tinggi.
   - Selesai jika: unit test untuk recenter, batas zoom, dan look-ahead lulus.
-- [ ] **A2. CameraRig** (0.75 hari): `src/camera/CameraRig.tsx`
+- [x] **A2. CameraRig** (0.75 hari): `src/camera/CameraRig.tsx`
   - Menggantikan kode kamera di `PlayerController.tsx`, dengan damping posisi dan rotasi.
   - Selesai jika: tidak ada jitter saat jalan, berlari, dan berkendara.
-- [ ] **A3. Gesture kamera** (1 hari): `src/camera/useCameraGestures.ts`
+- [x] **A3. Gesture kamera** (1 hari): `src/camera/useCameraGestures.ts`
   - Geser di separuh layar kanan untuk rotasi dan pinch untuk zoom. Di desktop: drag mouse dan scroll.
   - Zona sentuh tidak bentrok dengan joystick dan tombol aksi (multi-touch per pointer).
   - Selesai jika: joystick, geser kamera, dan tombol bisa dipakai bersamaan dengan 3 jari.
-- [ ] **A4. Joystick relatif kamera** (0.25 hari)
+- [x] **A4. Joystick relatif kamera** (0.25 hari)
   - Input dirotasi sebesar yaw kamera sebelum `stepPlayer`, berlaku juga untuk WASD.
-- [ ] **A5. Tabrakan kamera** (0.5 hari)
+- [x] **A5. Tabrakan kamera** (0.5 hari)
   - Ray vs AABB gedung di 3x3 chunk, offset 0.3 m, kembali menjauh secara halus.
   - Pemain disembunyikan atau transparan jika kamera < 1.2 m.
   - Selesai jika: unit test ray-AABB lulus dan 0 klip di uji keliling 2 putaran.
-- [ ] **A6. Kontrol kendaraan baru** (1 hari)
+- [x] **A6. Kontrol kendaraan baru** (1 hari)
   - Motor dan mobil: gas/rem plus belok dengan radius putar dan akselerasi. Sepeda dan skateboard: belok halus.
   - Parameter per kendaraan di `vehicleSpec.ts`.
   - Selesai jika: tidak bisa berputar di tempat, terasa wajar, dan mudah di-tuning.
-- [ ] **A7. Opsi tap-to-move** (0.25 hari)
+- [x] **A7. Opsi tap-to-move** (0.25 hari)
   - Toggle "Ketuk untuk berjalan" di Pengaturan, default mati, disimpan di Preferences.
-- [ ] **A8. Minimap ikut arah kamera** (0.25 hari)
+- [x] **A8. Minimap ikut arah kamera** (0.25 hari)
   - Opsi rotate-with-camera (default nyala) atau north-up, dengan penanda utara ikut berputar.
-- [ ] **A9. Horizon dan bayangan** (0.75 hari)
+- [x] **A9. Horizon dan bayangan** (0.75 hari)
   - Fog 60-140 m, siluet gedung impostor untuk chunk di luar radius muat (1 draw call per chunk).
   - Shadow camera ±20 m di depan arah pandang.
   - Selesai jika: batas streaming tidak terlihat dan draw call total ≤ 150.

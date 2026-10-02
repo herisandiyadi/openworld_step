@@ -3,17 +3,19 @@ import { playerState } from '../game/runtime';
 import { useGameStore } from '../state/gameStore';
 import { drawFog, drawNpcDot, drawNpcEdgeMarker, drawPlayerArrow, loadMapImage } from './mapRender';
 import { HALF_WORLD } from '../world/worldSpec';
+import { cameraState } from '../camera/followCamera';
 
 const MINIMAP_CSS_SIZE = 132;
 const VIEW_METERS = 90;
 const REDRAW_INTERVAL_MS = 66;
 
 /**
- * North-up minimap. The city map is baked offline to a PNG; each update (~15 Hz) only blits a
+ * Minimap ikut arah kamera (default) atau north-up, lihat Pengaturan. The city map is baked offline to a PNG; each update (~15 Hz) only blits a
  * cropped window plus markers, so no extra WebGL render pass is needed.
  */
 export function Minimap() {
   const canvasRef = useRef<HTMLCanvasElement>(null);
+  const northRef = useRef<HTMLSpanElement>(null);
   const setMapOpen = useGameStore((state) => state.setMapOpen);
 
   useEffect(() => {
@@ -39,8 +41,14 @@ export function Minimap() {
 
           const size = canvas.width;
           const scale = size / VIEW_METERS;
+          // Putar searah yaw kamera: arah pandang kamera selalu ke atas.
+          const rotation = useGameStore.getState().controls.minimapRotate ? cameraState.yaw : 0;
           context.fillStyle = '#6f8f5f';
           context.fillRect(0, 0, size, size);
+          context.save();
+          context.translate(size / 2, size / 2);
+          context.rotate(rotation);
+          context.translate(-size / 2, -size / 2);
           const sourceX = (playerState.x + map.image.width / map.ppm / 2) * map.ppm - sourceSize / 2;
           const sourceY = (playerState.z + map.image.height / map.ppm / 2) * map.ppm - sourceSize / 2;
           context.drawImage(map.image, sourceX, sourceY, sourceSize, sourceSize, 0, 0, size, size);
@@ -59,6 +67,9 @@ export function Minimap() {
             }
           }
           drawPlayerArrow(context, size / 2, size / 2, playerState.heading, 7 * dpr);
+          context.restore();
+          const north = northRef.current;
+          if (north) north.style.transform = `translateX(-50%) rotate(${rotation}rad)`;
         };
         frame = requestAnimationFrame(draw);
       })
@@ -73,7 +84,7 @@ export function Minimap() {
   return (
     <button type="button" className="minimap" aria-label="Buka peta besar" onClick={() => setMapOpen(true)}>
       <canvas ref={canvasRef} className="minimap-canvas" />
-      <span className="minimap-north" aria-hidden="true">
+      <span ref={northRef} className="minimap-north" aria-hidden="true" style={{ transformOrigin: '50% 60px' }}>
         U
       </span>
     </button>

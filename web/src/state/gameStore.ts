@@ -1,3 +1,4 @@
+import { Preferences } from '@capacitor/preferences';
 import { create } from 'zustand';
 import type { DistrictId } from '../world/worldSpec';
 import { INITIAL_VEHICLES, type ParkedVehicle, type VehicleKind } from '../game/vehicles';
@@ -63,6 +64,9 @@ interface GameState {
   /** Automated map-crossing performance run (pause menu or ?soak). */
   soakActive: boolean;
   soakResult: string | null;
+  controls: ControlSettings;
+  loadControls: () => Promise<void>;
+  setControls: (patch: Partial<ControlSettings>) => void;
   setScreen: (screen: Screen) => void;
   mount: (vehicle: ParkedVehicle) => void;
   dismount: (parked: ParkedVehicle) => void;
@@ -82,10 +86,28 @@ interface GameState {
   setSoakResult: (result: string | null) => void;
 }
 
+/** Preferensi kontrol, disimpan di Preferences. */
+export interface ControlSettings {
+  /** "Ketuk untuk berjalan": default mati karena bentrok dengan geser kamera. */
+  tapToMove: boolean;
+  /** Minimap ikut arah kamera (default) atau north-up. */
+  minimapRotate: boolean;
+}
+
+export const DEFAULT_CONTROLS: ControlSettings = { tapToMove: false, minimapRotate: true };
+const CONTROLS_KEY = 'control_settings_v1';
+
+export function normalizeControls(value: Partial<ControlSettings> | null | undefined): ControlSettings {
+  return {
+    tapToMove: typeof value?.tapToMove === 'boolean' ? value.tapToMove : DEFAULT_CONTROLS.tapToMove,
+    minimapRotate: typeof value?.minimapRotate === 'boolean' ? value.minimapRotate : DEFAULT_CONTROLS.minimapRotate,
+  };
+}
+
 export const NO_NEARBY: Nearby = { npcId: null, vehicleId: null, busStopId: null };
 
 /** UI-facing state only. Per-frame simulation state lives in game/runtime.ts to avoid React re-renders. */
-export const useGameStore = create<GameState>()((set) => ({
+export const useGameStore = create<GameState>()((set, get) => ({
   screen: 'title',
   mode: 'walk',
   riding: null,
@@ -104,6 +126,20 @@ export const useGameStore = create<GameState>()((set) => ({
   district: null,
   soakActive: false,
   soakResult: null,
+  controls: DEFAULT_CONTROLS,
+  loadControls: async () => {
+    try {
+      const { value } = await Preferences.get({ key: CONTROLS_KEY });
+      if (value) set({ controls: normalizeControls(JSON.parse(value) as Partial<ControlSettings>) });
+    } catch {
+      // Tetap pakai default kalau storage tidak tersedia atau isinya rusak.
+    }
+  },
+  setControls: (patch) => {
+    const controls = normalizeControls({ ...get().controls, ...patch });
+    set({ controls });
+    Preferences.set({ key: CONTROLS_KEY, value: JSON.stringify(controls) }).catch((error: unknown) => console.error('[controls] save', error));
+  },
   setScreen: (screen) => set({ screen }),
   mount: (vehicle) =>
     set((state) => ({
@@ -128,3 +164,5 @@ export const useGameStore = create<GameState>()((set) => ({
   setSoakActive: (soakActive) => set({ soakActive }),
   setSoakResult: (soakResult) => set({ soakResult }),
 }));
+
+if (typeof window !== 'undefined') void useGameStore.getState().loadControls();
