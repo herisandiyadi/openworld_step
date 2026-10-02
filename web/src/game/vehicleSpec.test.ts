@@ -45,6 +45,14 @@ describe('stepDrive', () => {
     expect(Math.sign(forward)).toBe(-Math.sign(backward));
   });
 
+  it('tetap bisa belok tajam saat pelan dan mundur', () => {
+    const slow = stepDrive({ speed: 0.5 }, 0, { x: 1, z: 0 }, DRIVE.car, dt);
+    const cruise = stepDrive({ speed: 3 }, 0, { x: 1, z: 0 }, DRIVE.car, dt);
+    expect(slow).toBeCloseTo(cruise);
+    const reverse = stepDrive({ speed: -0.5 }, 0, { x: 1, z: 0 }, DRIVE.car, dt);
+    expect(reverse).toBeCloseTo(-cruise);
+  });
+
   it('melambat sendiri saat gas dilepas', () => {
     const state = { speed: 3 };
     for (let i = 0; i < 60 * 3; i++) stepDrive(state, 0, { x: 0, z: 0 }, DRIVE.bike, dt);

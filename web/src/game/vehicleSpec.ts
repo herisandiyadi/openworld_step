@@ -40,9 +40,16 @@ export interface DriveSpec {
 export const DRIVE: Record<'skate' | 'bike' | 'moto' | 'car', DriveSpec> = {
   skate: { maxSpeed: 8, reverseSpeed: 1.5, accel: 5, brake: 7, drag: 2.5, turnRadius: 2.2 },
   bike: { maxSpeed: 11, reverseSpeed: 1.5, accel: 5, brake: 8, drag: 2, turnRadius: 2.8 },
-  moto: { maxSpeed: 15, reverseSpeed: 2.5, accel: 8, brake: 12, drag: 3, turnRadius: 4 },
-  car: { maxSpeed: 18, reverseSpeed: 4, accel: 6, brake: 14, drag: 2.5, turnRadius: 6.5 },
+  moto: { maxSpeed: 15, reverseSpeed: 4, accel: 8, brake: 12, drag: 3, turnRadius: 3.2 },
+  car: { maxSpeed: 18, reverseSpeed: 6, accel: 6, brake: 14, drag: 2.5, turnRadius: 5 },
 };
+
+/**
+ * Kecepatan minimum (m/s) yang dipakai untuk menghitung belokan. Tanpa ini, yaw rate
+ * sebanding dengan kecepatan, jadi manuver pelan di gang atau setelah menabrak hampir
+ * tidak membelokkan kendaraan sama sekali.
+ */
+const MIN_TURN_SPEED = 3;
 
 export interface DriveState {
   /** Kecepatan sepanjang arah hadap (m/s); negatif = mundur. */
@@ -69,7 +76,11 @@ export function stepDrive(state: DriveState, heading: number, input: { x: number
   }
 
   // Yaw rate model sepeda: nol saat berhenti, dan terbalik sendiri saat mundur.
-  return heading - (steer * state.speed * dt) / spec.turnRadius;
+  // Di bawah MIN_TURN_SPEED, belokan dihitung seolah kendaraan berjalan di kecepatan itu,
+  // supaya manuver pelan dan mundur tetap responsif.
+  if (state.speed === 0) return heading;
+  const turnSpeed = Math.sign(state.speed) * Math.max(Math.abs(state.speed), MIN_TURN_SPEED);
+  return heading - (steer * turnSpeed * dt) / spec.turnRadius;
 }
 
 /** Clip lengths (s) and the ground speed (m/s) each locomotion clip was authored for. */
