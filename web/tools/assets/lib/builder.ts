@@ -95,6 +95,21 @@ export class MeshBuilder {
     for (const face of faces) this.polygon(face, [0, 0, 0], options);
   }
 
+  /** Prisma dari profil cembung (z, y) berurutan siklis, diekstrusi sepanjang X selebar `width` (bodi kendaraan). */
+  prism(profile: [number, number][], width: number, options: PartOptions): void {
+    const hx = width / 2;
+    const n = profile.length;
+    const inside: Vec3 = [0, profile.reduce((s, p) => s + p[1], 0) / n, profile.reduce((s, p) => s + p[0], 0) / n];
+    const side = (x: number) => profile.map(([z, y]): Vec3 => [x, y, z]);
+    this.polygon(side(hx), inside, options);
+    this.polygon(side(-hx), inside, options);
+    for (let i = 0; i < n; i++) {
+      const [z0, y0] = profile[i] as [number, number];
+      const [z1, y1] = profile[(i + 1) % n] as [number, number];
+      this.polygon([[hx, y0, z0], [hx, y1, z1], [-hx, y1, z1], [-hx, y0, z0]], inside, options);
+    }
+  }
+
   /** Thin box spanning two points (used for frame tubes, poles, arms). */
   bar(from: Vec3, to: Vec3, thickness: number, options: Omit<PartOptions, 'at' | 'rot' | 'quat'>): void {
     const dir = sub(to, from);

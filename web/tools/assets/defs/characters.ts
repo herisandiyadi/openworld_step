@@ -1,4 +1,4 @@
-import { boneIndex, buildCharacterDocument, buildCustomCharacter, BIKE_RIDE, IDLE, RUN, SKATE_RIDE, TALK, WALK } from './humanoid';
+import { boneIndex, buildCharacterDocument, buildCustomCharacter, BIKE_RIDE, IDLE, RUN, SIT, SKATE_RIDE, TALK, WALK } from './humanoid';
 import { PALETTE } from '../lib/palette';
 import type { AssetDef } from './types';
 
@@ -10,7 +10,7 @@ export const characterAssets: AssetDef[] = [
     category: 'hero',
     tags: [...CHARACTER_TAGS, 'player'],
     collider: { type: 'capsule', radius: 0.3, height: 1.75, center: [0, 0.875, 0] },
-    requiredAnimations: ['anim_Idle', 'anim_Walk', 'anim_Run', 'anim_Skate', 'anim_Bike'],
+    requiredAnimations: ['anim_Idle', 'anim_Walk', 'anim_Run', 'anim_Skate', 'anim_Bike', 'anim_Sit'],
     previews: [
       { clip: 'anim_Walk', phase: 0.25 },
       { clip: 'anim_Run', phase: 0.25 },
@@ -35,7 +35,7 @@ export const characterAssets: AssetDef[] = [
             b.box([0.24, 0.1, 0.03], { at: [0, 1.22, 0.255], color: PALETTE.hoodieDark, bone: chest });
           },
         },
-        [IDLE, WALK, RUN, SKATE_RIDE, BIKE_RIDE],
+        [IDLE, WALK, RUN, SKATE_RIDE, BIKE_RIDE, SIT],
       ),
   },
   {
@@ -80,7 +80,7 @@ export const characterAssets: AssetDef[] = [
     category: 'hero',
     tags: [...CHARACTER_TAGS, 'player', 'custom'],
     collider: { type: 'capsule', radius: 0.3, height: 1.75, center: [0, 0.875, 0] },
-    requiredAnimations: ['anim_Idle', 'anim_Walk', 'anim_Run', 'anim_Skate', 'anim_Bike', 'anim_Talk'],
+    requiredAnimations: ['anim_Idle', 'anim_Walk', 'anim_Run', 'anim_Skate', 'anim_Bike', 'anim_Talk', 'anim_Sit'],
     requiredNodes: ['hair', 'shirt_0', 'shirt_1', 'shirt_2', 'pants_0', 'pants_1', 'pants_2', 'face_0', 'face_1', 'face_2'],
     previews: [
       { clip: 'anim_Walk', phase: 0.25 },
@@ -94,7 +94,7 @@ export const characterAssets: AssetDef[] = [
         gender,
         { skin: PALETTE.skin, eye: PALETTE.eye, shoe: PALETTE.shoe, sole: PALETTE.sole },
         { hair: PALETTE.hair, shirt: PALETTE.hoodie, pants: PALETTE.jeans },
-        [IDLE, WALK, RUN, SKATE_RIDE, BIKE_RIDE, TALK],
+        [IDLE, WALK, RUN, SKATE_RIDE, BIKE_RIDE, TALK, SIT],
       ),
   })),
 ];

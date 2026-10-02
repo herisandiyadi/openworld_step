@@ -138,6 +138,8 @@ export interface CharacterPart {
   builder: MeshBuilder;
   /** Slot material; tanpa slot = material palet biasa. */
   slot?: Slot;
+  /** Atribut `_TINT` per vertex (lihat lib/gltf.ts tintRegions). */
+  tint?: number[];
 }
 
 const DOWN: Vec3 = [Math.PI, 0, 0];
@@ -521,6 +523,32 @@ export const TALK: Clip = {
   },
 };
 
+/** Duduk di bangku (C9/C10): panggul turun ke tinggi dudukan 0.45 m, kaki menekuk 80 derajat. */
+export const SIT: Clip = {
+  name: 'anim_Sit',
+  duration: 3,
+  pose: (p) => {
+    const s = Math.sin(TAU * p);
+    return {
+      rot: {
+        upperLeg_R: rx(deg(88)),
+        upperLeg_L: rx(deg(88)),
+        lowerLeg_R: rx(deg(-86)),
+        lowerLeg_L: rx(deg(-86)),
+        spine: rx(deg(-4 + 1.5 * s)),
+        chest: rx(deg(2 * s)),
+        head: [deg(2 * s), deg(5 * Math.sin(TAU * p + 1)), 0],
+        upperArm_R: [deg(18), 0, deg(7)],
+        upperArm_L: [deg(18), 0, deg(-7)],
+        lowerArm_R: rx(deg(35)),
+        lowerArm_L: rx(deg(35)),
+      },
+      // Panggul turun ke tinggi dudukan; telapak kaki tetap menyentuh tanah (y ~ 0).
+      hips: [0, -0.43, 0],
+    };
+  },
+};
+
 const ANIMATION_FPS = 30;
 
 /** Builds a skinned GLB document: joints, inverse bind matrices, mesh, and sampled looping clips. */
@@ -530,6 +558,32 @@ export function buildCharacterDocument(id: string, body: BodySpec, clips: Clip[]
 
 /** Satu node mesh ber-skin per part, semua memakai skin yang sama. Slot material diberi warna bawaan (pratinjau). */
 function buildSkinnedDocument(id: string, parts: CharacterPart[], clips: Clip[], slotColors?: Record<Slot, Rgb>): Document {
+  return buildRigDocument(id, BONES, boneIndex('hips'), parts, clips, slotColors);
+}
+
+export interface RigBone {
+  name: string;
+  parent: number;
+  /** Posisi rest di ruang model (rotasi rest = identitas). */
+  rest: Vec3;
+}
+
+export interface RigClip {
+  name: string;
+  duration: number;
+  /** `hips` = offset translasi untuk tulang `moverIndex`. */
+  pose: (phase: number) => { rot: Partial<Record<string, Vec3>>; hips?: Vec3 };
+}
+
+/** Rig kaku generik (humanoid, hewan): satu joint per vertex, satu skin dipakai semua part. */
+export function buildRigDocument(
+  id: string,
+  bones: RigBone[],
+  moverIndex: number,
+  parts: CharacterPart[],
+  clips: RigClip[],
+  slotColors?: Record<Slot, Rgb>,
+): Document {
   const { doc, material } = createBaseDocument();
   const slotMaterials = new Map<Slot, Material>();
   const materialFor = (slot: Slot | undefined): Material => {
@@ -543,21 +597,21 @@ function buildSkinnedDocument(id: string, parts: CharacterPart[], clips: Clip[],
     return slotMaterial;
   };
 
-  const joints: Node[] = BONES.map((bone) => {
-    const parent = BONES[bone.parent];
+  const joints: Node[] = bones.map((bone) => {
+    const parent = bones[bone.parent];
     const local: Vec3 = parent
       ? [bone.rest[0] - parent.rest[0], bone.rest[1] - parent.rest[1], bone.rest[2] - parent.rest[2]]
       : bone.rest;
     return doc.createNode(`bone_${bone.name}`).setTranslation(local);
   });
-  BONES.forEach((bone, i) => {
+  bones.forEach((bone, i) => {
     const node = joints[i];
     const parent = joints[bone.parent];
     if (node && parent) parent.addChild(node);
   });
 
-  const inverseBind = new Float32Array(BONES.length * 16);
-  BONES.forEach((bone, i) => {
+  const inverseBind = new Float32Array(bones.length * 16);
+  bones.forEach((bone, i) => {
     inverseBind.set([1, 0, 0, 0, 0, 1, 0, 0, 0, 0, 1, 0, -bone.rest[0], -bone.rest[1], -bone.rest[2], 1], i * 16);
   });
   const rootJoint = joints[0];
@@ -568,23 +622,23 @@ function buildSkinnedDocument(id: string, parts: CharacterPart[], clips: Clip[],
   // Skinned mesh nodes and skeleton sit at the scene root (glTF: parent transforms don't affect skinned meshes).
   const scene = doc.createScene(id).addChild(rootJoint);
   for (const part of parts) {
-    const mesh = addMesh(doc, part.name, [{ builder: part.builder, material: materialFor(part.slot) }], true);
+    const mesh = addMesh(doc, part.name, [{ builder: part.builder, material: materialFor(part.slot), tint: part.tint }], true);
     scene.addChild(doc.createNode(part.name).setMesh(mesh).setSkin(skin));
   }
   doc.getRoot().setDefaultScene(scene);
 
-  const hipsIndex = boneIndex('hips');
-  const hipsRest = boneRest('hips');
+  const hipsIndex = moverIndex;
+  const hipsRest = bones[moverIndex]?.rest ?? [0, 0, 0];
   for (const clip of clips) {
     const frames = Math.max(2, Math.round(clip.duration * ANIMATION_FPS));
     const times = new Float32Array(frames + 1);
-    const rotations = BONES.map(() => new Float32Array((frames + 1) * 4));
+    const rotations = bones.map(() => new Float32Array((frames + 1) * 4));
     const hipsTranslation = new Float32Array((frames + 1) * 3);
 
     for (let frame = 0; frame <= frames; frame++) {
       times[frame] = (frame / frames) * clip.duration;
       const pose = clip.pose(frame === frames ? 0 : frame / frames);
-      BONES.forEach((bone, i) => rotations[i]?.set(quatFromEuler(pose.rot[bone.name] ?? [0, 0, 0]), frame * 4));
+      bones.forEach((bone, i) => rotations[i]?.set(quatFromEuler(pose.rot[bone.name] ?? [0, 0, 0]), frame * 4));
       const offset = pose.hips ?? [0, 0, 0];
       hipsTranslation.set([hipsRest[0] + offset[0], hipsRest[1] + offset[1], hipsRest[2] + offset[2]], frame * 3);
     }
@@ -601,7 +655,7 @@ function buildSkinnedDocument(id: string, parts: CharacterPart[], clips: Clip[],
       animation.addSampler(sampler).addChannel(channel);
     };
 
-    BONES.forEach((_, i) => {
+    bones.forEach((_, i) => {
       const node = joints[i];
       const values = rotations[i];
       if (i > 0 && node && values) addTrack(node, 'rotation', values);
