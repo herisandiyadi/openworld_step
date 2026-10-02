@@ -49,7 +49,7 @@ export function ActionButtons() {
       )}
 
       {nearbyNpc && (
-        <button type="button" className="action-button action-skill action-slot-2 action-ask" aria-label="Tanya NPC" onClick={askNearby}>
+        <button type="button" className="action-button action-skill action-slot-2 action-ask" aria-label="Tanya warga" onClick={askNearby}>
           <span className="action-icon" aria-hidden="true">
             ?
           </span>
@@ -60,10 +60,7 @@ export function ActionButtons() {
       {(seated || nearbySeat) && (
         <button
           type="button"
-          className="action-button action-skill action-sit"
-          // Slot ke-4 di kiri slot Tanya, tidak menimpa slot 1-3 (70 px dari .action-skill, >= 48 px).
-          // ponytail: inline karena styles.css di luar cakupan task ini; pindahkan ke .action-slot-4 nanti.
-          style={{ right: 170, bottom: 82, borderColor: '#9be37a' }}
+          className="action-button action-skill action-slot-4 action-sit"
           aria-label={seated ? 'Berdiri dari bangku' : 'Duduk di bangku'}
           onClick={toggleSeat}
         >

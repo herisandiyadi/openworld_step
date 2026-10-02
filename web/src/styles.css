@@ -625,6 +625,16 @@ button:focus-visible {
   border-color: #6fd3ff;
 }
 
+/* Slot ke-4 di kiri slot Tanya, tidak menimpa slot 1-3 (70 px dari .action-skill, >= 48 px). */
+.action-slot-4 {
+  right: 170px;
+  bottom: 82px;
+}
+
+.action-sit {
+  border-color: #9be37a;
+}
+
 .action-icon {
   font-size: 30px;
   line-height: 1;

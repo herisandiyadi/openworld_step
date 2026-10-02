@@ -6,6 +6,7 @@
  */
 import { chunkCoord, districtOf } from '../world/worldSpec';
 import { edgeAt, type LaneGraph } from './laneGraph';
+import type { WalkGraph } from './pedestrianSim';
 
 export const CYCLE_SECONDS = 12;
 export const YELLOW_SECONDS = 2;
@@ -58,4 +59,41 @@ export function signalBlocks(graph: LaneGraph, time: number, edge: number, turn:
   const isec = edgeAt(graph, turn).isec;
   if (isec < 0 || !isSignalised(graph, isec)) return false;
   return lampAt(isec, edgeAxis(graph, edge), time) !== 'green';
+}
+
+/** Jam lampu bersama (detik), ditulis AmbientLayer tiap tick supaya pejalan kaki sefase dengan kendaraan. */
+export const signalClock = { time: 0 };
+
+/**
+ * Gerbang zebra untuk pedestrianSim: `(walkEdge, time) => boolean` benar kalau pejalan boleh masuk.
+ * Lampu pejalan hijau = lampu kendaraan di jalan yang diseberangi merah (kuning masih menahan).
+ * Zebra di persimpangan tak berlampu selalu boleh; di sana pedestrianSim menilai dari kendaraan saja.
+ */
+export function pedestrianGate(graph: LaneGraph, walk: WalkGraph): (edge: number, time: number) => boolean {
+  // Petakan zebra ke persimpangan terdekat (titik tengahnya di dalam kotak persimpangan) sekali saja.
+  const zebra = new Map<number, { isec: number; axis: number }>();
+  const signalised = signalisedIntersections(graph);
+  walk.edges.forEach((edge, index) => {
+    const a = walk.nodes[edge.a];
+    const b = walk.nodes[edge.b];
+    if (!edge.cross || !a || !b) return;
+    const midX = (a.x + b.x) / 2;
+    const midZ = (a.z + b.z) / 2;
+    let best = -1;
+    let bestDistance = edge.length;
+    for (const isec of signalised) {
+      const point = graph.data.intersections[isec];
+      const distance = point ? Math.hypot(point.x - midX, point.z - midZ) : Infinity;
+      if (distance < bestDistance) {
+        bestDistance = distance;
+        best = isec;
+      }
+    }
+    // Zebra searah X menyeberangi jalan utara-selatan (sumbu 1), dan sebaliknya.
+    if (best >= 0) zebra.set(index, { isec: best, axis: Math.abs(b.x - a.x) >= Math.abs(b.z - a.z) ? 1 : 0 });
+  });
+  return (edge, time) => {
+    const signal = zebra.get(edge);
+    return !signal || lampAt(signal.isec, signal.axis, time) === 'red';
+  };
 }

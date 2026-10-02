@@ -17,6 +17,8 @@ import {
   walkEdgeAt,
 } from './pedestrianSim';
 import { inView } from './spawner';
+import { buildLaneGraph } from './laneGraph';
+import { lampAt, pedestrianGate, signalisedIntersections } from './trafficLights';
 
 const data = bakeLanes();
 const graph = buildWalkGraph(data);
@@ -236,5 +238,49 @@ describe('simulasi pejalan kaki', () => {
     const pose = pedPose(graph, ped);
     expect(nearestPed(graph, world, pose.x, pose.z, PED_TALK_DISTANCE)).toBe(ped);
     expect(nearestPed(graph, world, pose.x + 10, pose.z, PED_TALK_DISTANCE)).toBeNull();
+  });
+
+  it('menyeberang di zebra berlampu hanya saat lampu kendaraan yang diseberangi merah', () => {
+    const lanes = buildLaneGraph(data);
+    const gate = pedestrianGate(lanes, graph);
+    const isec = signalisedIntersections(lanes)[0]!;
+    const center = data.intersections[isec]!;
+    // Zebra searah X di persimpangan berlampu ini menyeberangi jalan utara-selatan (sumbu 1).
+    const crossIndex = graph.edges.findIndex((edge) => {
+      const a = graph.nodes[edge.a]!;
+      const b = graph.nodes[edge.b]!;
+      return edge.cross && a.z === b.z && Math.hypot((a.x + b.x) / 2 - center.x, (a.z + b.z) / 2 - center.z) < 12;
+    });
+    expect(crossIndex).toBeGreaterThanOrEqual(0);
+    const greenAt = Array.from({ length: 120 }, (_, i) => i / 10).find((time) => lampAt(isec, 1, time) === 'green')!;
+    const redAt = Array.from({ length: 120 }, (_, i) => i / 10).find((time) => lampAt(isec, 1, time) === 'red')!;
+    expect(gate(crossIndex, greenAt)).toBe(false);
+    expect(gate(crossIndex, redAt)).toBe(true);
+
+    const random = mulberry(9);
+    const ped = createPedestrian(graph, 1, crossIndex, 0, random);
+    ped.state = 'wait';
+    const world = createPedWorld([ped]);
+    world.pedGreen = gate;
+    world.signalTime = greenAt;
+    stepPedestrians(graph, world, 1 / TICK_HZ, random);
+    expect(ped.state).toBe('wait');
+    world.signalTime = redAt;
+    stepPedestrians(graph, world, 1 / TICK_HZ, random);
+    expect(ped.state).toBe('cross');
+  });
+
+  it('zebra di persimpangan tanpa lampu tidak ditahan gerbang lampu', () => {
+    const lanes = buildLaneGraph(data);
+    const gate = pedestrianGate(lanes, graph);
+    const signalised = new Set(signalisedIntersections(lanes));
+    const plain = data.intersections.findIndex((_, isec) => !signalised.has(isec));
+    const center = data.intersections[plain]!;
+    const crossIndex = graph.edges.findIndex((edge) => {
+      const a = graph.nodes[edge.a]!;
+      const b = graph.nodes[edge.b]!;
+      return edge.cross && Math.hypot((a.x + b.x) / 2 - center.x, (a.z + b.z) / 2 - center.z) < 12;
+    });
+    for (let time = 0; time < 12; time += 0.5) expect(gate(crossIndex, time)).toBe(true);
   });
 });
