@@ -69,10 +69,10 @@ Status: `[ ]` belum, `[~]` dikerjakan, `[x]` selesai.
 - [ ] **B3. Simulasi lalu lintas** (1.5 hari): `src/ambient/trafficSim.ts`
   - Posisi 1D per edge, car-following (2 m + 0.8 detik x kecepatan), reservasi persimpangan, 15/5 Hz.
   - Selesai jika: test 10.000 tick tanpa tabrakan atau deadlock lulus.
-- [ ] **B4. Lampu lalu lintas** (1 hari)
+- [ ] **B4. Lampu lalu lintas** (1 hari) — separuh aset selesai: `prop_trafficlight_01` (node `lamp_red/yellow/green`); siklus & berbagi status belum
   - Aset `prop_trafficlight_01`, siklus 12 detik dengan kuning 2 detik di Pusat Kota, emissive diatur shader.
   - Status lampu dibagi ke simulasi mobil dan pejalan kaki.
-- [ ] **B5. Aset kendaraan GLB** (1.5 hari)
+- [x] **B5. Aset kendaraan GLB** (1.5 hari) — GLB selesai; wiring runtime `vehicleModels.tsx` -> GLB oleh lead
   - `veh_car_sedan`, `veh_car_hatch`, `veh_moto`, `veh_bus` dengan roda sebagai node terpisah.
   - Mobil dan motor milik pemain dipindah dari `vehicleModels.tsx` ke GLB.
   - Selesai jika: lolos validator, anggaran segitiga terpenuhi, dan terdaftar di manifest.
@@ -98,11 +98,11 @@ Status: `[ ]` belum, `[~]` dikerjakan, `[x]` selesai.
 - [ ] **C2. Simulasi pejalan kaki** (1.5 hari): `src/ambient/pedestrianSim.ts`
   - Jalan di trotoar, menyeberang saat lampu pejalan hijau, duduk di bangku (memakai reservasi kursi dari C10), menghindari pemain.
   - Selesai jika: test memastikan tidak ada agen di dalam AABB gedung.
-- [ ] **C3. Aset dan animasi warga** (2 hari)
+- [ ] **C3. Aset dan animasi warga** (2 hari) — separuh aset selesai: `ped_citizen` (atribut `_TINT`, 6 varian di meta, klip idle/walk/sit); shader instanced & uji HP belum
   - `ped_citizen` dengan 6 variasi warna lewat atribut instance.
   - Animasi vertex shader prosedural (walk, idle, sit), dan skinned hanya untuk ≤ 4 agen terdekat.
   - Ini task paling berisiko, jadi prototipe dulu performanya di HP.
-- [ ] **C4. Aset hewan** (1.5 hari)
+- [x] **C4. Aset hewan** (1.5 hari)
   - `animal_cat`, `animal_dog`, dan `bird_pigeon` dengan vertex anim (walk, run, sit, sniff, peck, fly).
 - [ ] **C5. Simulasi hewan** (1.25 hari): `src/ambient/animalSim.ts`
   - State machine, berkeliaran di navmesh dalam radius 10-20 m, reaksi kucing kabur (3 m), merpati terbang (5 m),
@@ -119,7 +119,7 @@ Status: `[ ]` belum, `[~]` dikerjakan, `[x]` selesai.
   - Warga berhenti dan menghadap pemain, tidak di-despawn selama chat, lalu lanjut beraktivitas.
   - Riwayat per warga masuk save game (10 giliran, maks 30 warga, LRU) dan statistik "warga diajak ngobrol" di HUD.
   - Selesai jika: test save/load riwayat warga lulus, dan chat streaming ke `cbai` berjalan di HP.
-- [ ] **C9. Bangku pinggir jalan dan titik duduk** (1 hari)
+- [ ] **C9. Bangku pinggir jalan dan titik duduk** (1 hari) — separuh aset selesai: `prop_bench_02` (108 segitiga, collider kotak, titik duduk di meta); generator & chunk belum
   - Aset `prop_bench_02` (≤ 300 segitiga, sandaran, collider kotak) lewat `npm run assets`.
   - Generator: penempatan di cincin trotoar (Pusat Kota 2 per sisi blok, Perumahan 1, Industri dekat halte),
     jarak ≥ 1.5 m dari lampu/tempat sampah/halte, tidak di 6 m terakhir sebelum persimpangan.

@@ -1,7 +1,18 @@
 import type { Document } from '@gltf-transform/core';
 import type { BoxCollider } from '../../../src/world/propSpec';
 
-export type Category = 'hero' | 'npc' | 'vehicle_small' | 'vehicle_bike' | 'prop_small' | 'tree' | 'structure';
+export type Category =
+  | 'hero'
+  | 'npc'
+  | 'vehicle_small'
+  | 'vehicle_bike'
+  | 'vehicle_car'
+  | 'vehicle_bus'
+  | 'animal'
+  | 'prop_small'
+  | 'prop_lit'
+  | 'tree'
+  | 'structure';
 
 export interface CapsuleCollider {
   type: 'capsule';
