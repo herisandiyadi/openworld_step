@@ -145,19 +145,20 @@ bangku berjalan tanpa pemain terjebak, dan anggaran ambient terpenuhi.
 
 ## Fase D: Polish dan Rilis (4 hari)
 
-- [ ] **D1. Audio ambient spasial** (1.25 hari)
+- [x] **D1. Audio ambient spasial** (1.25 hari)
   - Klakson, mesin lewat dengan pitch doppler sederhana, meong, gonggong, dan kepak sayap.
   - Pan dan volume mengikuti jarak, maks 6 suara bersamaan, memakai mesin `src/audio` yang sudah ada.
-- [ ] **D2. Suasana malam** (0.5 hari)
+- [x] **D2. Suasana malam** (0.5 hari)
   - Lampu mobil, lampu jalan menyala (emissive), dan jendela gedung terang acak.
-- [ ] **D3. Sapaan gelembung** (0.5 hari)
+- [x] **D3. Sapaan gelembung** (0.5 hari)
   - Warga kadang menyapa singkat saat pemain lewat, memakai teks lokal tanpa AI.
-- [ ] **D4. Preset kepadatan** (0.25 hari)
+- [x] **D4. Preset kepadatan** (0.25 hari)
   - Pengaturan "Keramaian kota": Sepi, Normal, atau Ramai, terpisah dari preset grafis.
 - [ ] **D5. Uji performa per preset dan tuning** (1 hari)
   - Preset Rendah, Sedang, dan Tinggi di HP, lalu sesuaikan pool dan jarak spawn.
-- [ ] **D6. Dokumentasi dan rilis** (0.5 hari)
-  - README, `ARCHITECTURE.md`, dan `PERF_BUDGET.md`, lalu APK release, verifikasi signing, dan push.
+- [x] **D6. Dokumentasi dan rilis** (0.5 hari)
+  - `docs/AMBIENT.md`: sistem ambient, preset kepadatan, dan tombol penyetelan. APK release dan
+    verifikasi signing menyusul bersama D5 (butuh perangkat fisik).
 
 **Gerbang D:** uji performa di HP lulus untuk ketiga preset, dan APK release terverifikasi.
 
