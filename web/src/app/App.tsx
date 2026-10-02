@@ -18,12 +18,15 @@ import { SOAK_FROM_URL, SoakTest } from './SoakTest';
 import { Hud } from '../ui/Hud';
 import { TitleScreen } from '../ui/TitleScreen';
 import { SettingsScreen } from '../ui/SettingsScreen';
+import { ProfileScreen } from '../ui/ProfileScreen';
+import { usePlayerProfile } from '../state/profile';
 import { useAiSettings } from '../state/aiSettings';
 import { QUALITY_PRESETS, type Quality, useGameStore } from '../state/gameStore';
 
 const SKY_COLOR = '#bcd3e6';
 preloadAssets();
 void useAiSettings.getState().load();
+void usePlayerProfile.getState().load();
 installAudio();
 if (SOAK_FROM_URL) useGameStore.setState({ screen: 'game', soakActive: true });
 
@@ -31,6 +34,21 @@ const DOWNGRADE: Record<Quality, Quality> = { high: 'medium', medium: 'low', low
 
 export function App() {
   const screen = useGameStore((state) => state.screen);
+  const profileLoaded = usePlayerProfile((state) => state.loaded);
+  const hasProfile = usePlayerProfile((state) => state.profile !== null);
+  // ?soak goes straight to the game; everyone else picks a username once after install.
+  if (screen === 'game') return <Game />;
+  if (!profileLoaded) {
+    return (
+      <main className="menu-screen">
+        <p className="menu-status" role="status">
+          Memuat...
+        </p>
+      </main>
+    );
+  }
+  if (!hasProfile) return <ProfileScreen firstRun />;
+  if (screen === 'profile') return <ProfileScreen />;
   if (screen === 'title') return <TitleScreen />;
   if (screen === 'settings') return <SettingsScreen />;
   return <Game />;

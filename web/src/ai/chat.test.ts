@@ -14,6 +14,13 @@ describe('npc chat', () => {
     expect(messages.at(-1)?.content).toBe('m29');
   });
 
+  it('tells the NPC the player name', () => {
+    const [system] = buildMessages('npc_sari', 'Bu Sari', [], 'Andi');
+    expect(system?.content).toContain('"Andi"');
+    expect(system?.content).toContain('Kak Andi');
+    expect(buildMessages('npc_sari', 'Bu Sari', [])[0]?.content).not.toContain('Pemain yang');
+  });
+
   it('extracts content and strips think blocks', () => {
     expect(extractReply({ choices: [{ message: { content: '<think>x</think> Halo!' } }] })).toBe('Halo!');
     expect(extractReply({})).toBe('');

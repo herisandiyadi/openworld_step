@@ -5,7 +5,7 @@ import { INITIAL_VEHICLES, type ParkedVehicle, type VehicleKind } from '../game/
 /** 'walk' is the default; every other mode needs a parked vehicle next to the player. */
 export type MoveMode = 'walk' | VehicleKind;
 export type Quality = 'low' | 'medium' | 'high';
-export type Screen = 'title' | 'settings' | 'game';
+export type Screen = 'title' | 'settings' | 'profile' | 'game';
 
 export interface RenderStats {
   fps: number;

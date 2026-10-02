@@ -1,6 +1,7 @@
 import { type FormEvent, useEffect, useId, useRef, useState } from 'react';
 import { buildMessages, type ChatMessage, streamChat } from '../ai/chat';
 import { useAiSettings } from '../state/aiSettings';
+import { usePlayerProfile } from '../state/profile';
 import { useGameStore } from '../state/gameStore';
 import { worldState } from '../world/worldState';
 import { audio } from '../audio/audioEngine';
@@ -15,6 +16,7 @@ export function NpcChat() {
   const setChatNpcId = useGameStore((state) => state.setChatNpcId);
   const addMet = useGameStore((state) => state.addMet);
   const settings = useAiSettings((state) => state.settings);
+  const username = usePlayerProfile((state) => state.profile?.username);
   const npc = worldState.index?.npcs.find((item) => item.id === npcId);
   const [messages, setMessages] = useState<ChatMessage[]>(() => (npcId ? (histories.get(npcId) ?? []) : []));
   const [partial, setPartial] = useState<string | null>(null);
@@ -57,7 +59,7 @@ export function NpcChat() {
     const controller = new AbortController();
     abortRef.current = controller;
     try {
-      const reply = await streamChat(settings, buildMessages(npcId, npc.name, next), setPartial, controller.signal);
+      const reply = await streamChat(settings, buildMessages(npcId, npc.name, next, username), setPartial, controller.signal);
       const withReply: ChatMessage[] = [...next, { role: 'assistant', content: reply }];
       histories.set(npcId, withReply);
       setMessages(withReply);
@@ -84,7 +86,11 @@ export function NpcChat() {
           </button>
         </div>
         <div ref={logRef} className="chat-log" aria-live="polite">
-          {messages.length === 0 && <p className="chat-hint">Tanyakan apa saja seputar kota ke {npc.name}.</p>}
+          {messages.length === 0 && (
+            <p className="chat-hint">
+              {username ? `Halo, Kak ${username}! ` : ''}Tanyakan apa saja seputar kota ke {npc.name}.
+            </p>
+          )}
           {messages.map((message, index) => (
             <p key={index} className={`chat-bubble ${message.role}`}>
               {message.content}

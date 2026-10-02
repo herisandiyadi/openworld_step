@@ -29,9 +29,19 @@ const RULES =
 /** Last N turns sent to the model to keep requests small. */
 export const HISTORY_TURNS = 10;
 
-export function buildMessages(npcId: string, npcName: string, history: readonly ChatMessage[]): ChatMessage[] {
+/**
+ * The username is validated (letters, digits, space . _ -; max 20) before it is stored, so it cannot
+ * carry quotes or instructions into the system prompt.
+ */
+function playerLine(playerName: string | undefined): string {
+  if (!playerName) return '';
+  return `Pemain yang sedang berbicara denganmu bernama "${playerName}". Panggil dia dengan namanya (boleh dengan sapaan sopan seperti "Kak ${playerName}"), terutama saat menyapa.`;
+}
+
+export function buildMessages(npcId: string, npcName: string, history: readonly ChatMessage[], playerName?: string): ChatMessage[] {
   const persona = NPC_PERSONAS[npcId] ?? `Kamu adalah ${npcName}, warga Openworld City.`;
-  return [{ role: 'system', content: `${persona} ${WORLD_FACTS} ${RULES}` }, ...history.slice(-HISTORY_TURNS * 2)];
+  const system = [persona, WORLD_FACTS, playerLine(playerName), RULES].filter(Boolean).join(' ');
+  return [{ role: 'system', content: system }, ...history.slice(-HISTORY_TURNS * 2)];
 }
 
 /** Reads the assistant text out of a non-streamed OpenAI-compatible chat completion response. */

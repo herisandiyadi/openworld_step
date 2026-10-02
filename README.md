@@ -15,6 +15,8 @@ Godot lama dan tidak dipakai lagi.
 - Tombol aksi kanan bawah: Lompat (selalu ada), lalu Naik/Turun, Tanya, dan Bus yang muncul sesuai konteks.
 - Defaultnya jalan kaki. Skateboard, sepeda, motor, dan mobil bisa dipakai kalau ada di dekat pemain.
 - Halte bus untuk fast travel ke lima area kota.
+- Username diminta sekali setelah install dan disimpan di database SQLite perangkat (`openworld.db`, plugin native `PlayerDbPlugin`).
+  NPC memanggil pemain dengan nama itu. Bisa diganti lewat "Ganti nama" di menu awal.
 - Chat teks bebas dengan 5 NPC yang punya persona masing-masing. Balasan di-stream (SSE).
 - Quest "kenalan dengan warga", fog of war di minimap dan peta besar, serta siklus siang-malam.
 - Save/load otomatis (posisi, kendaraan, quest, area terjelajahi, jam) via Capacitor Preferences.
