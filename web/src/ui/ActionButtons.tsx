@@ -1,4 +1,4 @@
-import { askNearby, jump, openBus, toggleVehicle } from '../game/actions';
+import { askNearby, jump, openBus, toggleSeat, toggleVehicle } from '../game/actions';
 import { VEHICLE_LABELS } from '../game/vehicles';
 import { useGameStore } from '../state/gameStore';
 
@@ -12,8 +12,11 @@ export function ActionButtons() {
   const nearbyNpc = useGameStore((state) => state.nearby.npcId);
   const nearbyBus = useGameStore((state) => state.nearby.busStopId);
   const nearbyVehicle = useGameStore((state) => state.vehicles.find((item) => item.id === state.nearby.vehicleId) ?? null);
+  const nearbySeat = useGameStore((state) => state.nearby.seatId);
+  const seated = useGameStore((state) => state.seated);
   const canJump = mode !== 'car';
-  const useLabel = riding ? `Turun dari ${VEHICLE_LABELS[riding.kind]}` : nearbyVehicle ? `Naik ${VEHICLE_LABELS[nearbyVehicle.kind]}` : null;
+  // Naik/Turun kendaraan disembunyikan selama duduk.
+  const useLabel = seated ? null : riding ? `Turun dari ${VEHICLE_LABELS[riding.kind]}` : nearbyVehicle ? `Naik ${VEHICLE_LABELS[nearbyVehicle.kind]}` : null;
 
   return (
     <div className="action-cluster" role="group" aria-label="Aksi">
@@ -51,6 +54,23 @@ export function ActionButtons() {
             ?
           </span>
           <span className="action-text">Tanya</span>
+        </button>
+      )}
+
+      {(seated || nearbySeat) && (
+        <button
+          type="button"
+          className="action-button action-skill action-sit"
+          // Slot ke-4 di kiri slot Tanya, tidak menimpa slot 1-3 (70 px dari .action-skill, >= 48 px).
+          // ponytail: inline karena styles.css di luar cakupan task ini; pindahkan ke .action-slot-4 nanti.
+          style={{ right: 170, bottom: 82, borderColor: '#9be37a' }}
+          aria-label={seated ? 'Berdiri dari bangku' : 'Duduk di bangku'}
+          onClick={toggleSeat}
+        >
+          <span className="action-icon" aria-hidden="true">
+            {seated ? '⇧' : '⇲'}
+          </span>
+          <span className="action-text">{seated ? 'Berdiri' : 'Duduk'}</span>
         </button>
       )}
 

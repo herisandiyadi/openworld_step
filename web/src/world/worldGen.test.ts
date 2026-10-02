@@ -1,15 +1,20 @@
 import { describe, expect, it } from 'vitest';
 import type { Aabb } from '../game/movement';
+import { BENCH_IDS, SEAT_HEIGHT } from './propSpec';
 import { buildTerrainBuffers } from './terrainMesh';
 import { generateWorld } from './worldGen';
 import {
+  BLOCK_PITCH,
   chunkGroundHeight,
   chunkCoord,
   chunkOrigin,
   GRID_CELLS,
   GRID_VERTS,
+  HALF_WORLD,
   propCollider,
+  ROAD_WIDTH,
   sampleChunkHeight,
+  SIDEWALK_WIDTH,
   SURFACE,
   surfaceAt,
   WORLD_CHUNKS,
@@ -87,6 +92,80 @@ describe('generateWorld', () => {
     for (let j = 0; j < GRID_VERTS; j++) {
       expect(left.heights[j * GRID_VERTS + GRID_VERTS - 1]).toBe(right.heights[j * GRID_VERTS]);
     }
+  });
+});
+
+describe('bangku dan titik duduk', () => {
+  const props = world.chunks.flatMap((chunk) => chunk.props);
+  const benches = props.filter((prop) => BENCH_IDS.includes(prop.id));
+  const local = (value: number) => (((value + HALF_WORLD) % BLOCK_PITCH) + BLOCK_PITCH) % BLOCK_PITCH;
+  const HALF_ROAD = ROAD_WIDTH / 2;
+  const onSidewalk = (value: number) => {
+    const l = local(value);
+    return (l > HALF_ROAD && l < HALF_ROAD + SIDEWALK_WIDTH) || (l > BLOCK_PITCH - HALF_ROAD - SIDEWALK_WIDTH && l < BLOCK_PITCH - HALF_ROAD);
+  };
+  const street = benches.filter((bench) => onSidewalk(bench.x) || onSidewalk(bench.z));
+
+  it('menaruh bangku pinggir jalan di ketiga kawasan', () => {
+    const districts = new Set(world.chunks.filter((chunk) => chunk.props.some((prop) => street.includes(prop))).map((chunk) => chunk.district));
+    expect(districts).toEqual(new Set(['downtown', 'residential', 'industrial']));
+  });
+
+  it('menyisakan trotoar >= 1.4 m dan tidak di 6 m terakhir sebelum persimpangan', () => {
+    for (const bench of street) {
+      const box = propCollider(bench);
+      const acrossX = onSidewalk(bench.x);
+      const depth = acrossX ? box.maxX - box.minX : box.maxZ - box.minZ;
+      expect(SIDEWALK_WIDTH - depth).toBeGreaterThanOrEqual(1.4 - 1e-6);
+      const [min, max] = acrossX ? [box.minZ, box.maxZ] : [box.minX, box.maxX];
+      // 6 m diukur dari tepi jalan yang memotong (awal blok).
+      const blockStart = HALF_ROAD;
+      expect(local(min)).toBeGreaterThanOrEqual(blockStart + 6 - 1e-6);
+      expect(local(max)).toBeLessThanOrEqual(BLOCK_PITCH - blockStart - 6 + 1e-6);
+    }
+  });
+
+  it('bangku tidak tumpang tindih dengan prop lain dan berjarak 1.5 m dari lampu/tempat sampah/halte', () => {
+    // Prop di-indeks per sel 8 m supaya pemeriksaan tidak O(n^2) untuk ~20 ribu prop.
+    const CELL = 8;
+    const key = (x: number, z: number) => `${Math.floor(x / CELL)}_${Math.floor(z / CELL)}`;
+    const grid = new Map<string, { prop: (typeof props)[number]; box: Aabb }[]>();
+    for (const prop of props) {
+      const entry = { prop, box: propCollider(prop) };
+      for (let dz = -1; dz <= 1; dz++) {
+        for (let dx = -1; dx <= 1; dx++) {
+          const cell = key(prop.x + dx * CELL, prop.z + dz * CELL);
+          const list = grid.get(cell);
+          if (list) list.push(entry);
+          else grid.set(cell, [entry]);
+        }
+      }
+    }
+    const furniture = ['prop_streetlamp_01', 'prop_trashbin_01', 'prop_busstop_01'];
+    for (const bench of street) {
+      const box = propCollider(bench);
+      for (const { prop: other, box: otherBox } of grid.get(key(bench.x, bench.z)) ?? []) {
+        if (other === bench) continue;
+        expect(overlaps(box, otherBox)).toBe(false);
+        if (furniture.includes(other.id)) {
+          const gap = Math.max(otherBox.minX - box.maxX, box.minX - otherBox.maxX, otherBox.minZ - box.maxZ, box.minZ - otherBox.maxZ);
+          expect(gap).toBeGreaterThanOrEqual(1.5 - 1e-6);
+        }
+      }
+    }
+  });
+
+  it('membake 2 titik duduk per bangku di luar collider gedung, tinggi 0.45 m', () => {
+    for (const chunk of world.chunks) {
+      expect(chunk.seats).toHaveLength(chunk.props.filter((prop) => BENCH_IDS.includes(prop.id)).length * 2);
+      for (const seat of chunk.seats) {
+        expect(allBuildings.some((b) => seat.x > b.minX && seat.x < b.maxX && seat.z > b.minZ && seat.z < b.maxZ)).toBe(false);
+        expect(seat.y).toBeCloseTo(chunkGroundHeight(chunk, seat.x, seat.z) + SEAT_HEIGHT, 1);
+      }
+    }
+    const ids = world.chunks.flatMap((chunk) => chunk.seats.map((seat) => seat.id));
+    expect(new Set(ids).size).toBe(ids.length);
+    expect(world.index.seats).toHaveLength(ids.length);
   });
 });
 

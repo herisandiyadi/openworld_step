@@ -5,7 +5,7 @@ import { PROP_COLLIDERS, type PropId } from './propSpec';
  * Data contract shared by the offline world generator (tools/world) and the runtime streamer.
  * Units: metres, +Y up. The world is a square grid of chunks centred on the origin.
  */
-export const WORLD_DATA_VERSION = 1;
+export const WORLD_DATA_VERSION = 2;
 export const CHUNK_SIZE = 64;
 export const WORLD_CHUNKS = 8;
 export const WORLD_SIZE = CHUNK_SIZE * WORLD_CHUNKS;
@@ -70,6 +70,16 @@ export interface NpcSpawn {
   yaw: number;
 }
 
+/** Titik duduk bangku (dibake oleh worldGen). yaw = arah hadap karakter yang duduk, konvensi sama dengan heading. */
+export interface SeatPoint {
+  id: string;
+  x: number;
+  /** Tinggi dudukan (tanah + 0.45 m). */
+  y: number;
+  z: number;
+  yaw: number;
+}
+
 /** Fast-travel stop (a bus shelter); the player is placed at (x, z). */
 export interface BusStop {
   id: string;
@@ -92,6 +102,8 @@ export interface ChunkData {
   props: PropPlacement[];
   /** Collision footprints (buildings, props, NPCs); visual meshes are never used for collision. */
   colliders: Aabb[];
+  /** Titik duduk semua bangku di chunk ini (sejak versi 2). */
+  seats: SeatPoint[];
 }
 
 export interface ChunkEntry {
@@ -110,6 +122,11 @@ export interface WorldIndex {
   spawn: { x: number; z: number };
   npcs: NpcSpawn[];
   busStops: BusStop[];
+  /**
+   * Salinan datar titik duduk semua chunk untuk Proximity (index sudah dimuat di worldState).
+   * ponytail: chunkWorker belum meneruskan `ChunkData.seats`; pindahkan ke ChunkRecord kalau index jadi terlalu besar.
+   */
+  seats: SeatPoint[];
   chunks: ChunkEntry[];
   navmesh: string;
   map: { file: string; pixelsPerMeter: number };

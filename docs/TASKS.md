@@ -119,7 +119,7 @@ Status: `[ ]` belum, `[~]` dikerjakan, `[x]` selesai.
   - Warga berhenti dan menghadap pemain, tidak di-despawn selama chat, lalu lanjut beraktivitas.
   - Riwayat per warga masuk save game (10 giliran, maks 30 warga, LRU) dan statistik "warga diajak ngobrol" di HUD.
   - Selesai jika: test save/load riwayat warga lulus, dan chat streaming ke `cbai` berjalan di HP.
-- [ ] **C9. Bangku pinggir jalan dan titik duduk** (1 hari)
+- [~] **C9. Bangku pinggir jalan dan titik duduk** (1 hari) — penempatan generator + titik duduk selesai; aset `prop_bench_02` dikerjakan agen lain
   - Aset `prop_bench_02` (≤ 300 segitiga, sandaran, collider kotak) lewat `npm run assets`.
   - Generator: penempatan di cincin trotoar (Pusat Kota 2 per sisi blok, Perumahan 1, Industri dekat halte),
     jarak ≥ 1.5 m dari lampu/tempat sampah/halte, tidak di 6 m terakhir sebelum persimpangan.
@@ -127,7 +127,7 @@ Status: `[ ]` belum, `[~]` dikerjakan, `[x]` selesai.
     JSON. `WORLD_DATA_VERSION` naik.
   - Selesai jika: test memastikan sisa lebar trotoar ≥ 1.4 m, bangku tidak tumpang tindih dengan prop lain, dan
     semua titik duduk di luar collider gedung.
-- [ ] **C10. Duduk di bangku** (1 hari): `src/game/seating.ts`
+- [x] **C10. Duduk di bangku** (1 hari): `src/game/seating.ts` — uji di HP belum
   - Cari kursi kosong terdekat ≤ 1.5 m, reservasi kursi untuk pemain dan warga, posisi duduk dan berdiri
     (0.7 m di depan, coba kiri/kanan jika terhalang).
   - `nearby.seatId` di `Proximity`, hanya saat jalan kaki dan tidak di udara.

@@ -38,6 +38,8 @@ export function useCharacter(id: AssetId) {
 /** Cross-fades between looping clips. */
 export class ClipPlayer {
   private current: AnimationAction | null = null;
+  /** Diset Hero supaya transisi keluar dari klip duduk juga 0.4 detik. */
+  wasSitting = false;
 
   play(action: AnimationAction, fadeSeconds = 0.2): void {
     if (action === this.current) return;
