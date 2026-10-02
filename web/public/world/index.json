@@ -1,0 +1,823 @@
+{
+  "version": 1,
+  "chunkSize": 64,
+  "worldChunks": 8,
+  "gridStep": 2,
+  "spawn": {
+    "x": 0,
+    "z": 0
+  },
+  "npcs": [
+    {
+      "id": "npc_budi",
+      "asset": "npc_vendor",
+      "name": "Pak Budi",
+      "x": 5,
+      "z": 10,
+      "yaw": 1.5707963267948966
+    },
+    {
+      "id": "npc_sari",
+      "asset": "npc_vendor",
+      "name": "Bu Sari",
+      "x": -187,
+      "z": -170,
+      "yaw": 1.5707963267948966
+    },
+    {
+      "id": "npc_rina",
+      "asset": "npc_vendor",
+      "name": "Mbak Rina",
+      "x": 69,
+      "z": -54,
+      "yaw": 1.5707963267948966
+    },
+    {
+      "id": "npc_dewi",
+      "asset": "npc_vendor",
+      "name": "Bu Dewi",
+      "x": -123,
+      "z": 74,
+      "yaw": 1.5707963267948966
+    },
+    {
+      "id": "npc_joko",
+      "asset": "npc_vendor",
+      "name": "Mas Joko",
+      "x": 165,
+      "z": 138,
+      "yaw": 1.5707963267948966
+    }
+  ],
+  "busStops": [
+    {
+      "id": "bus_0",
+      "district": "residential",
+      "x": -240,
+      "z": -253.2
+    },
+    {
+      "id": "bus_1",
+      "district": "residential",
+      "x": -80,
+      "z": -253.2
+    },
+    {
+      "id": "bus_2",
+      "district": "residential",
+      "x": 80,
+      "z": -253.2
+    },
+    {
+      "id": "bus_3",
+      "district": "industrial",
+      "x": 144,
+      "z": -253.2
+    },
+    {
+      "id": "bus_4",
+      "district": "residential",
+      "x": -112,
+      "z": -221.2
+    },
+    {
+      "id": "bus_5",
+      "district": "residential",
+      "x": 48,
+      "z": -221.2
+    },
+    {
+      "id": "bus_6",
+      "district": "industrial",
+      "x": 240,
+      "z": -221.2
+    },
+    {
+      "id": "bus_7",
+      "district": "residential",
+      "x": -144,
+      "z": -189.2
+    },
+    {
+      "id": "bus_8",
+      "district": "residential",
+      "x": 16,
+      "z": -189.2
+    },
+    {
+      "id": "bus_9",
+      "district": "industrial",
+      "x": 208,
+      "z": -189.2
+    },
+    {
+      "id": "bus_10",
+      "district": "residential",
+      "x": -176,
+      "z": -157.2
+    },
+    {
+      "id": "bus_11",
+      "district": "residential",
+      "x": -16,
+      "z": -157.2
+    },
+    {
+      "id": "bus_12",
+      "district": "industrial",
+      "x": 176,
+      "z": -157.2
+    },
+    {
+      "id": "bus_13",
+      "district": "residential",
+      "x": -208,
+      "z": -125.2
+    },
+    {
+      "id": "bus_14",
+      "district": "downtown",
+      "x": -80,
+      "z": -125.2
+    },
+    {
+      "id": "bus_15",
+      "district": "downtown",
+      "x": 16,
+      "z": -125.2
+    },
+    {
+      "id": "bus_16",
+      "district": "downtown",
+      "x": 112,
+      "z": -125.2
+    },
+    {
+      "id": "bus_17",
+      "district": "industrial",
+      "x": 144,
+      "z": -125.2
+    },
+    {
+      "id": "bus_18",
+      "district": "residential",
+      "x": -240,
+      "z": -93.2
+    },
+    {
+      "id": "bus_19",
+      "district": "downtown",
+      "x": -112,
+      "z": -93.2
+    },
+    {
+      "id": "bus_20",
+      "district": "downtown",
+      "x": -16,
+      "z": -93.2
+    },
+    {
+      "id": "bus_21",
+      "district": "downtown",
+      "x": 80,
+      "z": -93.2
+    },
+    {
+      "id": "bus_22",
+      "district": "industrial",
+      "x": 240,
+      "z": -93.2
+    },
+    {
+      "id": "bus_23",
+      "district": "downtown",
+      "x": -48,
+      "z": -61.2
+    },
+    {
+      "id": "bus_24",
+      "district": "downtown",
+      "x": 48,
+      "z": -61.2
+    },
+    {
+      "id": "bus_25",
+      "district": "industrial",
+      "x": 208,
+      "z": -61.2
+    },
+    {
+      "id": "bus_26",
+      "district": "residential",
+      "x": -144,
+      "z": -29.2
+    },
+    {
+      "id": "bus_27",
+      "district": "downtown",
+      "x": -80,
+      "z": -29.2
+    },
+    {
+      "id": "bus_28",
+      "district": "downtown",
+      "x": 16,
+      "z": -29.2
+    },
+    {
+      "id": "bus_29",
+      "district": "downtown",
+      "x": 112,
+      "z": -29.2
+    },
+    {
+      "id": "bus_30",
+      "district": "industrial",
+      "x": 176,
+      "z": -29.2
+    },
+    {
+      "id": "bus_31",
+      "district": "residential",
+      "x": -176,
+      "z": 2.8
+    },
+    {
+      "id": "bus_32",
+      "district": "downtown",
+      "x": -112,
+      "z": 2.8
+    },
+    {
+      "id": "bus_33",
+      "district": "downtown",
+      "x": -16,
+      "z": 2.8
+    },
+    {
+      "id": "bus_34",
+      "district": "downtown",
+      "x": 80,
+      "z": 2.8
+    },
+    {
+      "id": "bus_35",
+      "district": "industrial",
+      "x": 144,
+      "z": 2.8
+    },
+    {
+      "id": "bus_36",
+      "district": "residential",
+      "x": -208,
+      "z": 34.8
+    },
+    {
+      "id": "bus_37",
+      "district": "downtown",
+      "x": -48,
+      "z": 34.8
+    },
+    {
+      "id": "bus_38",
+      "district": "downtown",
+      "x": 48,
+      "z": 34.8
+    },
+    {
+      "id": "bus_39",
+      "district": "industrial",
+      "x": 240,
+      "z": 34.8
+    },
+    {
+      "id": "bus_40",
+      "district": "residential",
+      "x": -240,
+      "z": 66.8
+    },
+    {
+      "id": "bus_41",
+      "district": "downtown",
+      "x": -80,
+      "z": 66.8
+    },
+    {
+      "id": "bus_42",
+      "district": "downtown",
+      "x": 16,
+      "z": 66.8
+    },
+    {
+      "id": "bus_43",
+      "district": "downtown",
+      "x": 112,
+      "z": 66.8
+    },
+    {
+      "id": "bus_44",
+      "district": "industrial",
+      "x": 208,
+      "z": 66.8
+    },
+    {
+      "id": "bus_45",
+      "district": "downtown",
+      "x": -112,
+      "z": 98.8
+    },
+    {
+      "id": "bus_46",
+      "district": "downtown",
+      "x": -16,
+      "z": 98.8
+    },
+    {
+      "id": "bus_47",
+      "district": "downtown",
+      "x": 80,
+      "z": 98.8
+    },
+    {
+      "id": "bus_48",
+      "district": "industrial",
+      "x": 176,
+      "z": 98.8
+    },
+    {
+      "id": "bus_49",
+      "district": "residential",
+      "x": -144,
+      "z": 130.8
+    },
+    {
+      "id": "bus_50",
+      "district": "residential",
+      "x": 16,
+      "z": 130.8
+    },
+    {
+      "id": "bus_51",
+      "district": "industrial",
+      "x": 144,
+      "z": 130.8
+    },
+    {
+      "id": "bus_52",
+      "district": "residential",
+      "x": -176,
+      "z": 162.8
+    },
+    {
+      "id": "bus_53",
+      "district": "residential",
+      "x": -16,
+      "z": 162.8
+    },
+    {
+      "id": "bus_54",
+      "district": "industrial",
+      "x": 240,
+      "z": 162.8
+    },
+    {
+      "id": "bus_55",
+      "district": "residential",
+      "x": -208,
+      "z": 194.8
+    },
+    {
+      "id": "bus_56",
+      "district": "residential",
+      "x": -48,
+      "z": 194.8
+    },
+    {
+      "id": "bus_57",
+      "district": "residential",
+      "x": 112,
+      "z": 194.8
+    },
+    {
+      "id": "bus_58",
+      "district": "industrial",
+      "x": 208,
+      "z": 194.8
+    },
+    {
+      "id": "bus_59",
+      "district": "residential",
+      "x": -240,
+      "z": 226.8
+    },
+    {
+      "id": "bus_60",
+      "district": "residential",
+      "x": -80,
+      "z": 226.8
+    },
+    {
+      "id": "bus_61",
+      "district": "residential",
+      "x": 80,
+      "z": 226.8
+    },
+    {
+      "id": "bus_62",
+      "district": "industrial",
+      "x": 176,
+      "z": 226.8
+    }
+  ],
+  "chunks": [
+    {
+      "cx": 0,
+      "cz": 0,
+      "district": "residential",
+      "file": "chunks/0_0.json"
+    },
+    {
+      "cx": 1,
+      "cz": 0,
+      "district": "residential",
+      "file": "chunks/1_0.json"
+    },
+    {
+      "cx": 2,
+      "cz": 0,
+      "district": "residential",
+      "file": "chunks/2_0.json"
+    },
+    {
+      "cx": 3,
+      "cz": 0,
+      "district": "residential",
+      "file": "chunks/3_0.json"
+    },
+    {
+      "cx": 4,
+      "cz": 0,
+      "district": "residential",
+      "file": "chunks/4_0.json"
+    },
+    {
+      "cx": 5,
+      "cz": 0,
+      "district": "residential",
+      "file": "chunks/5_0.json"
+    },
+    {
+      "cx": 6,
+      "cz": 0,
+      "district": "industrial",
+      "file": "chunks/6_0.json"
+    },
+    {
+      "cx": 7,
+      "cz": 0,
+      "district": "industrial",
+      "file": "chunks/7_0.json"
+    },
+    {
+      "cx": 0,
+      "cz": 1,
+      "district": "residential",
+      "file": "chunks/0_1.json"
+    },
+    {
+      "cx": 1,
+      "cz": 1,
+      "district": "residential",
+      "file": "chunks/1_1.json"
+    },
+    {
+      "cx": 2,
+      "cz": 1,
+      "district": "residential",
+      "file": "chunks/2_1.json"
+    },
+    {
+      "cx": 3,
+      "cz": 1,
+      "district": "residential",
+      "file": "chunks/3_1.json"
+    },
+    {
+      "cx": 4,
+      "cz": 1,
+      "district": "residential",
+      "file": "chunks/4_1.json"
+    },
+    {
+      "cx": 5,
+      "cz": 1,
+      "district": "residential",
+      "file": "chunks/5_1.json"
+    },
+    {
+      "cx": 6,
+      "cz": 1,
+      "district": "industrial",
+      "file": "chunks/6_1.json"
+    },
+    {
+      "cx": 7,
+      "cz": 1,
+      "district": "industrial",
+      "file": "chunks/7_1.json"
+    },
+    {
+      "cx": 0,
+      "cz": 2,
+      "district": "residential",
+      "file": "chunks/0_2.json"
+    },
+    {
+      "cx": 1,
+      "cz": 2,
+      "district": "residential",
+      "file": "chunks/1_2.json"
+    },
+    {
+      "cx": 2,
+      "cz": 2,
+      "district": "downtown",
+      "file": "chunks/2_2.json"
+    },
+    {
+      "cx": 3,
+      "cz": 2,
+      "district": "downtown",
+      "file": "chunks/3_2.json"
+    },
+    {
+      "cx": 4,
+      "cz": 2,
+      "district": "downtown",
+      "file": "chunks/4_2.json"
+    },
+    {
+      "cx": 5,
+      "cz": 2,
+      "district": "downtown",
+      "file": "chunks/5_2.json"
+    },
+    {
+      "cx": 6,
+      "cz": 2,
+      "district": "industrial",
+      "file": "chunks/6_2.json"
+    },
+    {
+      "cx": 7,
+      "cz": 2,
+      "district": "industrial",
+      "file": "chunks/7_2.json"
+    },
+    {
+      "cx": 0,
+      "cz": 3,
+      "district": "residential",
+      "file": "chunks/0_3.json"
+    },
+    {
+      "cx": 1,
+      "cz": 3,
+      "district": "residential",
+      "file": "chunks/1_3.json"
+    },
+    {
+      "cx": 2,
+      "cz": 3,
+      "district": "downtown",
+      "file": "chunks/2_3.json"
+    },
+    {
+      "cx": 3,
+      "cz": 3,
+      "district": "downtown",
+      "file": "chunks/3_3.json"
+    },
+    {
+      "cx": 4,
+      "cz": 3,
+      "district": "downtown",
+      "file": "chunks/4_3.json"
+    },
+    {
+      "cx": 5,
+      "cz": 3,
+      "district": "downtown",
+      "file": "chunks/5_3.json"
+    },
+    {
+      "cx": 6,
+      "cz": 3,
+      "district": "industrial",
+      "file": "chunks/6_3.json"
+    },
+    {
+      "cx": 7,
+      "cz": 3,
+      "district": "industrial",
+      "file": "chunks/7_3.json"
+    },
+    {
+      "cx": 0,
+      "cz": 4,
+      "district": "residential",
+      "file": "chunks/0_4.json"
+    },
+    {
+      "cx": 1,
+      "cz": 4,
+      "district": "residential",
+      "file": "chunks/1_4.json"
+    },
+    {
+      "cx": 2,
+      "cz": 4,
+      "district": "downtown",
+      "file": "chunks/2_4.json"
+    },
+    {
+      "cx": 3,
+      "cz": 4,
+      "district": "downtown",
+      "file": "chunks/3_4.json"
+    },
+    {
+      "cx": 4,
+      "cz": 4,
+      "district": "downtown",
+      "file": "chunks/4_4.json"
+    },
+    {
+      "cx": 5,
+      "cz": 4,
+      "district": "downtown",
+      "file": "chunks/5_4.json"
+    },
+    {
+      "cx": 6,
+      "cz": 4,
+      "district": "industrial",
+      "file": "chunks/6_4.json"
+    },
+    {
+      "cx": 7,
+      "cz": 4,
+      "district": "industrial",
+      "file": "chunks/7_4.json"
+    },
+    {
+      "cx": 0,
+      "cz": 5,
+      "district": "residential",
+      "file": "chunks/0_5.json"
+    },
+    {
+      "cx": 1,
+      "cz": 5,
+      "district": "residential",
+      "file": "chunks/1_5.json"
+    },
+    {
+      "cx": 2,
+      "cz": 5,
+      "district": "downtown",
+      "file": "chunks/2_5.json"
+    },
+    {
+      "cx": 3,
+      "cz": 5,
+      "district": "downtown",
+      "file": "chunks/3_5.json"
+    },
+    {
+      "cx": 4,
+      "cz": 5,
+      "district": "downtown",
+      "file": "chunks/4_5.json"
+    },
+    {
+      "cx": 5,
+      "cz": 5,
+      "district": "downtown",
+      "file": "chunks/5_5.json"
+    },
+    {
+      "cx": 6,
+      "cz": 5,
+      "district": "industrial",
+      "file": "chunks/6_5.json"
+    },
+    {
+      "cx": 7,
+      "cz": 5,
+      "district": "industrial",
+      "file": "chunks/7_5.json"
+    },
+    {
+      "cx": 0,
+      "cz": 6,
+      "district": "residential",
+      "file": "chunks/0_6.json"
+    },
+    {
+      "cx": 1,
+      "cz": 6,
+      "district": "residential",
+      "file": "chunks/1_6.json"
+    },
+    {
+      "cx": 2,
+      "cz": 6,
+      "district": "residential",
+      "file": "chunks/2_6.json"
+    },
+    {
+      "cx": 3,
+      "cz": 6,
+      "district": "residential",
+      "file": "chunks/3_6.json"
+    },
+    {
+      "cx": 4,
+      "cz": 6,
+      "district": "residential",
+      "file": "chunks/4_6.json"
+    },
+    {
+      "cx": 5,
+      "cz": 6,
+      "district": "residential",
+      "file": "chunks/5_6.json"
+    },
+    {
+      "cx": 6,
+      "cz": 6,
+      "district": "industrial",
+      "file": "chunks/6_6.json"
+    },
+    {
+      "cx": 7,
+      "cz": 6,
+      "district": "industrial",
+      "file": "chunks/7_6.json"
+    },
+    {
+      "cx": 0,
+      "cz": 7,
+      "district": "residential",
+      "file": "chunks/0_7.json"
+    },
+    {
+      "cx": 1,
+      "cz": 7,
+      "district": "residential",
+      "file": "chunks/1_7.json"
+    },
+    {
+      "cx": 2,
+      "cz": 7,
+      "district": "residential",
+      "file": "chunks/2_7.json"
+    },
+    {
+      "cx": 3,
+      "cz": 7,
+      "district": "residential",
+      "file": "chunks/3_7.json"
+    },
+    {
+      "cx": 4,
+      "cz": 7,
+      "district": "residential",
+      "file": "chunks/4_7.json"
+    },
+    {
+      "cx": 5,
+      "cz": 7,
+      "district": "residential",
+      "file": "chunks/5_7.json"
+    },
+    {
+      "cx": 6,
+      "cz": 7,
+      "district": "industrial",
+      "file": "chunks/6_7.json"
+    },
+    {
+      "cx": 7,
+      "cz": 7,
+      "district": "industrial",
+      "file": "chunks/7_7.json"
+    }
+  ],
+  "navmesh": "navmesh.bin",
+  "map": {
+    "file": "map.png",
+    "pixelsPerMeter": 2
+  }
+}

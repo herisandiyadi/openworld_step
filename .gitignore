@@ -1,0 +1,21 @@
+# Godot 4 generated files
+.godot/
+/android/
+export_presets.cfg
+*.translation
+
+# Exported builds
+build/
+*.apk
+*.aab
+*.keystore
+*.jks
+
+# Bundled Godot editor binary (172 MB, not source)
+_tools/
+
+# Release signing keys (back these up outside the repo)
+_keys/
+
+# Godot editor user data / logs
+Godot/

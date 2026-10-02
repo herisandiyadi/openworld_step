@@ -1,0 +1,15 @@
+[gd_scene load_steps=2 format=3 uid="uid://b7hud1minimap2"]
+
+[ext_resource type="Script" path="res://scripts/ui/minimap.gd" id="1"]
+
+[node name="Hud" type="CanvasLayer"]
+
+[node name="Minimap" type="Control" parent="."]
+anchor_left = 1.0
+anchor_right = 1.0
+offset_left = -268.0
+offset_top = 28.0
+offset_right = -28.0
+offset_bottom = 268.0
+mouse_filter = 2
+script = ExtResource("1")

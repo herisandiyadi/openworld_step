@@ -1,0 +1,637 @@
+:root {
+  --safe-top: env(safe-area-inset-top, 0px);
+  --safe-right: env(safe-area-inset-right, 0px);
+  --safe-bottom: env(safe-area-inset-bottom, 0px);
+  --safe-left: env(safe-area-inset-left, 0px);
+  --panel: rgba(18, 24, 32, 0.62);
+  --accent: #ffd23f;
+  font-family: system-ui, -apple-system, 'Segoe UI', Roboto, sans-serif;
+  color: #ffffff;
+}
+
+* {
+  box-sizing: border-box;
+}
+
+html,
+body,
+#root {
+  margin: 0;
+  width: 100%;
+  height: 100%;
+  overflow: hidden;
+  background: #bcd3e6;
+  overscroll-behavior: none;
+  -webkit-user-select: none;
+  user-select: none;
+  -webkit-tap-highlight-color: transparent;
+}
+
+.game-root,
+.game-canvas {
+  position: fixed;
+  inset: 0;
+  touch-action: none;
+}
+
+.hud {
+  position: fixed;
+  inset: 0;
+  pointer-events: none;
+}
+
+.hud button,
+.hud .joystick {
+  pointer-events: auto;
+  touch-action: none;
+}
+
+button {
+  font: inherit;
+  color: inherit;
+  cursor: pointer;
+}
+
+button:focus-visible {
+  outline: 3px solid var(--accent);
+  outline-offset: 2px;
+}
+
+.hud-top-left {
+  position: absolute;
+  top: calc(12px + var(--safe-top));
+  left: calc(12px + var(--safe-left));
+  display: flex;
+  gap: 10px;
+  align-items: flex-start;
+}
+
+.minimap {
+  position: relative;
+  width: 132px;
+  height: 132px;
+  padding: 0;
+  border: 3px solid rgba(255, 255, 255, 0.85);
+  border-radius: 50%;
+  overflow: hidden;
+  background: #6f8f5f;
+  box-shadow: 0 2px 10px rgba(0, 0, 0, 0.35);
+}
+
+.minimap-canvas {
+  display: block;
+  width: 100%;
+  height: 100%;
+}
+
+.minimap-north {
+  position: absolute;
+  top: 3px;
+  left: 50%;
+  transform: translateX(-50%);
+  font-size: 11px;
+  font-weight: 700;
+  text-shadow: 0 1px 2px #000000;
+}
+
+.status-panel {
+  display: flex;
+  flex-direction: column;
+  gap: 6px;
+  padding: 8px 10px;
+  border-radius: 10px;
+  background: var(--panel);
+  min-width: 150px;
+}
+
+.stamina {
+  height: 10px;
+  border-radius: 5px;
+  background: rgba(255, 255, 255, 0.2);
+  overflow: hidden;
+}
+
+.stamina-fill {
+  height: 100%;
+  background: #4cc38a;
+}
+
+.quest-line {
+  font-size: 13px;
+}
+
+.hud-top-right {
+  position: absolute;
+  top: calc(12px + var(--safe-top));
+  right: calc(12px + var(--safe-right));
+  display: flex;
+  gap: 8px;
+  align-items: center;
+}
+
+.stats {
+  padding: 4px 8px;
+  border-radius: 6px;
+  background: var(--panel);
+  font-size: 12px;
+  font-variant-numeric: tabular-nums;
+}
+
+.hud-button {
+  width: 44px;
+  height: 44px;
+  border: none;
+  border-radius: 10px;
+  background: var(--panel);
+  font-weight: 700;
+}
+
+.joystick {
+  position: absolute;
+  left: calc(36px + var(--safe-left));
+  bottom: calc(36px + var(--safe-bottom));
+  width: 136px;
+  height: 136px;
+  border-radius: 50%;
+  background: rgba(255, 255, 255, 0.16);
+  border: 2px solid rgba(255, 255, 255, 0.45);
+  display: flex;
+  align-items: center;
+  justify-content: center;
+}
+
+.joystick-knob {
+  width: 60px;
+  height: 60px;
+  border-radius: 50%;
+  background: rgba(255, 255, 255, 0.75);
+  box-shadow: 0 2px 8px rgba(0, 0, 0, 0.3);
+}
+
+.hud-bottom-right {
+  position: absolute;
+  right: calc(24px + var(--safe-right));
+  bottom: calc(36px + var(--safe-bottom));
+  display: flex;
+  gap: 10px;
+}
+
+.mode-button {
+  min-width: 76px;
+  min-height: 56px;
+  padding: 0 12px;
+  border: 2px solid rgba(255, 255, 255, 0.5);
+  border-radius: 14px;
+  background: var(--panel);
+  font-weight: 600;
+}
+
+.mode-button.active {
+  border-color: var(--accent);
+  background: rgba(255, 210, 63, 0.3);
+}
+
+.overlay {
+  position: fixed;
+  inset: 0;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  background: rgba(0, 0, 0, 0.55);
+  pointer-events: auto;
+}
+
+.pause-panel,
+.map-panel {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  gap: 14px;
+  padding: 18px;
+  border-radius: 14px;
+  background: rgba(18, 24, 32, 0.92);
+}
+
+.pause-panel h2 {
+  margin: 0;
+}
+
+.quality-row {
+  display: flex;
+  gap: 8px;
+}
+
+.big-map-canvas {
+  width: min(78vh, 78vw);
+  height: min(78vh, 78vw);
+  border-radius: 8px;
+}
+
+.map-panel {
+  flex-direction: row;
+}
+
+.overlay-button {
+  min-height: 48px;
+  padding: 0 20px;
+  border: none;
+  border-radius: 12px;
+  background: var(--accent);
+  color: #1a1a1a;
+  font-weight: 700;
+}
+.overlay-button.secondary {
+  background: rgba(255, 255, 255, 0.15);
+  color: #ffffff;
+}
+
+.overlay-button:disabled {
+  opacity: 0.6;
+}
+
+.soak-result {
+  margin: 0;
+  max-height: 55vh;
+  overflow: auto;
+  font: 12px/1.45 ui-monospace, Consolas, monospace;
+  white-space: pre-wrap;
+  user-select: text;
+}
+/* ---------- Title / settings ---------- */
+.menu-screen {
+  position: fixed;
+  inset: 0;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  padding: calc(16px + var(--safe-top)) calc(16px + var(--safe-right)) calc(16px + var(--safe-bottom)) calc(16px + var(--safe-left));
+  background: linear-gradient(160deg, #2b4a6b 0%, #1a2433 100%);
+  overflow: auto;
+}
+
+.menu-panel {
+  display: flex;
+  flex-direction: column;
+  gap: 14px;
+  width: min(440px, 100%);
+  padding: 24px;
+  border-radius: 16px;
+  background: rgba(18, 24, 32, 0.92);
+  box-shadow: 0 8px 30px rgba(0, 0, 0, 0.4);
+}
+
+.menu-title {
+  margin: 0;
+  font-size: 32px;
+  text-align: center;
+  color: var(--accent);
+}
+
+.menu-heading {
+  margin: 0;
+  font-size: 22px;
+}
+
+.menu-subtitle,
+.menu-status {
+  margin: 0;
+  text-align: center;
+  opacity: 0.85;
+}
+
+.menu-status {
+  font-size: 13px;
+}
+
+.menu-buttons {
+  display: flex;
+  flex-direction: column;
+  gap: 10px;
+}
+
+.menu-button {
+  min-height: 56px;
+  font-size: 18px;
+}
+
+.settings-panel {
+  width: min(560px, 100%);
+}
+
+.settings-buttons {
+  flex-direction: row;
+  flex-wrap: wrap;
+  justify-content: flex-end;
+}
+
+.field {
+  display: flex;
+  flex-direction: column;
+  gap: 6px;
+  font-size: 14px;
+}
+
+.field-row {
+  display: flex;
+  gap: 8px;
+}
+
+.field-row input {
+  flex: 1;
+  min-width: 0;
+}
+
+.field input,
+.chat-form input {
+  min-height: 48px;
+  padding: 0 12px;
+  border: 2px solid rgba(255, 255, 255, 0.3);
+  border-radius: 10px;
+  background: rgba(255, 255, 255, 0.08);
+  color: #ffffff;
+  font: inherit;
+  font-size: 16px;
+  -webkit-user-select: text;
+  user-select: text;
+  pointer-events: auto;
+}
+
+.field input:focus-visible,
+.chat-form input:focus-visible {
+  outline: 3px solid var(--accent);
+  outline-offset: 1px;
+}
+
+.field-toggle {
+  flex: none;
+  padding: 0 14px;
+}
+
+.settings-status {
+  margin: 0;
+  min-height: 1.4em;
+  font-size: 13px;
+  color: #9fe3b8;
+}
+
+.settings-status.error {
+  color: #ff9b8f;
+}
+
+/* ---------- NPC markers / map legend ---------- */
+.npc-label {
+  padding: 2px 8px;
+  border-radius: 8px;
+  background: rgba(18, 24, 32, 0.8);
+  color: var(--accent);
+  font-size: 12px;
+  font-weight: 700;
+  white-space: nowrap;
+}
+
+.map-legend {
+  display: flex;
+  flex-direction: column;
+  gap: 8px;
+  font-size: 13px;
+}
+
+.legend-dot {
+  display: inline-block;
+  width: 12px;
+  height: 12px;
+  margin-right: 6px;
+  border-radius: 50%;
+  vertical-align: middle;
+}
+
+.legend-dot.npc {
+  background: var(--accent);
+}
+
+.legend-dot.player {
+  background: #3fa9f5;
+}
+
+.mode-line {
+  opacity: 0.8;
+}
+
+/* ---------- MOBA-style action buttons ---------- */
+.action-cluster {
+  position: absolute;
+  right: calc(28px + var(--safe-right));
+  bottom: calc(28px + var(--safe-bottom));
+  width: 230px;
+  height: 200px;
+}
+
+.action-button {
+  position: absolute;
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  justify-content: center;
+  gap: 2px;
+  padding: 0;
+  border: 3px solid rgba(255, 255, 255, 0.7);
+  border-radius: 50%;
+  background: radial-gradient(circle at 35% 30%, rgba(255, 255, 255, 0.35), rgba(18, 24, 32, 0.75) 70%);
+  box-shadow: 0 3px 10px rgba(0, 0, 0, 0.45);
+  font-weight: 700;
+  transition: transform 80ms ease-out;
+}
+
+.action-button:active {
+  transform: scale(0.92);
+}
+
+.action-button:disabled {
+  opacity: 0.4;
+}
+
+.action-primary {
+  right: 0;
+  bottom: 0;
+  width: 104px;
+  height: 104px;
+  border-color: var(--accent);
+}
+
+.action-skill {
+  width: 70px;
+  height: 70px;
+  animation: action-pop 160ms ease-out;
+}
+
+/* Skill buttons arc around the primary button, like MOBA ability slots. */
+.action-slot-1 {
+  right: 118px;
+  bottom: 6px;
+}
+
+.action-slot-2 {
+  right: 96px;
+  bottom: 104px;
+}
+
+.action-ask {
+  border-color: #6fd3ff;
+}
+
+.action-icon {
+  font-size: 30px;
+  line-height: 1;
+}
+
+.action-skill .action-icon {
+  font-size: 24px;
+}
+
+.action-text {
+  font-size: 11px;
+  text-shadow: 0 1px 2px #000000;
+}
+
+@keyframes action-pop {
+  from {
+    transform: scale(0.5);
+    opacity: 0;
+  }
+  to {
+    transform: scale(1);
+    opacity: 1;
+  }
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .action-skill {
+    animation: none;
+  }
+}
+
+/* ---------- NPC chat ---------- */
+.chat-panel {
+  display: flex;
+  flex-direction: column;
+  gap: 10px;
+  width: min(620px, calc(100vw - 24px));
+  height: min(420px, calc(100vh - 24px - var(--safe-top) - var(--safe-bottom)));
+  padding: 14px;
+  border-radius: 14px;
+  background: rgba(18, 24, 32, 0.95);
+}
+
+.chat-header {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+}
+
+.chat-header h2 {
+  margin: 0;
+  color: var(--accent);
+}
+
+.chat-log {
+  flex: 1;
+  display: flex;
+  flex-direction: column;
+  gap: 8px;
+  overflow-y: auto;
+  -webkit-user-select: text;
+  user-select: text;
+}
+
+.chat-bubble {
+  max-width: 85%;
+  margin: 0;
+  padding: 8px 12px;
+  border-radius: 12px;
+  line-height: 1.4;
+  white-space: pre-wrap;
+}
+
+.chat-bubble.user {
+  align-self: flex-end;
+  background: rgba(255, 210, 63, 0.25);
+}
+
+.chat-bubble.assistant {
+  align-self: flex-start;
+  background: rgba(255, 255, 255, 0.12);
+}
+
+.chat-bubble.pending {
+  opacity: 0.7;
+  font-style: italic;
+}
+
+.chat-hint {
+  margin: auto 0;
+  text-align: center;
+  opacity: 0.7;
+}
+
+.chat-error {
+  margin: 0;
+  color: #ff9b8f;
+  font-size: 13px;
+}
+
+.chat-form {
+  display: flex;
+  gap: 8px;
+}
+
+.chat-form input {
+  flex: 1;
+  min-width: 0;
+}
+
+.visually-hidden {
+  position: absolute;
+  width: 1px;
+  height: 1px;
+  overflow: hidden;
+  clip: rect(0 0 0 0);
+  white-space: nowrap;
+}
+.action-slot-3 {
+  right: 4px;
+  bottom: 122px;
+}
+
+.action-bus {
+  border-color: #3fa9f5;
+}
+
+.legend-dot.bus {
+  border-radius: 2px;
+  background: #3fa9f5;
+}
+
+.quest-progress {
+  color: var(--accent);
+  font-size: 12px;
+}
+
+.bus-panel {
+  min-width: min(320px, calc(100vw - 24px));
+  max-height: calc(100vh - 24px);
+  overflow-y: auto;
+}
+
+.bus-option {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  justify-content: center;
+  width: 100%;
+  padding: 6px 16px;
+}
+
+.bus-option small {
+  font-weight: 400;
+  opacity: 0.75;
+}
