@@ -69,10 +69,12 @@ export interface PedWorld {
   player: { x: number; z: number };
   /** Kendaraan yang sedang di jalan (posisi dunia), untuk cek zebra cross aman. */
   vehicles: readonly { x: number; z: number; speed: number }[];
-  /** Lampu pejalan hijau di persimpangan; kalau tidak diisi, zebra dinilai dari kendaraan saja. */
-  pedGreen?: (edge: number, t: number) => boolean;
-  /** Jam dalam game (dayClock.t); hanya dipakai lewat pedGreen. */
+  /** Lampu pejalan hijau di zebra (lihat trafficLights.pedestrianGate); kalau tidak diisi, zebra dinilai dari kendaraan saja. */
+  pedGreen?: (edge: number, time: number) => boolean;
+  /** Jam dalam game (dayClock.t), untuk kepadatan spawn. */
   t: number;
+  /** Jam lampu lalu lintas (detik, signalClock.time) yang dibaca pedGreen. */
+  signalTime?: number;
 }
 
 const nodeOf = (graph: WalkGraph, index: number): LaneNode => {
@@ -154,7 +156,7 @@ function gapAhead(world: PedWorld, ped: Pedestrian): number {
  * kendaraan bergerak dalam 8 m dari titik masuk zebra.
  */
 function crossingClear(graph: WalkGraph, world: PedWorld, ped: Pedestrian, entry: LaneNode): boolean {
-  if (world.pedGreen && !world.pedGreen(ped.edge, world.t)) return false;
+  if (world.pedGreen && !world.pedGreen(ped.edge, world.signalTime ?? 0)) return false;
   const span = walkEdgeAt(graph, ped.edge).length;
   const exit = nodeOf(graph, ped.to);
   const midX = (entry.x + exit.x) / 2;

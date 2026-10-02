@@ -2,7 +2,7 @@ import { describe, expect, it } from 'vitest';
 import { bakeLanes } from '../../tools/world/lanes';
 import { mulberry32 } from '../world/worldGen';
 import { buildLaneGraph, edgeAt } from './laneGraph';
-import { createTraffic, createVehicle, safeGap, stepTraffic, stepTrafficTiered, TICK_HZ_NEAR, VEHICLE_LENGTH, vehiclePose } from './trafficSim';
+import { createTraffic, createVehicle, lerpPose, safeGap, stepTraffic, stepTrafficTiered, TICK_HZ_NEAR, VEHICLE_LENGTH, vehiclePose } from './trafficSim';
 
 const graph = buildLaneGraph(bakeLanes());
 
@@ -83,5 +83,21 @@ describe('simulasi lalu lintas', () => {
     }
     expect(moves.filter((move) => move > 0).length).toBe(2);
     expect(near.s).toBeCloseTo(far.s, 5);
+  });
+});
+
+describe('interpolasi pose kendaraan antar tick', () => {
+  const prev = { x: 0, z: 0, dirX: 1, dirZ: 0 };
+  const next = { x: 2, z: 0, dirX: 0, dirZ: 1 };
+
+  it('lerp linear sesuai sisa akumulator dan dijepit 0..1', () => {
+    expect(lerpPose(prev, next, 0)).toEqual(prev);
+    expect(lerpPose(prev, next, 0.5)).toEqual({ x: 1, z: 0, dirX: 0.5, dirZ: 0.5 });
+    expect(lerpPose(prev, next, 2)).toEqual(next);
+  });
+
+  it('tanpa pose sebelumnya atau setelah teleport langsung memakai pose baru', () => {
+    expect(lerpPose(undefined, next, 0.3)).toBe(next);
+    expect(lerpPose(prev, { ...next, x: 50 }, 0.3).x).toBe(50);
   });
 });

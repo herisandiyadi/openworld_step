@@ -1,8 +1,9 @@
-import { use, useEffect, useMemo, useRef } from 'react';
+import { Suspense, use, useEffect, useMemo, useRef } from 'react';
 import { useFrame, useThree } from '@react-three/fiber';
 import { useGLTF } from '@react-three/drei';
 import { Color, InstancedMesh, type Material, Matrix4, type Mesh, MeshBasicMaterial, Object3D, type PerspectiveCamera, Quaternion, Vector3 } from 'three';
 import { type AssetId, assetUrl } from '../app/assets';
+import { ambientAgents } from '../audio/ambientAudio';
 import { audio } from '../audio/audioEngine';
 import { pushOutOfBoxes } from '../game/movement';
 import { dayClock, MODE_RADIUS, playerState } from '../game/runtime';
@@ -11,11 +12,13 @@ import type { BusStop } from '../world/worldSpec';
 import { groundHeightAt, worldUrl } from '../world/worldState';
 import { busPose, createBus, planBusRoute, stepBus } from './busRoute';
 import { isNight } from './density';
+import { PedestrianLayer, pedRuntime } from './PedestrianLayer';
+import { pedPose } from './pedestrianSim';
 import { buildLaneGraph, type LaneGraph, type LanesData } from './laneGraph';
 import { updateSpawns, VEHICLE_POOL } from './spawner';
 import { useGraphicsSettings } from '../state/graphicsSettings';
-import { LAMP_NODES, type LampState, lampAt, signalBlocks, signalisedIntersections } from './trafficLights';
-import { createTraffic, FAR_DISTANCE, playerGap, stepTrafficTiered, TICK_HZ_NEAR, type Vehicle, VEHICLE_LENGTH, vehiclePose } from './trafficSim';
+import { LAMP_NODES, type LampState, lampAt, pedestrianGate, signalBlocks, signalClock, signalisedIntersections } from './trafficLights';
+import { createTraffic, FAR_DISTANCE, lerpPose, playerGap, stepTrafficTiered, TICK_HZ_NEAR, type Vehicle, VEHICLE_LENGTH, vehiclePose } from './trafficSim';
 
 /** Jenis kendaraan ambient; indeks 3 (bus) punya rute sendiri, lihat busRoute.ts. */
 const VEHICLE_IDS = ['veh_car_sedan', 'veh_car_hatch', 'veh_moto', 'veh_bus'] as const satisfies readonly AssetId[];
@@ -164,6 +167,8 @@ export function AmbientLayer({ busStops }: { busStops: readonly BusStop[] }) {
   const root = useMemo(() => new Object3D(), []);
   const traffic = useMemo(() => createTraffic(), []);
   const extras = useMemo(() => new WeakMap<Vehicle, Extra>(), []);
+  /** Pose tiap kendaraan sebelum tick terakhir, untuk interpolasi render. */
+  const previous = useMemo(() => new WeakMap<Vehicle, ReturnType<typeof vehiclePose>>(), []);
   const bus = useMemo(() => createBus(), []);
   const route = useMemo(() => planBusRoute(graph, busStops), [graph, busStops]);
   const signals = useMemo(() => signalisedIntersections(graph), [graph]);
@@ -192,10 +197,13 @@ export function AmbientLayer({ busStops }: { busStops: readonly BusStop[] }) {
 
     // Simulasi tetap 15 Hz (agen jauh 5 Hz, lihat stepTrafficTiered), render diinterpolasi lewat dt.
     sim.accumulator += dt;
+    let ticked = false;
     while (sim.accumulator >= TICK) {
       sim.accumulator -= TICK;
       sim.tick++;
       sim.time += TICK;
+      ticked = true;
+      for (const vehicle of traffic.vehicles) previous.set(vehicle, vehiclePose(graph, vehicle));
       stepTrafficTiered(graph, traffic, sim.tick, Math.random, isNear, {
         gate: (edge, turn) => signalBlocks(graph, sim.time, edge, turn),
         obstacleGap: (vehicle) => playerGap(graph, vehicle, player),
@@ -215,7 +223,21 @@ export function AmbientLayer({ busStops }: { busStops: readonly BusStop[] }) {
       }
     }
 
+    // Pejalan kaki membaca lampu dan kendaraan dari sini (15 Hz cukup); posisi agen juga dikirim ke audio ambient.
+    const walk = pedRuntime.graph;
+    signalClock.time = sim.time;
+    if (walk && ticked) {
+      const world = pedRuntime.world;
+      world.pedGreen ??= pedestrianGate(graph, walk);
+      world.signalTime = sim.time;
+      ambientAgents.peds = world.peds.map((ped) => pedPose(walk, ped));
+    }
+    camera.getWorldDirection(VIEW_DIR);
+    ambientAgents.listener = { x: camera.position.x, z: camera.position.z, dirX: VIEW_DIR.x, dirZ: VIEW_DIR.z };
+    const agents: typeof ambientAgents.vehicles = [];
+
     for (const batch of batches) for (const part of batch.parts) part.mesh.count = 0;
+    const alpha = sim.accumulator / TICK;
     for (const vehicle of traffic.vehicles) {
       let extra = extras.get(vehicle);
       if (!extra) {
@@ -225,8 +247,10 @@ export function AmbientLayer({ busStops }: { busStops: readonly BusStop[] }) {
       const batch = batches[extra.type];
       if (!batch) continue;
       extra.distance += vehicle.speed * dt;
-      // ponytail: pose diambil dari tick terakhir (tanpa lerp antar tick); cukup mulus di 15 Hz untuk agen dekat.
-      const pose = vehiclePose(graph, vehicle);
+      // Lerp dari pose sebelum tick terakhir ke pose sekarang (render tertinggal <= 1 tick, 67 ms).
+      // ponytail: agen jauh maju tiap tick ke-3 (5 Hz), jadi di sana gerakannya tetap bertahap; tak terlihat di > 60 m.
+      const pose = lerpPose(previous.get(vehicle), vehiclePose(graph, vehicle), alpha);
+      agents.push({ ...pose, speed: vehicle.speed });
       addVehicle(batch.parts, pose.x, groundHeightAt(pose.x, pose.z), pose.z, pose.dirX, pose.dirZ, -extra.distance / batch.wheelRadius);
 
       // B8: tumpang tindih dengan pemain -> kendaraan berhenti, pemain didorong keluar. Tanpa kerusakan.
@@ -246,6 +270,9 @@ export function AmbientLayer({ busStops }: { busStops: readonly BusStop[] }) {
       }
     }
 
+    ambientAgents.vehicles = agents;
+    if (walk) pedRuntime.world.vehicles = agents;
+
     const busBatch = batches[BUS];
     if (busBatch && route.edges.length > 0) {
       const pose = busPose(graph, route, bus);
@@ -257,6 +284,11 @@ export function AmbientLayer({ busStops }: { busStops: readonly BusStop[] }) {
     for (const batch of batches) for (const part of batch.parts) if (part.lights) part.mesh.visible = night;
 
     // Lampu lalu lintas di persimpangan berlampu terdekat. Lensa menghadap -Z, jadi menampilkan sumbu Z (1).
+    // ponytail: tiang TIDAK dibake ke prop dunia. Lensanya harus tetap berganti warna tiap detik,
+    // jadi hanya tiangnya yang bisa dibake; itu memecah penempatan jadi dua tempat, menaikkan
+    // WORLD_DATA_VERSION (+ bake ulang semua chunk), dan tetap tidak mengurangi draw call (lensa
+    // tetap 1 InstancedMesh di sini). Bake kalau nanti tiang perlu collider pemain atau muncul
+    // di persimpangan di luar radius 70 m.
     const { pole, lens } = lights;
     if (pole) pole.count = 0;
     if (lens) lens.count = 0;
@@ -282,5 +314,13 @@ export function AmbientLayer({ busStops }: { busStops: readonly BusStop[] }) {
     }
   });
 
-  return <primitive object={root} />;
+  return (
+    <>
+      <primitive object={root} />
+      {/* Suspense sendiri supaya GLB warga tidak menahan render lalu lintas. */}
+      <Suspense fallback={null}>
+        <PedestrianLayer />
+      </Suspense>
+    </>
+  );
 }

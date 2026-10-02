@@ -1,6 +1,6 @@
-import { Suspense, useRef } from 'react';
+import { useRef } from 'react';
 import { useFrame } from '@react-three/fiber';
-import { PedestrianLayer, pedRuntime, RESIDENTS } from '../ambient/PedestrianLayer';
+import { pedRuntime, RESIDENTS } from '../ambient/PedestrianLayer';
 import { nearestPed, PED_TALK_DISTANCE } from '../ambient/pedestrianSim';
 import { markExplored } from './exploration';
 import { BUS_DISTANCE, MODE_RADIUS, TALK_DISTANCE, USE_DISTANCE, jumpState, playerState } from './runtime';
@@ -79,11 +79,6 @@ export function Proximity() {
     }
   });
 
-  // ponytail: layer pejalan kaki dipasang dari sini karena App.tsx/World.tsx di luar cakupan task ini;
-  // pindahkan ke AmbientLayer saat B7 menyatukan render ambient.
-  return (
-    <Suspense fallback={null}>
-      <PedestrianLayer />
-    </Suspense>
-  );
+  // Render pejalan kaki ada di AmbientLayer (B7); di sini hanya pemindaian target aksi.
+  return null;
 }

@@ -186,3 +186,20 @@ export const vehiclePose = (graph: LaneGraph, vehicle: Vehicle): { x: number; z:
   const heading = edgeHeading(graph, vehicle.edge, vehicle.s);
   return { x: point.x, z: point.z, dirX: heading.x, dirZ: heading.z };
 };
+
+/** Lompatan lebih jauh dari ini antar tick dianggap teleport (spawn ulang), jadi tidak di-lerp. */
+const SNAP_DISTANCE = 10;
+
+type Pose = { x: number; z: number; dirX: number; dirZ: number };
+
+/** Interpolasi pose render antar tick: `alpha` = sisa akumulator / panjang tick (0..1). */
+export function lerpPose(prev: Pose | undefined, next: Pose, alpha: number): Pose {
+  if (!prev || Math.hypot(next.x - prev.x, next.z - prev.z) > SNAP_DISTANCE) return next;
+  const k = Math.min(1, Math.max(0, alpha));
+  return {
+    x: prev.x + (next.x - prev.x) * k,
+    z: prev.z + (next.z - prev.z) * k,
+    dirX: prev.dirX + (next.dirX - prev.dirX) * k,
+    dirZ: prev.dirZ + (next.dirZ - prev.dirZ) * k,
+  };
+}

@@ -2,7 +2,7 @@ import { describe, expect, it, vi } from 'vitest';
 
 vi.mock('@capacitor/preferences', () => ({ Preferences: { get: vi.fn(), set: vi.fn(() => Promise.resolve()), remove: vi.fn() } }));
 
-const { AUDIBLE_RANGE, bedLevels, cueChance, dopplerPitch, pickCue, spatial } = await import('./ambientAudio');
+const { AUDIBLE_RANGE, bedLevels, cueChance, cueSpatial, dopplerPitch, pickCue, spatial } = await import('./ambientAudio');
 
 const listener = { x: 0, z: 0, dirX: 0, dirZ: -1 };
 const at = (hour: number) => hour / 24;
@@ -48,5 +48,26 @@ describe('audio ambient', () => {
   it('pickCue hening saat peluang nol dan memilih saat selalu lolos', () => {
     expect(pickCue('downtown', at(12), 0.25, () => 0.999)).toBeUndefined();
     expect(pickCue('downtown', at(12), 0.25, () => 0)).toBe('horn');
+  });
+
+  it('cue memakai posisi agen asli: kendaraan untuk klakson, pejalan untuk hewan', () => {
+    const agents = {
+      listener,
+      vehicles: [{ x: 10, z: 0, dirX: 1, dirZ: 0, speed: 8 }],
+      peds: [{ x: -5, z: 0 }],
+    };
+    const horn = cueSpatial('horn', agents, () => 0)!;
+    expect(horn.gain).toBeCloseTo(spatial(listener, 10, 0).gain);
+    expect(horn.pan).toBeGreaterThan(0);
+    // Kendaraan di kanan dan melaju ke kanan = menjauh.
+    expect(horn.radialSpeed).toBeCloseTo(8);
+    const meow = cueSpatial('meow', agents, () => 0)!;
+    expect(meow.pan).toBeLessThan(0);
+    expect(meow.radialSpeed).toBe(0);
+  });
+
+  it('tanpa agen atau agen di luar jangkauan cue tidak dibunyikan', () => {
+    expect(cueSpatial('pass', { listener, vehicles: [], peds: [] }, () => 0)).toBeNull();
+    expect(cueSpatial('bark', { listener, vehicles: [], peds: [{ x: AUDIBLE_RANGE + 1, z: 0 }] }, () => 0)).toBeNull();
   });
 });

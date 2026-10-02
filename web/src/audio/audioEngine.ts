@@ -150,6 +150,15 @@ class AudioEngine {
     else ctx.resume().catch(() => undefined);
   }
 
+  /**
+   * Node induk untuk audio ambient (ambientAudio.ts) supaya perangkat hanya punya satu
+   * AudioContext. `bus` = sfxBus, jadi setelan Efek suara dan mute sudah ikut terpasang.
+   */
+  ambientTarget(): { ctx: AudioContext; bus: GainNode; noise: AudioBuffer } | null {
+    const graph = this.graph;
+    return graph ? { ctx: graph.ctx, bus: graph.sfxBus, noise: graph.noise } : null;
+  }
+
   setVolumes(volumes: AudioSettings): void {
     this.volumes = volumes;
     this.applyVolumes();
