@@ -195,9 +195,13 @@ button:focus-visible {
   position: fixed;
   inset: 0;
   display: flex;
-  align-items: center;
+  /* Tanpa align-items: center. Panel yang lebih tinggi dari layar akan meluber ke atas
+     dan bagian itu tidak bisa di-scroll. Pakai margin auto di panelnya. */
   justify-content: center;
+  padding: calc(8px + var(--safe-top)) calc(8px + var(--safe-right)) calc(8px + var(--safe-bottom)) calc(8px + var(--safe-left));
   background: rgba(0, 0, 0, 0.55);
+  overflow: auto;
+  overscroll-behavior: contain;
   pointer-events: auto;
 }
 
@@ -207,6 +211,7 @@ button:focus-visible {
   flex-direction: column;
   align-items: center;
   gap: 14px;
+  margin: auto;
   padding: 18px;
   border-radius: 14px;
   background: rgba(18, 24, 32, 0.92);
@@ -486,6 +491,36 @@ button:focus-visible {
     /* fieldset default min-width: min-content, bisa meluber dari sel grid. */
     min-width: 0;
     padding: 6px 10px 8px;
+  }
+
+  /* Panel jeda: 2 kolom juga, isinya 7 baris dan tidak muat di layar landscape. */
+  .pause-panel {
+    display: grid;
+    grid-template-columns: 1fr 1fr;
+    align-items: start;
+    gap: 8px 14px;
+    padding: 12px 14px;
+  }
+
+  .pause-panel > h2,
+  .pause-panel > .soak-result {
+    grid-column: 1 / -1;
+  }
+
+  .pause-panel h2 {
+    font-size: 19px;
+  }
+
+  .pause-panel .audio-controls {
+    min-width: 0;
+  }
+
+  .pause-panel > .overlay-button {
+    width: 100%;
+  }
+
+  .soak-result {
+    max-height: 40dvh;
   }
 }
 
