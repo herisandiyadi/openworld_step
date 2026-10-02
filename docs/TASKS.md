@@ -104,13 +104,13 @@ Status: `[ ]` belum, `[~]` dikerjakan, `[x]` selesai.
   - Ini task paling berisiko, jadi prototipe dulu performanya di HP.
 - [ ] **C4. Aset hewan** (1.5 hari)
   - `animal_cat`, `animal_dog`, dan `bird_pigeon` dengan vertex anim (walk, run, sit, sniff, peck, fly).
-- [ ] **C5. Simulasi hewan** (1.25 hari): `src/ambient/animalSim.ts`
+- [x] **C5. Simulasi hewan** (1.25 hari): `src/ambient/animalSim.ts`
   - State machine, berkeliaran di navmesh dalam radius 10-20 m, reaksi kucing kabur (3 m), merpati terbang (5 m),
     dan anjing mengikuti (4 m, peluang 30%).
   - Selesai jika: unit test transisi state lulus.
-- [ ] **C6. Kepadatan per kawasan dan jam** (0.5 hari)
+- [x] **C6. Kepadatan per kawasan dan jam** (0.5 hari)
   - Tabel kepadatan Pusat Kota, Perumahan, dan Industri, turun 60% di malam hari (22.00-05.00).
-- [ ] **C7. Pool warga dan persona** (0.75 hari): `src/ambient/residents.ts` dan `residents.json`
+- [x] **C7. Pool warga dan persona** (0.75 hari): `src/ambient/residents.ts` dan `residents.json`
   - 60 warga deterministik (nama, umur, pekerjaan, rumah/kantor, hobi, suasana hati), aktivitas ikut jam,
     dan system prompt warga yang menyertakan nama pemain.
   - Selesai jika: test determinisme, validasi isi persona, dan isi prompt lulus.
