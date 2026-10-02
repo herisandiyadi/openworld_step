@@ -6,6 +6,7 @@ import { NpcChat } from './NpcChat';
 import { BusMenu } from './BusMenu';
 import { AudioControls } from './AudioControls';
 import { type MoveMode, type Quality, useGameStore } from '../state/gameStore';
+import { useResidentChats } from '../state/saveGame';
 import { DISTRICT_NAMES } from '../world/worldSpec';
 import { worldState } from '../world/worldState';
 
@@ -28,6 +29,7 @@ export function Hud() {
   const chatNpcId = useGameStore((state) => state.chatNpcId);
   const busMenuOpen = useGameStore((state) => state.busMenuOpen);
   const metCount = useGameStore((state) => state.met.length);
+  const talkedCount = useResidentChats((state) => state.talked.length);
   const clock = useGameStore((state) => state.clock);
   const npcTotal = worldState.index?.npcs.length ?? 0;
   const setScreen = useGameStore((state) => state.setScreen);
@@ -61,6 +63,7 @@ export function Hud() {
               ? 'Quest selesai: semua warga sudah kamu kenal'
               : `Quest: kenalan dengan warga (${metCount}/${npcTotal})`}
           </div>
+          <div className="quest-line">Warga diajak ngobrol: {talkedCount}</div>
         </div>
       </div>
 

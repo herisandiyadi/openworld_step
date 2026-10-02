@@ -1,5 +1,9 @@
 import { type FormEvent, useEffect, useId, useRef, useState } from 'react';
-import { buildMessages, type ChatMessage, streamChat } from '../ai/chat';
+import { buildMessages, type ChatMessage, lookOf, streamChat, withHistory } from '../ai/chat';
+import { holdResident, RESIDENTS } from '../ambient/PedestrianLayer';
+import { residentSystemPrompt } from '../ambient/residents';
+import { dayClock } from '../game/runtime';
+import { recordResidentChat, residentHistory } from '../state/saveGame';
 import { useAiSettings } from '../state/aiSettings';
 import { usePlayerProfile } from '../state/profile';
 import { useGameStore } from '../state/gameStore';
@@ -7,7 +11,7 @@ import { worldState } from '../world/worldState';
 import { audio } from '../audio/audioEngine';
 
 const MAX_INPUT = 500;
-/** Conversation per NPC survives closing the panel for the rest of the session. */
+/** Conversation per named NPC survives closing the panel for the rest of the session (warga: di save game). */
 const histories = new Map<string, ChatMessage[]>();
 
 /** Free-text Q&A with the NPC next to the player; replies stream in. The game loop is paused while open. */
@@ -18,8 +22,11 @@ export function NpcChat() {
   const settings = useAiSettings((state) => state.settings);
   const username = usePlayerProfile((state) => state.profile?.username);
   const appearance = usePlayerProfile((state) => state.profile?.appearance);
-  const npc = worldState.index?.npcs.find((item) => item.id === npcId);
-  const [messages, setMessages] = useState<ChatMessage[]>(() => (npcId ? (histories.get(npcId) ?? []) : []));
+  const resident = RESIDENTS.find((item) => item.id === npcId);
+  const npc = worldState.index?.npcs.find((item) => item.id === npcId) ?? resident;
+  const [messages, setMessages] = useState<ChatMessage[]>(() =>
+    npcId ? (resident ? residentHistory(npcId) : (histories.get(npcId) ?? [])) : [],
+  );
   const [partial, setPartial] = useState<string | null>(null);
   const [text, setText] = useState('');
   const [error, setError] = useState<string | null>(null);
@@ -30,6 +37,12 @@ export function NpcChat() {
   const busy = partial !== null;
 
   useEffect(() => inputRef.current?.focus(), []);
+  // Warga berhenti, menghadap pemain, dan tidak di-despawn selama panel terbuka.
+  useEffect(() => {
+    if (!resident) return;
+    holdResident(resident.id, true);
+    return () => holdResident(resident.id, false);
+  }, [resident]);
   useEffect(() => {
     logRef.current?.scrollTo({ top: logRef.current.scrollHeight });
   }, [messages, partial, error]);
@@ -52,7 +65,8 @@ export function NpcChat() {
     if (!question || busy) return;
     const next: ChatMessage[] = [...messages, { role: 'user', content: question }];
     setMessages(next);
-    histories.set(npcId, next);
+    if (resident) recordResidentChat(npcId, next);
+    else histories.set(npcId, next);
     setText('');
     setError(null);
     setPartial('');
@@ -60,12 +74,19 @@ export function NpcChat() {
     const controller = new AbortController();
     abortRef.current = controller;
     try {
-      const reply = await streamChat(settings, buildMessages(npcId, npc.name, next, username, appearance), setPartial, controller.signal);
+      const prompt = resident
+        ? withHistory(residentSystemPrompt(resident, dayClock.t, username, appearance?.gender, lookOf(appearance)), next)
+        : buildMessages(npcId, npc.name, next, username, appearance);
+      const reply = await streamChat(settings, prompt, setPartial, controller.signal);
       const withReply: ChatMessage[] = [...next, { role: 'assistant', content: reply }];
-      histories.set(npcId, withReply);
       setMessages(withReply);
       audio.message();
-      addMet(npcId);
+      // Quest "kenalan" hanya untuk 5 NPC bernama; warga masuk statistik "diajak ngobrol".
+      if (resident) recordResidentChat(npcId, withReply);
+      else {
+        histories.set(npcId, withReply);
+        addMet(npcId);
+      }
     } catch (chatError) {
       if (controller.signal.aborted) return;
       setError(chatError instanceof Error ? chatError.message : String(chatError));

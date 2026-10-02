@@ -1,5 +1,7 @@
-import { useRef } from 'react';
+import { Suspense, useRef } from 'react';
 import { useFrame } from '@react-three/fiber';
+import { PedestrianLayer, pedRuntime, RESIDENTS } from '../ambient/PedestrianLayer';
+import { nearestPed, PED_TALK_DISTANCE } from '../ambient/pedestrianSim';
 import { markExplored } from './exploration';
 import { BUS_DISTANCE, MODE_RADIUS, TALK_DISTANCE, USE_DISTANCE, jumpState, playerState } from './runtime';
 import { findNearestFreeSeat } from './seating';
@@ -9,7 +11,7 @@ import { chunkAt, worldState } from '../world/worldState';
 const INTERVAL = 0.15;
 
 /**
- * Throttled (~7 Hz) scan for the NPC, parked vehicle, and bus stop the action buttons should target.
+ * Throttled (~7 Hz) scan for the NPC (named NPC or ambient resident), parked vehicle, and bus stop the action buttons should target.
  * Also reveals the fog of war around the player. The store is only touched when a target changes.
  */
 export function Proximity() {
@@ -46,6 +48,12 @@ export function Proximity() {
       }
     }
 
+    // Warga ambient dalam 3 m hanya kalau tidak ada NPC bernama di dekat (NPC bernama diprioritaskan).
+    if (!npcId && onFoot && pedRuntime.graph) {
+      const ped = nearestPed(pedRuntime.graph, pedRuntime.world, playerState.x, playerState.z, PED_TALK_DISTANCE);
+      npcId = ped ? (RESIDENTS[ped.residentIndex]?.id ?? null) : null;
+    }
+
     let busStopId: string | null = null;
     if (onFoot) {
       let bestStop = BUS_DISTANCE;
@@ -71,5 +79,11 @@ export function Proximity() {
     }
   });
 
-  return null;
+  // ponytail: layer pejalan kaki dipasang dari sini karena App.tsx/World.tsx di luar cakupan task ini;
+  // pindahkan ke AmbientLayer saat B7 menyatukan render ambient.
+  return (
+    <Suspense fallback={null}>
+      <PedestrianLayer />
+    </Suspense>
+  );
 }

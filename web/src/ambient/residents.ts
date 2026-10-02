@@ -2,6 +2,7 @@
  * Pool 60 warga tetap dengan persona deterministik (NEXT_FEATURES 3.7). Murni, tanpa three.js/React,
  * supaya bisa di-unit-test dan dibake ke public/ambient/residents.json.
  */
+import { playerLine, systemPrompt } from '../ai/promptFacts';
 import { mulberry32 } from '../world/worldGen';
 import { DISTRICT_NAMES, type DistrictId, districtOf, WORLD_CHUNKS } from '../world/worldSpec';
 import { hourOf } from './density';
@@ -121,13 +122,6 @@ export function residentActivity(resident: Resident, t: number): string {
 
 const placeName = (place: Place) => DISTRICT_NAMES[place.district];
 
-// ponytail: fakta kota dan aturan disalin dari ai/chat.ts karena chat.ts mengimpor three (lewat HeroAppearance).
-// Pindahkan ke modul prompt murni bersama saat C8 menyambungkan chat warga.
-const WORLD_FACTS =
-  'Fakta kota: ada tiga kawasan (Pusat Kota di tengah, Perumahan di sisi barat/utara/selatan, Kawasan Industri di sisi timur). Pemain bisa jalan kaki, naik skateboard, sepeda, motor, dan mobil yang terparkir, serta naik bus dari halte untuk berpindah cepat. Tidak ada musuh.';
-const RULES =
-  'Jawab dalam bahasa Indonesia, singkat (maksimal 3 kalimat), tetap sebagai karakter. Hanya bahas hal seputar kota dan kehidupan sehari-hari di dalam game. Jika ditanya di luar konteks, arahkan kembali dengan sopan.';
-
 /**
  * System prompt warga, gaya sama dengan buildMessages di ai/chat.ts. `playerName` sudah divalidasi di profil.
  * `look` = appearanceSummary(appearance) dari pemanggil (dihitung di luar agar modul ini tetap murni).
@@ -143,9 +137,5 @@ export function residentSystemPrompt(
     `Kamu adalah ${resident.name}, ${resident.age} tahun, ${resident.job} di Openworld City. ` +
     `Kamu tinggal di kawasan ${placeName(resident.home)} dan bekerja di kawasan ${placeName(resident.office)}. ` +
     `Hobimu ${resident.hobby}. Suasana hatimu hari ini ${resident.mood}. Saat ini kamu sedang ${residentActivity(resident, t)}.`;
-  const greeting = playerGender === 'f' ? 'Mbak' : 'Mas';
-  const player = playerName
-    ? `Pemain yang sedang berbicara denganmu bernama "${playerName}". Panggil dia "${greeting} ${playerName}", terutama saat menyapa.${look ? ` Dia memakai ${look}.` : ''}`
-    : '';
-  return [persona, WORLD_FACTS, player, RULES].filter(Boolean).join(' ');
+  return systemPrompt(persona, playerLine(playerName, playerGender, look));
 }
