@@ -52,6 +52,11 @@ interface GameState {
   /** NPC whose chat panel is open (game loop paused). */
   chatNpcId: string | null;
   busMenuOpen: boolean;
+  /**
+   * Perjalanan bus yang sedang berlangsung (HUD + tombol Turun); null = tidak naik bus.
+   * Diperbarui ~4 Hz oleh AmbientLayer; state per frame ada di game/busTrip.ts. Tidak masuk save game.
+   */
+  busRide: BusRideInfo | null;
   /** Pemain sedang duduk di bangku (tidak masuk save game; detail kursi di game/seating.ts). */
   seated: boolean;
   /** Quest "Kenalan dengan warga": NPC ids the player has talked to. */
@@ -109,6 +114,17 @@ export function normalizeControls(value: Partial<ControlSettings> | null | undef
   };
 }
 
+export interface BusRideInfo {
+  phase: 'menunggu' | 'naik' | 'jalan' | 'turun' | 'selesai' | 'gagal';
+  /** Id halte berikutnya (perantara atau tujuan). */
+  nextStopId: string;
+  destinationId: string;
+  /** 0..1 */
+  progress: number;
+  /** Perkiraan sisa waktu (detik). */
+  eta: number;
+}
+
 export const NO_NEARBY: Nearby = { npcId: null, vehicleId: null, busStopId: null, seatId: null };
 
 /** UI-facing state only. Per-frame simulation state lives in game/runtime.ts to avoid React re-renders. */
@@ -120,6 +136,7 @@ export const useGameStore = create<GameState>()((set, get) => ({
   nearby: NO_NEARBY,
   chatNpcId: null,
   busMenuOpen: false,
+  busRide: null,
   seated: false,
   met: [],
   clock: '07:40',

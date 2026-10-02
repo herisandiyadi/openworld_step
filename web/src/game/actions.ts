@@ -5,6 +5,8 @@ import { audio } from '../audio/audioEngine';
 import type { BusStop } from '../world/worldSpec';
 import { worldState } from '../world/worldState';
 import { playerSeat, releaseSeat, reserveSeat, sitPose, standPosition } from './seating';
+import { BUS_EXIT, busLocalToWorld } from '../ambient/busRide';
+import { busTrip, resetBusTrip } from './busTrip';
 
 const PLAYER_ID = 'player';
 
@@ -12,7 +14,8 @@ const JUMP_SPEED = 6;
 
 const blocked = () => {
   const state = useGameStore.getState();
-  return state.paused || state.mapOpen || state.chatNpcId !== null || state.busMenuOpen || state.soakActive;
+  // Selama naik bus semua aksi lain mati; satu-satunya jalan keluar adalah tombol Turun (leaveBus).
+  return state.paused || state.mapOpen || state.chatNpcId !== null || state.busMenuOpen || state.soakActive || state.busRide !== null;
 };
 
 /** Shared by the HUD action buttons and the desktop keyboard shortcuts. */
@@ -100,6 +103,57 @@ export function askNearby(): void {
   setChatNpcId(nearby.npcId);
 }
 
+/**
+ * Naik bus yang benar-benar mengantar: permintaan dititipkan ke busTrip, AmbientLayer yang
+ * memegang graf lajur akan merencanakan rutenya. Fast travel lama tetap dipakai sebagai fallback
+ * (lihat travelTo) kalau rute tidak ada atau perjalanan bermasalah.
+ */
+export function rideBusTo(stop: BusStop): void {
+  const state = useGameStore.getState();
+  const from = worldState.index?.busStops.find((item) => item.id === state.nearby.busStopId);
+  if (!from || from.id === stop.id) {
+    travelTo(stop);
+    return;
+  }
+  standUp();
+  playerState.target = null;
+  playerState.path = [];
+  jumpState.y = 0;
+  jumpState.vy = 0;
+  busTrip.request = { from, to: stop };
+  busTrip.ride = null;
+  busTrip.to = stop;
+  busTrip.pending = 0;
+  busTrip.pose = null;
+  audio.bus();
+  useGameStore.setState({ busMenuOpen: false, busRide: { phase: 'menunggu', nextStopId: stop.id, destinationId: stop.id, progress: 0, eta: 0 } });
+}
+
+/**
+ * Tombol "Turun": kapan saja. Di halte tujuan artinya perjalanan selesai; di tengah jalan pemain
+ * diturunkan di sisi bus. Dipanggil juga oleh fallback, jadi harus aman walau tidak sedang naik bus.
+ */
+export function leaveBus(): void {
+  const ride = busTrip.ride;
+  const pose = busTrip.pose;
+  if (ride && pose && ride.phase !== 'selesai') {
+    const spot = busLocalToWorld(pose, BUS_EXIT);
+    playerState.x = spot.x;
+    playerState.z = spot.z;
+    playerState.heading = spot.heading;
+    markExplored(spot.x, spot.z);
+  }
+  resetBusTrip();
+  playerState.target = null;
+  playerState.path = [];
+  jumpState.y = 0;
+  jumpState.vy = 0;
+  if (useGameStore.getState().busRide) {
+    audio.stand();
+    useGameStore.setState({ busRide: null });
+  }
+}
+
 /** Opens the bus destination menu at a bus stop (on foot only). */
 export function openBus(): void {
   if (blocked()) return;
@@ -109,8 +163,12 @@ export function openBus(): void {
   state.setBusMenuOpen(true);
 }
 
-/** Fast travel: the bus drops the player at the destination stop. */
+/**
+ * Fast travel lama: pemain langsung dipindah ke halte tujuan. Sekarang hanya fallback perjalanan bus
+ * (rute kosong/tidak tersambung, AmbientLayer belum siap, atau timeout), jadi juga membersihkan busTrip.
+ */
 export function travelTo(stop: BusStop): void {
+  resetBusTrip();
   standUp();
   playerState.x = stop.x;
   playerState.z = stop.z;
@@ -121,5 +179,5 @@ export function travelTo(stop: BusStop): void {
   jumpState.vy = 0;
   markExplored(stop.x, stop.z);
   audio.bus();
-  useGameStore.setState({ busMenuOpen: false, nearby: { npcId: null, vehicleId: null, busStopId: stop.id, seatId: null } });
+  useGameStore.setState({ busMenuOpen: false, busRide: null, nearby: { npcId: null, vehicleId: null, busStopId: stop.id, seatId: null } });
 }

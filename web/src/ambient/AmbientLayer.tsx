@@ -10,7 +10,11 @@ import { dayClock, MODE_RADIUS, playerState } from '../game/runtime';
 import { useGameStore } from '../state/gameStore';
 import type { BusStop } from '../world/worldSpec';
 import { groundHeightAt, worldUrl } from '../world/worldState';
-import { busPose, createBus, planBusRoute, stepBus } from './busRoute';
+import { BUS_PAUSE, busPose, createBus, planBusRoute, stepBus } from './busRoute';
+import { BUS_SEAT, busLocalToWorld, nextRouteStop, RIDE_SPEED, rideEtaSeconds, rideNextStopId, rideOnBoard, rideProgress, startBusRide, stepBusRide } from './busRide';
+import { travelTo } from '../game/actions';
+import { busTrip } from '../game/busTrip';
+import { MOTO_RIDER_ASSET, motoRiderPose, riderTint } from '../game/riderSpec';
 import { isNight } from './density';
 import { PedestrianLayer, pedRuntime } from './PedestrianLayer';
 import { pedPose } from './pedestrianSim';
@@ -24,6 +28,8 @@ import { createTraffic, FAR_DISTANCE, lerpPose, playerGap, stepTrafficTiered, TI
 const VEHICLE_IDS = ['veh_car_sedan', 'veh_car_hatch', 'veh_moto', 'veh_bus'] as const satisfies readonly AssetId[];
 const TRAFFIC_TYPES = 3;
 const BUS = 3;
+/** Indeks `batches` motor; pengendara dipasang di matriks motor yang sama. */
+const MOTO = 2;
 const TICK = 1 / TICK_HZ_NEAR;
 /** Lampu lalu lintas hanya digambar untuk persimpangan sedekat ini. */
 const LIGHT_DISTANCE = 70;
@@ -34,6 +40,9 @@ const HONK_AFTER = 2;
 const HONK_COOLDOWN = 4;
 const LAMP_OFF = new Color('#2a2420');
 const LAMP_ON: Record<LampState, Color> = { red: new Color('#ff3b2f'), yellow: new Color('#ffd23f'), green: new Color('#4cd964') };
+/** Status perjalanan bus dikirim ke store (HUD) dengan interval ini supaya React tidak re-render tiap frame. */
+const RIDE_UI_INTERVAL = 0.25;
+const TINT = new Color();
 
 let lanesPromise: Promise<LaneGraph> | null = null;
 /** lanes.json dimuat sekali; promise-nya stabil supaya bisa dipakai React use(). */
@@ -117,6 +126,29 @@ function addVehicle(parts: Part[], x: number, y: number, z: number, dirX: number
   }
 }
 
+/**
+ * Pengendara motor warga: satu InstancedMesh per node mesh aset pengendara (jaket+helm dan
+ * kulit+celana) = 2 draw call untuk SEMUA motor, dipakai hanya oleh kendaraan bertipe MOTO.
+ * Warna per instance dipakai supaya jaket tiap pengendara berbeda tanpa menambah draw call.
+ */
+function buildRiders(root: Object3D, slots: number): { mesh: InstancedMesh; node: Matrix4; tinted: boolean }[] {
+  root.updateMatrixWorld(true);
+  const parts: { mesh: InstancedMesh; node: Matrix4; tinted: boolean }[] = [];
+  root.traverse((object) => {
+    const mesh = object as Mesh;
+    if (!mesh.isMesh) return;
+    // Material diklon: instanceColor mengalikan warna, dan material aset dipakai bersama motor.
+    const instanced = new InstancedMesh(mesh.geometry, (mesh.material as Material).clone(), slots);
+    instanced.frustumCulled = false;
+    instanced.count = 0;
+    // Nama dipertahankan dari node aset supaya batch ini mudah dikenali saat men-debug scene graph.
+    instanced.name = `moto_${mesh.name}`;
+    // Hanya node 'paint' (jaket + helm) yang diwarnai; kulit dan celana tetap warna aset.
+    parts.push({ mesh: instanced, node: mesh.matrixWorld.clone(), tinted: mesh.name.includes('paint') });
+  });
+  return parts;
+}
+
 /** Data render per kendaraan ambient: jenis model, jarak tempuh (putaran roda), dan klakson. */
 interface Extra {
   type: number;
@@ -128,11 +160,17 @@ interface Extra {
 /**
  * Lapisan lalu lintas kota (B4, B7-B9): mobil/motor ambient, bus kota, dan lampu lalu lintas.
  * Draw call: sedan/hatch/motor masing-masing 3 (badan, lampu depan, roda), bus 4 (+ pintu),
- * lampu lalu lintas 2 (tiang, lensa) = 15.
+ * lampu lalu lintas 2 (tiang, lensa), pengendara motor 2 (jaket+helm, kulit+celana) = 17
+ * (sebelum ada pengendara: 15).
+ *
+ * Juga menjalankan perjalanan bus pemain (busRide.ts): bus kota yang sama dipakai mengantar pemain,
+ * dan useFrame-nya berprioritas -1 supaya pose pemain di kursi bus sudah ditulis sebelum
+ * PlayerController/CameraRig membaca playerState pada frame yang sama (tanpa jeda satu frame).
  */
 export function AmbientLayer({ busStops }: { busStops: readonly BusStop[] }) {
   const graph = use(loadLaneGraph());
-  const gltfs = useGLTF([...VEHICLE_IDS, 'prop_trafficlight_01'].map((id) => assetUrl(id as AssetId)));
+  // Aset pengendara sengaja tidak masuk AssetId (app/assets.ts milik modul lain); URL-nya pola yang sama.
+  const gltfs = useGLTF([...VEHICLE_IDS, 'prop_trafficlight_01', MOTO_RIDER_ASSET].map((id) => assetUrl(id as AssetId)));
   const camera = useThree((state) => state.camera) as PerspectiveCamera;
 
   const batches = useMemo(
@@ -164,6 +202,8 @@ export function AmbientLayer({ busStops }: { busStops: readonly BusStop[] }) {
     return { pole: pole as InstancedMesh | null, poleMatrix, lens: lens as InstancedMesh | null, lenses };
   }, [gltfs]);
 
+  const riders = useMemo(() => buildRiders(gltfs[VEHICLE_IDS.length + 1]?.scene ?? new Object3D(), VEHICLE_POOL.high), [gltfs]);
+
   const root = useMemo(() => new Object3D(), []);
   const traffic = useMemo(() => createTraffic(), []);
   const extras = useMemo(() => new WeakMap<Vehicle, Extra>(), []);
@@ -172,16 +212,18 @@ export function AmbientLayer({ busStops }: { busStops: readonly BusStop[] }) {
   const bus = useMemo(() => createBus(), []);
   const route = useMemo(() => planBusRoute(graph, busStops), [graph, busStops]);
   const signals = useMemo(() => signalisedIntersections(graph), [graph]);
-  const clock = useRef({ accumulator: 0, tick: 0, time: 0, nextId: 1, busDistance: 0 });
+  const clock = useRef({ accumulator: 0, tick: 0, time: 0, nextId: 1, busDistance: 0, rideUi: 0 });
+  /** Pose bus sebelum tick terakhir: bus diinterpolasi supaya kamera yang menempel tidak bergetar. */
+  const busPrevious = useRef<ReturnType<typeof busPose> | undefined>(undefined);
 
   useEffect(() => {
-    const meshes = [...batches.flatMap((batch) => batch.parts.map((part) => part.mesh)), lights.pole, lights.lens];
+    const meshes = [...batches.flatMap((batch) => batch.parts.map((part) => part.mesh)), ...riders.map((part) => part.mesh), lights.pole, lights.lens];
     for (const mesh of meshes) if (mesh) root.add(mesh);
     return () => {
       for (const mesh of meshes) mesh?.dispose();
       root.clear();
     };
-  }, [batches, lights, root]);
+  }, [batches, lights, riders, root]);
 
   useFrame((_, delta) => {
     const sim = clock.current;
@@ -210,10 +252,40 @@ export function AmbientLayer({ busStops }: { busStops: readonly BusStop[] }) {
       });
       const busLeg = bus.leg;
       const busS = bus.s;
-      stepBus(graph, route, bus, TICK);
+      if (route.edges.length > 0) busPrevious.current = busPose(graph, route, bus);
+
+      // Permintaan naik bus dari BusMenu: rencanakan di sini karena graf lajur hanya ada di lapisan ini.
+      const request = busTrip.request;
+      if (request) {
+        busTrip.request = null;
+        const ride = startBusRide(graph, route, bus, request.from, request.to);
+        // Rute kosong / tidak tersambung: jatuh ke fast travel lama, pemain tidak pernah terkunci.
+        if (!ride) travelTo(request.to);
+        else {
+          busTrip.ride = ride;
+          // Bus dipindah ke titik datang, jadi interpolasi dari pose lama akan menyapu kota.
+          busPrevious.current = undefined;
+        }
+      }
+
+      const ride = busTrip.ride;
+      if (ride) {
+        stepBusRide(graph, route, bus, ride, TICK);
+        if (ride.phase === 'selesai' || ride.phase === 'gagal') {
+          // Bus kota melanjutkan putarannya dari halte berikutnya setelah mengantar.
+          bus.nextStop = nextRouteStop(graph, route, bus);
+          bus.wait = ride.phase === 'selesai' ? 0 : BUS_PAUSE;
+          const to = busTrip.to;
+          busTrip.ride = null;
+          // Sukses dan gagal sama-sama berakhir di halte tujuan (gagal = timeout, fallback fast travel).
+          if (to) travelTo(to);
+        }
+      } else {
+        stepBus(graph, route, bus, TICK);
+      }
       // Jarak tempuh bus untuk putaran roda (0 saat berhenti di halte).
       if (bus.leg === busLeg) sim.busDistance += Math.max(0, bus.s - busS);
-      else sim.busDistance += TICK * 9;
+      else sim.busDistance += TICK * (ride ? RIDE_SPEED : 9);
 
       // Spawn/despawn sekali per detik, di luar frustum kamera.
       if (sim.tick % TICK_HZ_NEAR === 0) {
@@ -237,7 +309,10 @@ export function AmbientLayer({ busStops }: { busStops: readonly BusStop[] }) {
     const agents: typeof ambientAgents.vehicles = [];
 
     for (const batch of batches) for (const part of batch.parts) part.mesh.count = 0;
+    for (const part of riders) part.mesh.count = 0;
     const alpha = sim.accumulator / TICK;
+    // Pemain di dalam bus: lalu lintas tidak boleh mendorongnya keluar (B8) atau mengklakson.
+    const onBus = busTrip.ride !== null && rideOnBoard(busTrip.ride);
     for (const vehicle of traffic.vehicles) {
       let extra = extras.get(vehicle);
       if (!extra) {
@@ -251,17 +326,30 @@ export function AmbientLayer({ busStops }: { busStops: readonly BusStop[] }) {
       // ponytail: agen jauh maju tiap tick ke-3 (5 Hz), jadi di sana gerakannya tetap bertahap; tak terlihat di > 60 m.
       const pose = lerpPose(previous.get(vehicle), vehiclePose(graph, vehicle), alpha);
       agents.push({ ...pose, speed: vehicle.speed });
-      addVehicle(batch.parts, pose.x, groundHeightAt(pose.x, pose.z), pose.z, pose.dirX, pose.dirZ, -extra.distance / batch.wheelRadius);
+      const groundY = groundHeightAt(pose.x, pose.z);
+      addVehicle(batch.parts, pose.x, groundY, pose.z, pose.dirX, pose.dirZ, -extra.distance / batch.wheelRadius);
+      if (extra.type === MOTO) {
+        // Pengendara memakai matriks motor yang sama (aset dimodelkan di ruang model motor).
+        const rider = motoRiderPose(pose, groundY);
+        BASE.compose(POS.set(rider.x, rider.y, rider.z), QUAT.setFromAxisAngle(UP, rider.heading), ONE);
+        TINT.set(riderTint(vehicle.id));
+        for (const part of riders) {
+          const index = part.mesh.count++;
+          part.mesh.setMatrixAt(index, SCRATCH.multiplyMatrices(BASE, part.node));
+          if (part.tinted) part.mesh.setColorAt(index, TINT);
+        }
+      }
 
       // B8: tumpang tindih dengan pemain -> kendaraan berhenti, pemain didorong keluar. Tanpa kerusakan.
+      // Saat pemain duduk di bus efek ini dimatikan: dorongan akan melempar pemain keluar dari bus.
       const distance = Math.hypot(pose.x - player.x, pose.z - player.z);
-      if (distance < VEHICLE_LENGTH / 2 + player.radius) {
+      if (!onBus && distance < VEHICLE_LENGTH / 2 + player.radius) {
         vehicle.speed = 0;
         const half = VEHICLE_LENGTH / 2;
         pushOutOfBoxes(playerState, player.radius, [{ minX: pose.x - half, maxX: pose.x + half, minZ: pose.z - half, maxZ: pose.z + half }]);
       }
       // Klakson kalau pemain menghalangi lebih dari 2 detik.
-      extra.blocked = vehicle.speed < 0.2 && Number.isFinite(playerGap(graph, vehicle, player)) ? extra.blocked + dt : 0;
+      extra.blocked = !onBus && vehicle.speed < 0.2 && Number.isFinite(playerGap(graph, vehicle, player)) ? extra.blocked + dt : 0;
       extra.honkCooldown = Math.max(0, extra.honkCooldown - dt);
       if (extra.blocked > HONK_AFTER && extra.honkCooldown === 0) {
         extra.honkCooldown = HONK_COOLDOWN;
@@ -270,13 +358,39 @@ export function AmbientLayer({ busStops }: { busStops: readonly BusStop[] }) {
       }
     }
 
+    for (const part of riders) {
+      part.mesh.instanceMatrix.needsUpdate = true;
+      if (part.mesh.instanceColor) part.mesh.instanceColor.needsUpdate = true;
+    }
     ambientAgents.vehicles = agents;
     if (walk) pedRuntime.world.vehicles = agents;
 
     const busBatch = batches[BUS];
     if (busBatch && route.edges.length > 0) {
-      const pose = busPose(graph, route, bus);
-      addVehicle(busBatch.parts, pose.x, groundHeightAt(pose.x, pose.z), pose.z, pose.dirX, pose.dirZ, -sim.busDistance / busBatch.wheelRadius);
+      const pose = lerpPose(busPrevious.current, busPose(graph, route, bus), alpha);
+      const busY = groundHeightAt(pose.x, pose.z);
+      addVehicle(busBatch.parts, pose.x, busY, pose.z, pose.dirX, pose.dirZ, -sim.busDistance / busBatch.wheelRadius);
+      busTrip.pose = pose;
+      const active = busTrip.ride;
+      if (active && rideOnBoard(active)) {
+        // Pemain duduk di kursi bus: posisi ditulis tiap frame dari pose bus yang sama dengan render.
+        // ponytail: tinggi tanah diambil di pivot bus, bukan di kursi; beda < 5 cm di jalan datar kota.
+        const seat = busLocalToWorld(pose, BUS_SEAT);
+        playerState.x = seat.x;
+        playerState.z = seat.z;
+        playerState.heading = seat.heading;
+      }
+    }
+
+    // HUD perjalanan bus: progres, halte berikutnya, ETA. Diperbarui 4 Hz atau saat fase berubah.
+    const active = busTrip.ride;
+    const ui = useGameStore.getState().busRide;
+    sim.rideUi += dt;
+    if (active && ui && (sim.rideUi >= RIDE_UI_INTERVAL || ui.phase !== active.phase)) {
+      sim.rideUi = 0;
+      useGameStore.setState({
+        busRide: { phase: active.phase, nextStopId: rideNextStopId(active), destinationId: active.toStopId, progress: rideProgress(active), eta: Math.ceil(rideEtaSeconds(active)) },
+      });
     }
 
     // Lampu depan hanya menyala di malam hari.
@@ -312,7 +426,7 @@ export function AmbientLayer({ busStops }: { busStops: readonly BusStop[] }) {
       lens.instanceMatrix.needsUpdate = true;
       if (lens.instanceColor) lens.instanceColor.needsUpdate = true;
     }
-  });
+  }, -1);
 
   return (
     <>

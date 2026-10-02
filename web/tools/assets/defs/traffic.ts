@@ -2,6 +2,7 @@ import { MeshBuilder } from '../lib/builder';
 import { addMesh, createBaseDocument } from '../lib/gltf';
 import { type Vec3 } from '../lib/math';
 import { PALETTE } from '../lib/palette';
+import { MOTO_RIDER, MOTO_RIDER_ASSET } from '../../../src/game/riderSpec';
 import type { AssetDef } from './types';
 
 const HALF_PI = Math.PI / 2;
@@ -116,6 +117,61 @@ function buildMoto() {
   return doc;
 }
 
+/**
+ * Pengendara motor warga (R&D: motor ambient tampak tanpa pengendara). Aset terpisah, bukan node
+ * di dalam veh_moto, karena veh_moto juga dipakai pemain yang sudah membawa hero sendiri.
+ * Dua node mesh: `rider_paint` (jaket + helm, vertex colour netral supaya runtime bisa mengalikan
+ * warna per instance) dan `rider_skin` (kepala, tangan, celana, sepatu — warna tetap).
+ *
+ * Pose dibangun langsung di ruang model MOTOR (pinggul di jok, tangan di grip, kaki di pijakan),
+ * jadi runtime cukup memakai matriks motor yang sama. checkPivot di build.ts mewajibkan dasar
+ * di y=0; itu dipenuhi bayangan blob datar di bawah motor (lalu lintas belum punya bayangan,
+ * jadi blob ini sekalian membuat motor + pengendara tidak tampak melayang).
+ */
+function buildMotoRider() {
+  const { doc, material } = createBaseDocument();
+  const paint = new MeshBuilder();
+  const skin = new MeshBuilder();
+  const { pegX, pegY, pegZ, seatY, seatZ, gripX, gripY, gripZ } = MOTO_RIDER;
+  const at = (x: number, y: number, z: number): Vec3 => [x, y, z];
+  skin.frustum({ radiusBottom: 0.42, radiusTop: 0.42, height: 0.01, segments: 8 }, { at: [0, 0.002, 0], color: PALETTE.rubber });
+  const shoulderY = seatY + 0.46;
+  const shoulderZ = seatZ - 0.2;
+
+  // Kaki: paha turun ke depan dari jok, lutut di depan pinggul, telapak di pijakan.
+  for (const sign of [-1, 1]) {
+    const hip = at(sign * 0.11, seatY - 0.02, seatZ - 0.02);
+    const knee = at(sign * 0.2, seatY - 0.26, seatZ - 0.44);
+    const foot = at(sign * pegX, pegY + 0.04, pegZ);
+    skin.bar(hip, knee, 0.16, { color: PALETTE.jeans });
+    skin.bar(knee, foot, 0.13, { color: PALETTE.jeans });
+    skin.box([0.1, 0.07, 0.22], { at: at(sign * pegX, pegY + 0.035, pegZ - 0.04), color: PALETTE.sole });
+  }
+
+  // Torso miring dari pinggul ke bahu (membungkuk ke stang), jaket dan helm bisa diwarnai runtime.
+  paint.bar(at(0, seatY, seatZ), at(0, shoulderY, shoulderZ), 0.32, { color: PALETTE.paint });
+  paint.box([0.36, 0.14, 0.3], { at: at(0, seatY + 0.04, seatZ + 0.01), color: PALETTE.paint });
+  for (const sign of [-1, 1]) {
+    // Lengan dari bahu ke grip: siku sedikit menekuk lewat dua segmen.
+    const shoulder = at(sign * 0.18, shoulderY, shoulderZ);
+    const elbow = at(sign * 0.26, shoulderY - 0.2, shoulderZ - 0.22);
+    const hand = at(sign * gripX, gripY, gripZ + 0.02);
+    paint.bar(shoulder, elbow, 0.11, { color: PALETTE.paint });
+    skin.bar(elbow, hand, 0.09, { color: PALETTE.skinTan });
+    skin.box([0.08, 0.08, 0.1], { at: at(sign * gripX, gripY, gripZ), color: PALETTE.grip });
+  }
+  skin.box([0.11, 0.13, 0.11], { at: at(0, shoulderY + 0.11, shoulderZ - 0.04), color: PALETTE.skinTan });
+  paint.blob({ radius: 0.15, stretch: [1, 1.05, 1.1], seed: 7 }, { at: at(0, shoulderY + 0.26, shoulderZ - 0.07), color: PALETTE.paint });
+  // Visor menghadap -Z (arah jalan), jadi pengendara jelas melihat ke depan.
+  skin.box([0.2, 0.08, 0.04], { at: at(0, shoulderY + 0.25, shoulderZ - 0.21), color: PALETTE.glass });
+
+  const root = doc.createNode(MOTO_RIDER_ASSET);
+  root.addChild(doc.createNode('rider_paint').setMesh(addMesh(doc, 'rider_paint', [{ builder: paint, material }])));
+  root.addChild(doc.createNode('rider_skin').setMesh(addMesh(doc, 'rider_skin', [{ builder: skin, material }])));
+  doc.getRoot().setDefaultScene(doc.createScene('scene').addChild(root));
+  return doc;
+}
+
 /** Bus kota: pintu depan dan tengah jadi node terpisah (berhenti 4 detik di halte, NEXT_FEATURES 3.1). */
 function buildBus() {
   const { doc, material, emissive } = createBaseDocument();
@@ -187,6 +243,18 @@ export const trafficVehicleAssets: AssetDef[] = [
     requiredNodes: ['wheel_front', 'wheel_rear', 'lights'],
     meta: { wheelRadius: 0.32, wheelNodes: ['wheel_front', 'wheel_rear'], drive: 'moto' },
     build: buildMoto,
+  },
+  {
+    // Hanya untuk motor warga (AmbientLayer); runtime menempatkannya di jok lewat motoRiderPose().
+    id: MOTO_RIDER_ASSET,
+    category: 'vehicle_bike',
+    tags: ['traffic', 'ambient', 'rider', 'city'],
+    collider: { type: 'box', center: [0, 0.6, -0.15], size: [0.5, 1.2, 0.8] },
+    requiredNodes: ['rider_paint', 'rider_skin'],
+    meta: { ...MOTO_RIDER, mountedOn: 'veh_moto', paintSlot: 'vertex-colour' },
+    // Pratinjau di atas motor (tanpa klip): origin sama, jadi ini juga bukti posisi duduknya pas.
+    previews: [{ clip: '', phase: 0, with: 'veh_moto' }],
+    build: buildMotoRider,
   },
   {
     id: 'veh_bus',

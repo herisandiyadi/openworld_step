@@ -1,5 +1,5 @@
 import { useEffect } from 'react';
-import { travelTo } from '../game/actions';
+import { rideBusTo } from '../game/actions';
 import { busDestinations } from '../game/busRoutes';
 import { useGameStore } from '../state/gameStore';
 import { DISTRICT_NAMES } from '../world/worldSpec';
@@ -23,13 +23,14 @@ export function BusMenu() {
     <div className="overlay" role="dialog" aria-modal="true" aria-labelledby="bus-title">
       <div className="pause-panel bus-panel">
         <h2 id="bus-title">Naik bus ke...</h2>
+        <p className="bus-note">Bus kota akan datang menjemput dan mengantar kamu ke halte tujuan.</p>
         {destinations.map((destination, index) => (
           <button
             key={destination.stop.id}
             type="button"
             className="overlay-button secondary bus-option"
             autoFocus={index === 0}
-            onClick={() => travelTo(destination.stop)}
+            onClick={() => rideBusTo(destination.stop)}
           >
             {destination.label}
             <small>{DISTRICT_NAMES[destination.stop.district]}</small>

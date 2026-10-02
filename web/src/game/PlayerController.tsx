@@ -2,7 +2,8 @@ import { useMemo, useRef } from 'react';
 import { useFrame } from '@react-three/fiber';
 import { DirectionalLight, Group, Mesh, Object3D, Vector3 } from 'three';
 import { clampToBounds, hasInput, pushOutOfBoxes, stepPlayer } from './movement';
-import { standUp } from './actions';
+import { standUp, travelTo } from './actions';
+import { busTrip, PICKUP_WATCHDOG } from './busTrip';
 import { playerSeat, SIT_TRANSITION } from './seating';
 import { Hero } from './Hero';
 import { audio } from '../audio/audioEngine';
@@ -34,6 +35,12 @@ function lerpAngle(from: number, to: number, alpha: number): number {
 export function PlayerController({ shadows }: { shadows: boolean }) {
   const mode = useGameStore((state) => state.mode);
   const seated = useGameStore((state) => state.seated);
+  /** Naik bus (menunggu, duduk di dalam, sampai turun): kontrol jalan kaki dan gravitasi mati. */
+  const onBus = useGameStore((state) => state.busRide !== null);
+  /** Sudah di dalam bus (bukan sekadar menunggu di halte): hero memakai pose duduk. */
+  const boarded = useGameStore((state) => state.busRide !== null && state.busRide.phase !== 'menunggu');
+  /** Posisi akhir frame sebelumnya: posisi di bus ditulis sebelum frame ini, jadi kecepatan diukur dari sini. */
+  const lastPos = useRef({ x: 0, z: 0 });
   const playerRef = useRef<Group>(null);
   const bodyRef = useRef<Group>(null);
   const markerRef = useRef<Mesh>(null);
@@ -43,11 +50,26 @@ export function PlayerController({ shadows }: { shadows: boolean }) {
   useFrame((state, rawDelta) => {
     const dt = Math.min(rawDelta, MAX_DT);
     const raw = { x: joystickInput.x + keyboardInput.x, z: joystickInput.z + keyboardInput.z };
-    const startX = playerState.x;
-    const startZ = playerState.z;
+    const startX = onBus ? lastPos.current.x : playerState.x;
+    const startZ = onBus ? lastPos.current.z : playerState.z;
 
     const seat = playerSeat.seat;
-    if (seat) {
+    if (onBus) {
+      // Posisi di kursi bus ditulis AmbientLayer (useFrame prioritas -1, jadi sudah terjadi frame ini).
+      // Tidak ada stepPlayer/pushOutOfBoxes di sini: collider jalan/halte tidak boleh mendorong pemain
+      // keluar dari bus. Selama bus belum datang pemain diam menunggu di halte.
+      driveState.speed = 0;
+      jumpState.y = 0;
+      jumpState.vy = 0;
+      // Watchdog: AmbientLayer belum dimuat / gagal mengambil permintaan -> fast travel lama.
+      if (busTrip.request) {
+        busTrip.pending += dt;
+        if (busTrip.pending > PICKUP_WATCHDOG) travelTo(busTrip.request.to);
+      } else if (!busTrip.ride && busTrip.to) {
+        // Store masih bilang naik bus tapi perjalanan sudah hilang (mis. AmbientLayer di-unmount).
+        travelTo(busTrip.to);
+      }
+    } else if (seat) {
       // Duduk: joystick/WASD membuat berdiri; selain itu meluncur ke titik duduk dalam ~0.4 detik.
       // Collider bangku tidak dipakai di sini, jadi pemain tidak didorong keluar dari kursinya.
       if (hasInput(raw)) {
@@ -79,7 +101,10 @@ export function PlayerController({ shadows }: { shadows: boolean }) {
       }
     }
 
-    const speed = dt > 0 ? Math.hypot(playerState.x - startX, playerState.z - startZ) / dt : 0;
+    // Batas 40 m/s: lompatan posisi (bus muncul, fallback teleport) tidak boleh terbaca sebagai ngebut.
+    const speed = dt > 0 ? Math.min(40, Math.hypot(playerState.x - startX, playerState.z - startZ) / dt) : 0;
+    lastPos.current.x = playerState.x;
+    lastPos.current.z = playerState.z;
     playerMotion.speed += (speed - playerMotion.speed) * (1 - Math.exp(-SPEED_SMOOTHING * dt));
 
     if (jumpState.vy !== 0 || jumpState.y > 0) {
@@ -142,7 +167,7 @@ export function PlayerController({ shadows }: { shadows: boolean }) {
 
       <group ref={playerRef}>
         <group ref={bodyRef}>
-          {mode !== 'car' && <Hero mode={mode} seated={seated} />}
+          {mode !== 'car' && <Hero mode={mode} seated={seated || boarded} />}
           <PlayerVehicle />
         </group>
       </group>

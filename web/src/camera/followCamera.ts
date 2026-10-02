@@ -25,6 +25,12 @@ export const CAMERA_MODES: Record<MoveMode, CameraTuning> = {
   car: { distance: 9, targetY: 1.3, pitch: 10 * DEG, fov: 60 },
 };
 
+/**
+ * Kamera saat duduk di dalam bus: lebih jauh dan lebih tinggi dari mobil supaya seluruh bus dan
+ * jalan di depannya terlihat (bus 10 m, pemain duduk di bagian belakang).
+ */
+export const BUS_CAMERA: CameraTuning = { distance: 15, targetY: 2.6, pitch: 16 * DEG, fov: 60 };
+
 export const PITCH_MIN = -5 * DEG;
 export const PITCH_MAX = 40 * DEG;
 export const ZOOM_MIN = 0.7;
@@ -187,6 +193,8 @@ export interface SolveInput {
   heading: number;
   speed: number;
   boxes: readonly Aabb[];
+  /** Ganti tuning mode (mis. BUS_CAMERA saat naik bus). */
+  tuning?: CameraTuning;
 }
 
 /**
@@ -194,7 +202,7 @@ export interface SolveInput {
  * lalu FOV. Jarak di-smooth: maju cepat saat terhalang, menjauh pelan agar tidak melompat.
  */
 export function solveCamera(state: FollowState, input: SolveInput, dt: number, out: CameraPose): void {
-  const tuning = CAMERA_MODES[input.mode];
+  const tuning = input.tuning ?? CAMERA_MODES[input.mode];
   const ahead = lookAheadDistance(input.mode, input.speed);
   out.tx = input.x - Math.sin(input.heading) * ahead;
   out.ty = input.y + tuning.targetY;
