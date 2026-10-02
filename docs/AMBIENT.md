@@ -10,6 +10,8 @@ ambient, suasana malam, dan sapaan warga. Semua jam mengikuti satu sumber: `dayC
 | --- | --- |
 | `src/ambient/laneGraph.ts` | Graf lajur hasil bake (`public/world/lanes.json`): simpul, edge lajur, dan persimpangan. |
 | `src/ambient/trafficSim.ts` | Kendaraan mengikuti edge, jaga jarak, reservasi persimpangan. |
+| `src/ambient/busRide.ts` | Perjalanan bus yang mengantar pemain ke halte tujuan (lihat `RD_TRAFFIC.md`). |
+| `src/game/riderSpec.ts` | Titik kontak dan pose pengendara motor warga (`veh_moto_rider`). |
 | `src/ambient/spawner.ts` | Cincin spawn 40-110 m di luar frustum, despawn di luar 130 m, pool per preset. |
 | `src/ambient/density.ts` | `DENSITY` per kawasan, `densityAt(district, kind, t)`, `isNight`, `NIGHT_FACTOR`. |
 | `src/ambient/residents.ts` | 60 warga tetap deterministik, persona, dan `residentActivity(resident, t)`. |
