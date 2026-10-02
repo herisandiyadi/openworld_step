@@ -98,7 +98,7 @@ Status: `[ ]` belum, `[~]` dikerjakan, `[x]` selesai.
 - [x] **C2. Simulasi pejalan kaki** (1.5 hari): `src/ambient/pedestrianSim.ts` — duduk warga di bangku (state `sit`) belum dipakai runtime
   - Jalan di trotoar, menyeberang saat lampu pejalan hijau, duduk di bangku (memakai reservasi kursi dari C10), menghindari pemain.
   - Selesai jika: test memastikan tidak ada agen di dalam AABB gedung.
-- [ ] **C3. Aset dan animasi warga** (2 hari) — separuh aset selesai: `ped_citizen` (atribut `_TINT`, 6 varian di meta, klip idle/walk/sit); shader instanced & uji HP belum
+- [x] **C3. Aset dan animasi warga** (2 hari) — instanced 1 draw call: bind pose di-bake ke meter, `_TINT` 6 varian, pose walk/idle/sit di vertex shader (`pedAnim.ts`); jalur skinned ≤ 4 agen terdekat ditunda (`ponytail:`), performa di HP diuji di C11
   - `ped_citizen` dengan 6 variasi warna lewat atribut instance.
   - Animasi vertex shader prosedural (walk, idle, sit), dan skinned hanya untuk ≤ 4 agen terdekat.
   - Ini task paling berisiko, jadi prototipe dulu performanya di HP.
@@ -137,7 +137,7 @@ Status: `[ ]` belum, `[~]` dikerjakan, `[x]` selesai.
   - SFX duduk dan berdiri, shortcut keyboard, `aria-label`. Posisi duduk tidak disimpan di save.
   - Selesai jika: unit test reservasi (tidak ada dua karakter di satu kursi) dan berdiri tanpa terjebak lulus,
     dan duduk/berdiri berjalan di HP.
-- [ ] **C11. Uji dan rilis fase C** (0.75 hari) — kode tersambung (`PedestrianLayer` via `Proximity`); uji anggaran di HP belum
+- [ ] **C11. Uji dan rilis fase C** (0.75 hari) — kode tersambung (`PedestrianLayer` di `AmbientLayer`, audio ambient dari posisi agen, lampu pejalan kaki); uji anggaran di HP belum
   - Anggaran ambient (≤ 30 draw call, ≤ 40k segitiga, simulasi ≤ 1.5 ms per frame) dan uji di HP.
 
 **Gerbang C:** tidak ada agen di dalam gedung, reaksi hewan benar, chat warga jalan di HP, duduk/berdiri di
