@@ -21,7 +21,10 @@ function selectClip(mode: MoveMode, speed: number): { name: string; timeScale: n
   return { name: 'anim_Run', timeScale: clamp(speed / ANIM.runSpeed, 0.7, 1.6) };
 }
 
-export function Hero({ mode }: { mode: MoveMode }) {
+/** Transisi ke/dari klip duduk (detik). */
+const SIT_FADE = 0.4;
+
+export function Hero({ mode, seated = false }: { mode: MoveMode; seated?: boolean }) {
   // Penampilan milik profil (bukan save game), jadi dibaca sekali saat hero dipasang.
   const appearance = usePlayerProfile((state) => state.profile?.appearance) ?? DEFAULT_APPEARANCE;
   const { scene, mixer, actions } = useCharacter(heroAssetId(appearance));
@@ -29,12 +32,15 @@ export function Hero({ mode }: { mode: MoveMode }) {
   useEffect(() => applyAppearance(scene, appearance), [scene, appearance]);
 
   useFrame((_, delta) => {
+    // ponytail: GLB hero belum punya anim_Sit (dibuat lewat npm run assets, E1); sampai ada, pakai Idle.
+    const sit = seated ? (actions.get('anim_Sit') ?? actions.get('anim_Idle')) : undefined;
     const { name, timeScale } = selectClip(mode, playerMotion.speed);
-    const action = actions.get(name);
+    const action = sit ?? actions.get(name);
     if (action) {
-      player.play(action);
-      action.timeScale = timeScale;
+      player.play(action, seated || player.wasSitting ? SIT_FADE : undefined);
+      action.timeScale = sit ? 1 : timeScale;
     }
+    player.wasSitting = seated;
     mixer.update(Math.min(delta, 0.05));
     // Kamera terlalu dekat (terdorong gedung): sembunyikan pemain supaya layar tidak tertutup badan.
     scene.visible = cameraState.distance >= HERO_HIDE_DISTANCE;

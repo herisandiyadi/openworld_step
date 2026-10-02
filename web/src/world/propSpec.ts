@@ -17,6 +17,12 @@ export interface BoxCollider {
   size: Vec3Tuple;
 }
 
+/** Bangku: 2 kursi di offset lokal X ±0.4 m, tinggi dudukan 0.45 m (lihat NEXT_FEATURES 3.8). */
+export const SEAT_OFFSETS_X = [-0.4, 0.4] as const;
+export const SEAT_HEIGHT = 0.45;
+/** Bangku yang terdaftar di manifest; `prop_bench_02` ikut otomatis begitu asetnya ada. */
+export const BENCH_IDS: readonly PropId[] = PROP_IDS.filter((id) => id.startsWith('prop_bench_'));
+
 /** Simple collision volumes (not the visual mesh). Also exported to assets/manifest.json. */
 export const PROP_COLLIDERS: Record<PropId, BoxCollider> = {
   prop_streetlamp_01: { type: 'box', center: [0, 2.1, 0], size: [0.3, 4.2, 0.3] },

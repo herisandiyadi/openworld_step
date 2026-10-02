@@ -1,6 +1,7 @@
 import { Preferences } from '@capacitor/preferences';
 import { clearExplored, decodeExplored, encodeExplored } from '../game/exploration';
 import { dayClock, jumpState, playerState } from '../game/runtime';
+import { clearSeatReservations, playerSeat } from '../game/seating';
 import { INITIAL_VEHICLES, type ParkedVehicle } from '../game/vehicles';
 import { NO_NEARBY, useGameStore } from './gameStore';
 
@@ -67,6 +68,9 @@ function resetRuntime(x: number, z: number, heading: number): void {
   playerState.stuckTime = 0;
   jumpState.y = 0;
   jumpState.vy = 0;
+  // Posisi duduk tidak disimpan: saat load pemain selalu berdiri.
+  playerSeat.seat = null;
+  clearSeatReservations();
 }
 
 export function applySave(data: SaveData): void {
@@ -79,6 +83,7 @@ export function applySave(data: SaveData): void {
     vehicles: data.vehicles,
     met: data.met,
     nearby: NO_NEARBY,
+    seated: false,
   });
 }
 
@@ -86,7 +91,7 @@ export function resetGame(): void {
   resetRuntime(0, 0, 0);
   clearExplored();
   dayClock.t = 0.32;
-  useGameStore.setState({ mode: 'walk', riding: null, vehicles: [...INITIAL_VEHICLES], met: [], nearby: NO_NEARBY });
+  useGameStore.setState({ mode: 'walk', riding: null, vehicles: [...INITIAL_VEHICLES], met: [], nearby: NO_NEARBY, seated: false });
 }
 
 export async function loadSave(): Promise<SaveData | null> {

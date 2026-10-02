@@ -1,7 +1,8 @@
 import { useRef } from 'react';
 import { useFrame } from '@react-three/fiber';
 import { markExplored } from './exploration';
-import { BUS_DISTANCE, MODE_RADIUS, TALK_DISTANCE, USE_DISTANCE, playerState } from './runtime';
+import { BUS_DISTANCE, MODE_RADIUS, TALK_DISTANCE, USE_DISTANCE, jumpState, playerState } from './runtime';
+import { findNearestFreeSeat } from './seating';
 import { useGameStore } from '../state/gameStore';
 import { chunkAt, worldState } from '../world/worldState';
 
@@ -57,9 +58,16 @@ export function Proximity() {
       }
     }
 
+    // Kursi bangku: hanya saat jalan kaki, tidak di udara, dan belum duduk.
+    const airborne = jumpState.y > 0 || jumpState.vy !== 0;
+    const seatId =
+      onFoot && !airborne && !state.seated
+        ? (findNearestFreeSeat(worldState.index?.seats ?? [], playerState.x, playerState.z)?.id ?? null)
+        : null;
+
     const current = state.nearby;
-    if (vehicleId !== current.vehicleId || npcId !== current.npcId || busStopId !== current.busStopId) {
-      state.setNearby({ npcId, vehicleId, busStopId });
+    if (vehicleId !== current.vehicleId || npcId !== current.npcId || busStopId !== current.busStopId || seatId !== current.seatId) {
+      state.setNearby({ npcId, vehicleId, busStopId, seatId });
     }
   });
 

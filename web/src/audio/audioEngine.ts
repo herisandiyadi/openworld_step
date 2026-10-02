@@ -259,6 +259,18 @@ class AudioEngine {
     this.noiseBurst(0.08, 'lowpass', 500, 0.2, 0.05);
   }
 
+  /** Duduk: gesekan pendek lalu bunyi kayu rendah. */
+  sit(): void {
+    this.noiseBurst(0.18, 'lowpass', 600, 0.22);
+    this.tone(260, 150, 0.22, 'triangle', 0.09, 0.04);
+  }
+
+  /** Berdiri: kebalikan dari duduk (nada naik). */
+  stand(): void {
+    this.tone(170, 300, 0.18, 'triangle', 0.09);
+    this.noiseBurst(0.1, 'highpass', 1600, 0.16, 0.06);
+  }
+
   click(): void {
     this.tone(900, 900, 0.04, 'triangle', 0.07);
   }

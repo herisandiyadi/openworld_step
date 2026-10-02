@@ -14,13 +14,14 @@ const MOVE_SMOOTHING = 14;
 /** Kamera third-person: pose dihitung di followCamera.ts, komponen ini hanya menerapkannya. */
 export function CameraRig() {
   const mode = useGameStore((state) => state.mode);
+  const seated = useGameStore((state) => state.seated);
   const camera = useThree((state) => state.camera);
   const pose = useMemo<CameraPose>(() => ({ x: 0, y: 0, z: 0, tx: 0, ty: 0, tz: 0, fov: 55 }), []);
   useCameraGestures();
 
   useFrame((_, rawDelta) => {
     const dt = Math.min(rawDelta, MAX_DT);
-    stepFollow(cameraState, mode, playerState.heading, playerMotion.speed, dt);
+    stepFollow(cameraState, mode, playerState.heading, playerMotion.speed, dt, !seated);
     solveCamera(
       cameraState,
       {

@@ -1,6 +1,6 @@
 import { useEffect } from 'react';
 import { keyboardInput } from './runtime';
-import { askNearby, jump, openBus, toggleVehicle } from './actions';
+import { askNearby, jump, openBus, toggleSeat, toggleVehicle } from './actions';
 
 const LEFT = ['KeyA', 'ArrowLeft'];
 const RIGHT = ['KeyD', 'ArrowRight'];
@@ -31,6 +31,7 @@ export function useKeyboardInput(): void {
         if (event.code === 'KeyE') toggleVehicle();
         if (event.code === 'KeyQ') askNearby();
         if (event.code === 'KeyB') openBus();
+        if (event.code === 'KeyF') toggleSeat();
       }
       pressed.add(event.code);
       update();

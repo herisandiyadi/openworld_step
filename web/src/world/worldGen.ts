@@ -24,6 +24,7 @@ import {
   WORLD_SIZE,
   type WorldIndex,
 } from './worldSpec';
+import { BENCH_IDS, PROP_COLLIDERS, PROP_IDS, type PropId, SEAT_HEIGHT, SEAT_OFFSETS_X } from './propSpec';
 
 /**
  * Offline, deterministic city generator (run by tools/world/build.ts, also used by tests).
@@ -52,6 +53,11 @@ const BUS_WAIT_OFFSET = 1.8;
 const chunkCoordOf = (value: number) => Math.min(WORLD_CHUNKS - 1, Math.max(0, Math.floor((value + HALF_WORLD) / CHUNK_SIZE)));
 const DOWNTOWN_COLORS = ['#9fb4c7', '#c9b79c', '#a7a3b8', '#d8d4cc', '#8fa2b5', '#b9c2c9'];
 const INDUSTRIAL_COLORS = ['#8c939b', '#a9886a', '#6f7f8f', '#b3b09f', '#7e8a74'];
+/** Bangku pinggir jalan memakai prop_bench_02 kalau asetnya sudah terdaftar, kalau belum prop_bench_01. */
+const STREET_BENCH: PropId = (PROP_IDS as readonly string[]).includes('prop_bench_02') ? ('prop_bench_02' as PropId) : 'prop_bench_01';
+/** Jarak bebas bangku dari lampu, tempat sampah, dan halte (tepi ke tepi). */
+const BENCH_CLEARANCE = 1.5;
+const BENCH_CLEAR_OF: readonly PropId[] = ['prop_streetlamp_01', 'prop_trashbin_01', 'prop_busstop_01'];
 const HOUSE_COLORS = ['#e8d8c3', '#d9a68b', '#b8c4a6', '#e3c46f', '#f0e4d0', '#c98f7a'];
 
 export const NPCS: NpcSpawn[] = [
@@ -174,6 +180,7 @@ function makeChunkGround(cx: number, cz: number, seed: number, blocks: readonly 
     buildings: [],
     props: [],
     colliders: [],
+    seats: [],
   };
 }
 
@@ -206,6 +213,7 @@ export function generateWorld(seed = 1337): GeneratedWorld {
   const buildings: Building[] = [];
   let props: PropPlacement[] = [];
   const addProp = (id: PropPlacement['id'], x: number, z: number, yaw: number) => props.push({ id, x, y: 0, z, yaw });
+  const streetBenches: PropPlacement[] = [];
 
   const addBuilding = (box: Aabb, height: number, color: string) => {
     const samples = [
@@ -320,8 +328,22 @@ export function generateWorld(seed = 1337): GeneratedWorld {
         addProp(id, spot.x, spot.z, spot.yaw);
       };
       if (hasBus) place('prop_busstop_01', 0);
+      // Bangku menempel ke sisi kavling dan menghadap jalan, jadi sisa trotoar = lebar - kedalaman bangku.
+      const bench = (along: number) => {
+        const spot = edge(along);
+        const back = SIDEWALK_WIDTH - edgeInset - PROP_COLLIDERS[STREET_BENCH].size[2] / 2;
+        streetBenches.push({ id: STREET_BENCH, x: spot.x + Math.sin(spot.yaw) * back, y: 0, z: spot.z + Math.cos(spot.yaw) * back, yaw: spot.yaw });
+      };
+      // Semua posisi |along| + 0.8 <= 6, jadi tidak ada bangku di 6 m terakhir sebelum persimpangan.
+      // Pusat Kota: 2 per sisi; sisi dengan halte tidak muat (halte sudah punya tempat duduk).
+      if (block.district === 'downtown' && !hasBus) {
+        bench(-2.5);
+        bench(2.5);
+      }
+      if (block.district === 'residential' || (block.district === 'industrial' && hasBus)) bench(-4.5);
       if (block.district !== 'residential') {
-        place('prop_streetlamp_01', -6);
+        // Industri: lampu kiri halte digeser keluar supaya bangku dekat halte tetap 1.5 m dari lampu.
+        place('prop_streetlamp_01', block.district === 'industrial' && hasBus ? -9 : -6);
         place('prop_streetlamp_01', 6);
         if (random() < 0.5) place('prop_trashbin_01', 8.5);
       } else {
@@ -345,12 +367,30 @@ export function generateWorld(seed = 1337): GeneratedWorld {
     const box = propCollider(prop);
     return !keepClear.some((zone) => overlaps(zone, box)) && !buildings.some((building) => overlaps(building, box));
   });
+  // Bangku pinggir jalan dicek terakhir: tidak menimpa prop lain dan berjarak dari perabot jalan.
+  for (const bench of streetBenches) {
+    const box = propCollider(bench);
+    const clash = props.some((prop) => overlaps(BENCH_CLEAR_OF.includes(prop.id) ? expand(propCollider(prop), BENCH_CLEARANCE) : propCollider(prop), box));
+    if (!clash && !keepClear.some((zone) => overlaps(zone, box)) && !buildings.some((building) => overlaps(building, box))) props.push(bench);
+  }
 
   for (const prop of props) {
     prop.y = Math.round(ground(prop.x, prop.z) * 100) / 100;
     const chunk = chunkAt(prop.x, prop.z);
     chunk.props.push(prop);
     chunk.colliders.push(propCollider(prop));
+    if (!BENCH_IDS.includes(prop.id)) continue;
+    // Titik duduk: offset lokal X diputar yaw (sama seperti propCollider), menghadap depan bangku.
+    for (const offset of SEAT_OFFSETS_X) {
+      const round2 = (value: number) => Math.round(value * 100) / 100;
+      chunk.seats.push({
+        id: `seat_${chunk.cx}_${chunk.cz}_${chunk.seats.length}`,
+        x: round2(prop.x + Math.cos(prop.yaw) * offset),
+        y: round2(prop.y + SEAT_HEIGHT),
+        z: round2(prop.z - Math.sin(prop.yaw) * offset),
+        yaw: Math.round(prop.yaw * 1e4) / 1e4,
+      });
+    }
   }
   for (const building of buildings) {
     const chunk = chunkAt((building.minX + building.maxX) / 2, (building.minZ + building.maxZ) / 2);
@@ -378,6 +418,7 @@ export function generateWorld(seed = 1337): GeneratedWorld {
         x: prop.x,
         z: Math.round((prop.z - BUS_WAIT_OFFSET) * 100) / 100,
       })),
+    seats: chunks.flatMap((chunk) => chunk.seats),
     chunks: chunks.map((chunk) => ({
       cx: chunk.cx,
       cz: chunk.cz,

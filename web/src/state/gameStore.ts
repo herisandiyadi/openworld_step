@@ -36,6 +36,8 @@ export interface Nearby {
   npcId: string | null;
   vehicleId: string | null;
   busStopId: string | null;
+  /** Kursi bangku kosong dalam 1.5 m (hanya saat jalan kaki, tidak di udara, belum duduk). */
+  seatId: string | null;
 }
 
 interface GameState {
@@ -50,6 +52,8 @@ interface GameState {
   /** NPC whose chat panel is open (game loop paused). */
   chatNpcId: string | null;
   busMenuOpen: boolean;
+  /** Pemain sedang duduk di bangku (tidak masuk save game; detail kursi di game/seating.ts). */
+  seated: boolean;
   /** Quest "Kenalan dengan warga": NPC ids the player has talked to. */
   met: string[];
   /** In-game clock label (HH:MM), updated by DayNight. */
@@ -73,6 +77,7 @@ interface GameState {
   setNearby: (nearby: Nearby) => void;
   setChatNpcId: (id: string | null) => void;
   setBusMenuOpen: (open: boolean) => void;
+  setSeated: (seated: boolean) => void;
   addMet: (npcId: string) => void;
   setClock: (clock: string) => void;
   setQuality: (quality: Quality) => void;
@@ -104,7 +109,7 @@ export function normalizeControls(value: Partial<ControlSettings> | null | undef
   };
 }
 
-export const NO_NEARBY: Nearby = { npcId: null, vehicleId: null, busStopId: null };
+export const NO_NEARBY: Nearby = { npcId: null, vehicleId: null, busStopId: null, seatId: null };
 
 /** UI-facing state only. Per-frame simulation state lives in game/runtime.ts to avoid React re-renders. */
 export const useGameStore = create<GameState>()((set, get) => ({
@@ -115,6 +120,7 @@ export const useGameStore = create<GameState>()((set, get) => ({
   nearby: NO_NEARBY,
   chatNpcId: null,
   busMenuOpen: false,
+  seated: false,
   met: [],
   clock: '07:40',
   quality: 'medium',
@@ -152,6 +158,7 @@ export const useGameStore = create<GameState>()((set, get) => ({
   setNearby: (nearby) => set({ nearby }),
   setChatNpcId: (chatNpcId) => set({ chatNpcId }),
   setBusMenuOpen: (busMenuOpen) => set({ busMenuOpen }),
+  setSeated: (seated) => set({ seated }),
   addMet: (npcId) => set((state) => (state.met.includes(npcId) ? state : { met: [...state.met, npcId] })),
   setClock: (clock) => set({ clock }),
   setQuality: (quality) => set({ quality }),

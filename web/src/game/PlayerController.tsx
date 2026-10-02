@@ -1,7 +1,9 @@
 import { useMemo, useRef } from 'react';
 import { useFrame } from '@react-three/fiber';
 import { DirectionalLight, Group, Mesh, Object3D, Vector3 } from 'three';
-import { clampToBounds, pushOutOfBoxes, stepPlayer } from './movement';
+import { clampToBounds, hasInput, pushOutOfBoxes, stepPlayer } from './movement';
+import { standUp } from './actions';
+import { playerSeat, SIT_TRANSITION } from './seating';
 import { Hero } from './Hero';
 import { audio } from '../audio/audioEngine';
 import { PlayerVehicle } from './PlayerVehicle';
@@ -31,6 +33,7 @@ function lerpAngle(from: number, to: number, alpha: number): number {
 /** Animated GLB hero (+ skateboard/bicycle) and the shadow light. The camera lives in camera/CameraRig.tsx. */
 export function PlayerController({ shadows }: { shadows: boolean }) {
   const mode = useGameStore((state) => state.mode);
+  const seated = useGameStore((state) => state.seated);
   const playerRef = useRef<Group>(null);
   const bodyRef = useRef<Group>(null);
   const markerRef = useRef<Mesh>(null);
@@ -43,7 +46,19 @@ export function PlayerController({ shadows }: { shadows: boolean }) {
     const startX = playerState.x;
     const startZ = playerState.z;
 
-    if (mode === 'walk') {
+    const seat = playerSeat.seat;
+    if (seat) {
+      // Duduk: joystick/WASD membuat berdiri; selain itu meluncur ke titik duduk dalam ~0.4 detik.
+      // Collider bangku tidak dipakai di sini, jadi pemain tidak didorong keluar dari kursinya.
+      if (hasInput(raw)) {
+        standUp();
+      } else {
+        const alpha = 1 - Math.exp((-4 / SIT_TRANSITION) * dt);
+        playerState.x += (seat.x - playerState.x) * alpha;
+        playerState.z += (seat.z - playerState.z) * alpha;
+        playerState.heading = seat.yaw;
+      }
+    } else if (mode === 'walk') {
       driveState.speed = 0;
       // Joystick dan WASD relatif kamera: atas = arah pandang kamera.
       stepPlayer(playerState, rotateCameraInput(raw, cameraState.yaw), MODE_SPEED.walk, MODE_RADIUS.walk, dt, worldState.collision);
@@ -127,7 +142,7 @@ export function PlayerController({ shadows }: { shadows: boolean }) {
 
       <group ref={playerRef}>
         <group ref={bodyRef}>
-          {mode !== 'car' && <Hero mode={mode} />}
+          {mode !== 'car' && <Hero mode={mode} seated={seated} />}
           <PlayerVehicle />
         </group>
       </group>

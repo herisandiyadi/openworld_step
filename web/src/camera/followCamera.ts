@@ -121,7 +121,12 @@ export function lerpAngle(from: number, to: number, alpha: number): number {
 }
 
 /** Auto-recenter: kamera kembali ke belakang pemain setelah jeda dan hanya saat bergerak. */
-export function stepFollow(state: FollowState, mode: MoveMode, heading: number, speed: number, dt: number): void {
+export function stepFollow(state: FollowState, mode: MoveMode, heading: number, speed: number, dt: number, recenter = true): void {
+  if (!recenter) {
+    // Duduk: kamera tetap bisa diputar dan di-zoom, hanya auto-recenter yang mati.
+    state.sinceGesture += dt;
+    return;
+  }
   if (state.dragging) {
     state.sinceGesture = 0;
     return;
