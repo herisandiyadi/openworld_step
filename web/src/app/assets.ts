@@ -19,6 +19,7 @@ export type AssetId =
   | 'veh_moto'
   | 'veh_bus'
   | 'ped_citizen'
+  | 'ped_citizen_f'
   | 'animal_cat'
   | 'animal_dog'
   | 'bird_pigeon';

@@ -13,6 +13,124 @@ import { BufferAttribute, type BufferGeometry, Matrix4, type SkinnedMesh, Vector
 
 export type PedAnim = 'idle' | 'walk' | 'sit';
 
+/** Gender warga; menentukan GLB mana yang dipakai (ped_citizen / ped_citizen_f). */
+export type PedGender = 'm' | 'f';
+
+/**
+ * Dua mesh warga, satu InstancedMesh per mesh (maks 2 draw call warga).
+ * Indeksnya juga indeks di PED_MESHES.
+ */
+export const PED_MESHES = [
+  { gender: 'm' as PedGender, asset: 'ped_citizen' as const },
+  { gender: 'f' as PedGender, asset: 'ped_citizen_f' as const },
+];
+
+/** Warga dengan gender 'f' WAJIB dirender memakai mesh wanita (indeks 1). */
+export const pedMeshIndex = (resident: { gender: PedGender } | undefined): number => (resident?.gender === 'f' ? 1 : 0);
+
+/**
+ * Grup gaya di atribut `_TINT` aset warga: `_TINT = region + 8 * grup` (lihat
+ * tools/assets/defs/creatures.ts). Grup 0 selalu terlihat; grup lain hanya kalau bit-nya
+ * menyala di atribut instance `pedStyle`, vertex lain dikempiskan di vertex shader.
+ */
+export const PED_GROUP = { always: 0, skirt: 1, ponytail: 2, looseHair: 3, hijab: 4, baseHair: 5, cap: 6 } as const;
+const bit = (group: number) => 2 ** (group - 1);
+
+/**
+ * Gaya tetap per warga (dari indeks warga, bukan id spawn), supaya satu warga selalu tampil sama.
+ * `generateResidents` menyelang gender (genap pria, ganjil wanita), jadi variasi memakai
+ * `k = floor(indeks / 2)` = urutan warga di dalam gendernya.
+ * Pria: 1 dari 4 bertopi (poni `baseHair` disembunyikan supaya tidak menembus topi).
+ * Wanita: 1 dari 3 berjilbab, sisanya bergantian kuncir / rambut terurai; 4 dari 5 berok
+ * (yang tidak berok bercelana panjang: region `legs` ikut warna bawahan).
+ */
+export function pedStyleMask(gender: PedGender, residentIndex: number): number {
+  const k = Math.floor(Math.max(0, residentIndex) / 2);
+  if (gender === 'm') return k % 4 === 1 ? bit(PED_GROUP.cap) : bit(PED_GROUP.baseHair);
+  const hijab = k % 3 === 0;
+  const hair = hijab ? bit(PED_GROUP.hijab) : bit(PED_GROUP.baseHair) + bit(k % 2 === 0 ? PED_GROUP.ponytail : PED_GROUP.looseHair);
+  const skirt = k % 5 !== 2 ? bit(PED_GROUP.skirt) : 0;
+  return hair + skirt;
+}
+
+/** Bit grup menyala? Dipakai test dan (lewat `pedStyle`) vertex shader. */
+export const pedHasGroup = (mask: number, group: number): boolean => Math.floor(mask / bit(group)) % 2 === 1;
+
+/**
+ * Palet varian warga (linear RGB), disalin dari `meta.variants` di tools/assets/defs/creatures.ts.
+ * Pria: [baju, celana, rambut, aksen sepatu/topi]; wanita: [baju, bawahan, rambut, jilbab].
+ * pedAnim.test.ts membandingkan salinan ini dengan public/assets/manifest.json, jadi kalau varian
+ * di creatures.ts berubah, salin ulang ke sini.
+ */
+export const PED_VARIANTS: Record<PedGender, readonly (readonly [number, number, number])[][]> = {
+  m: [
+    [[0.0284, 0.159, 0.7084], [0.0343, 0.0513, 0.1022], [0.0242, 0.0152, 0.0116], [0.807, 0.7758, 0.7157]],
+    [[0.6867, 0.063, 0.0423], [0.0273, 0.0273, 0.0331], [0.0103, 0.0075, 0.006], [0.0232, 0.0232, 0.0273]],
+    [[0.0497, 0.3278, 0.1022], [0.1022, 0.0685, 0.0423], [0.0685, 0.0296, 0.0144], [0.2542, 0.1022, 0.0437]],
+    [[0.7454, 0.4397, 0.0284], [0.0232, 0.0356, 0.0802], [0.0242, 0.0152, 0.0116], [0.807, 0.7758, 0.7157]],
+    [[0.2582, 0.1046, 0.552], [0.0423, 0.0343, 0.0296], [0.147, 0.0685, 0.0232], [0.0137, 0.0423, 0.147]],
+    [[0.807, 0.7758, 0.7157], [0.0513, 0.0802, 0.162], [0.0075, 0.0075, 0.0075], [0.4342, 0.0296, 0.0296]],
+  ],
+  f: [
+    [[0.807, 0.1441, 0.3231], [0.0423, 0.0284, 0.0908], [0.0242, 0.0152, 0.0116], [0.8714, 0.5776, 0.6867]],
+    [[0.8879, 0.8714, 0.8228], [0.0232, 0.0356, 0.0802], [0.0103, 0.0075, 0.006], [0.0284, 0.3325, 0.2747]],
+    [[0.807, 0.3515, 0.0423], [0.1022, 0.0423, 0.0232], [0.0685, 0.0296, 0.0144], [0.1946, 0.0782, 0.4342]],
+    [[0.0782, 0.3663, 0.6867], [0.807, 0.7758, 0.7157], [0.0103, 0.0075, 0.006], [0.0137, 0.0423, 0.147]],
+    [[0.3278, 0.0423, 0.1022], [0.0273, 0.0273, 0.0331], [0.147, 0.0685, 0.0232], [0.807, 0.4342, 0.0232]],
+    [[0.1441, 0.521, 0.1946], [0.0343, 0.0513, 0.1022], [0.0242, 0.0152, 0.0116], [0.8632, 0.7913, 0.6308]],
+    [[0.552, 0.1022, 0.6308], [0.0232, 0.0232, 0.0273], [0.0075, 0.0075, 0.0075], [0.6867, 0.063, 0.0423]],
+    [[0.8714, 0.6445, 0.0685], [0.147, 0.0685, 0.1946], [0.0685, 0.0296, 0.0144], [0.0423, 0.1946, 0.0685]],
+  ],
+};
+
+/** Varian warna tetap per warga (indeks warga, bukan id spawn). */
+export const pedVariantIndex = (gender: PedGender, residentIndex: number): number =>
+  Math.floor(Math.max(0, residentIndex) / 2) % PED_VARIANTS[gender].length;
+
+/** Region `_TINT` yang diwarnai palet (0 = warna vertex tetap). */
+export const PED_REGION = { fixed: 0, shirt: 1, bottom: 2, hair: 3, accent: 4, legs: 5 } as const;
+
+/** Vertex dengan kode `_TINT` ini terlihat untuk gaya `mask`? Kembaran `pedStyleVisible` di GLSL. */
+export function pedVertexVisible(tint: number, mask: number): boolean {
+  const group = Math.floor(tint / 8);
+  return group === 0 || pedHasGroup(mask, group);
+}
+
+/**
+ * Slot palet (0..3 = baju, bawahan, rambut, aksen) untuk vertex ini, atau -1 kalau memakai warna
+ * vertex. Region `legs` = kulit di bawah rok, warna bawahan kalau tidak berok.
+ * Kembaran `pedStyleSlot` di GLSL.
+ */
+export function pedTintSlot(tint: number, mask: number): number {
+  const region = tint % 8;
+  if (region === PED_REGION.fixed) return -1;
+  if (region === PED_REGION.legs) return pedHasGroup(mask, PED_GROUP.skirt) ? -1 : 1;
+  return region - 1;
+}
+
+/** Jumlah warna per varian di palet shader. */
+export const PED_SLOTS = 4;
+
+/**
+ * Bagi pejalan ke slot instance per mesh (0 pria, 1 wanita) menurut gender warganya. Urutan
+ * stabil, tiap pejalan muncul di tepat satu mesh, dan tidak ada slot melebihi `capacity`
+ * (kelebihan dibuang dan dilaporkan supaya tidak menimpa slot lain).
+ */
+export function splitPedsByMesh<P extends { residentIndex: number }>(
+  peds: readonly P[],
+  residents: readonly { gender: PedGender }[],
+  capacity: number,
+): { slots: [P[], P[]]; dropped: number } {
+  const slots: [P[], P[]] = [[], []];
+  let dropped = 0;
+  for (const ped of peds) {
+    const list = pedMeshIndex(residents[ped.residentIndex]) === 1 ? slots[1] : slots[0];
+    if (list.length < capacity) list.push(ped);
+    else dropped += 1;
+  }
+  return { slots, dropped };
+}
+
 /** Kode state yang dikirim ke shader sebagai atribut instance. */
 export const ANIM_CODE: Record<PedAnim, number> = { idle: 0, walk: 1, sit: 2 };
 
@@ -141,6 +259,25 @@ vec3 pedPoseVertex(vec3 pos, float bone, PedPose pose) {
   // Badan atas (spine ke atas, termasuk lengan) membungkuk ke depan (-Z) dari pinggul.
   if (bone > 1.5) pos = pedRotX(pos, vec3(0.0, 0.95, 0.0), -pose.lean);
   return pos;
+}
+
+/** Bit grup gaya (1..7) menyala di mask? Kembaran pedHasGroup. */
+bool pedHasGroup(float mask, float group) {
+  return mod(floor(mask / exp2(group - 1.0) + 0.001), 2.0) > 0.5;
+}
+
+/** Kembaran pedVertexVisible: tint = region + 8 * grup. */
+bool pedStyleVisible(float tint, float mask) {
+  float group = floor(tint / 8.0 + 0.001);
+  return group < 0.5 || pedHasGroup(mask, group);
+}
+
+/** Kembaran pedTintSlot: -1 = warna vertex, 0..3 = slot palet. */
+int pedStyleSlot(float tint, float mask) {
+  float region = tint - 8.0 * floor(tint / 8.0 + 0.001);
+  if (region < 0.5) return -1;
+  if (region > 4.5) return pedHasGroup(mask, ${PED_GROUP.skirt}.0) ? -1 : 1;
+  return int(region + 0.5) - 1;
 }
 `;
 
