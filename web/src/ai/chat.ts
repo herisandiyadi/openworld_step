@@ -1,6 +1,8 @@
 import { Capacitor, type PluginListenerHandle, registerPlugin } from '@capacitor/core';
 import { type AiSettings, normalizeSettings } from '../state/aiSettings';
 import { SseChatParser, visibleText } from './sse';
+import { appearanceSummary } from '../game/HeroAppearance';
+import type { Appearance } from '../state/profile';
 
 export interface ChatMessage {
   role: 'system' | 'user' | 'assistant';
@@ -31,16 +33,25 @@ export const HISTORY_TURNS = 10;
 
 /**
  * The username is validated (letters, digits, space . _ -; max 20) before it is stored, so it cannot
- * carry quotes or instructions into the system prompt.
+ * carry quotes or instructions into the system prompt. Sapaan ikut gender profil (NEXT_FEATURES 9.5),
+ * dan penampilan diringkas dari id opsi (bukan teks bebas pemain).
  */
-function playerLine(playerName: string | undefined): string {
+function playerLine(playerName: string | undefined, appearance?: Appearance): string {
   if (!playerName) return '';
-  return `Pemain yang sedang berbicara denganmu bernama "${playerName}". Panggil dia dengan namanya (boleh dengan sapaan sopan seperti "Kak ${playerName}"), terutama saat menyapa.`;
+  const greeting = appearance?.gender === 'f' ? 'Mbak' : 'Mas';
+  const look = appearance ? ` Dia memakai ${appearanceSummary(appearance)}.` : '';
+  return `Pemain yang sedang berbicara denganmu bernama "${playerName}". Panggil dia "${greeting} ${playerName}", terutama saat menyapa.${look}`;
 }
 
-export function buildMessages(npcId: string, npcName: string, history: readonly ChatMessage[], playerName?: string): ChatMessage[] {
+export function buildMessages(
+  npcId: string,
+  npcName: string,
+  history: readonly ChatMessage[],
+  playerName?: string,
+  appearance?: Appearance,
+): ChatMessage[] {
   const persona = NPC_PERSONAS[npcId] ?? `Kamu adalah ${npcName}, warga Openworld City.`;
-  const system = [persona, WORLD_FACTS, playerLine(playerName), RULES].filter(Boolean).join(' ');
+  const system = [persona, WORLD_FACTS, playerLine(playerName, appearance), RULES].filter(Boolean).join(' ');
   return [{ role: 'system', content: system }, ...history.slice(-HISTORY_TURNS * 2)];
 }
 

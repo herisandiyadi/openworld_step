@@ -686,3 +686,62 @@ button:focus-visible {
   padding: 0 6px;
   font-size: 14px;
 }
+
+/* Pilihan penampilan (ProfileScreen). Tombol >= 48 px untuk sentuh. */
+.character-preview {
+  height: 220px;
+  border-radius: 12px;
+  background: linear-gradient(170deg, #45617f 0%, #243245 100%);
+  touch-action: none;
+}
+
+.appearance-picker {
+  display: flex;
+  flex-direction: column;
+  gap: 10px;
+}
+
+.appearance-label {
+  margin: 0 0 4px;
+  font-size: 13px;
+  opacity: 0.85;
+}
+
+.appearance-options {
+  display: flex;
+  gap: 8px;
+}
+
+.appearance-option {
+  display: flex;
+  flex: 1;
+  min-height: 48px;
+  align-items: center;
+  justify-content: center;
+  gap: 6px;
+  padding: 0 8px;
+  border: 2px solid rgba(255, 255, 255, 0.25);
+  border-radius: 10px;
+  background: rgba(255, 255, 255, 0.08);
+  color: #ffffff;
+  font: inherit;
+  font-size: 13px;
+}
+
+.appearance-option.selected {
+  border-color: var(--accent);
+  background: rgba(255, 255, 255, 0.18);
+}
+
+.appearance-option:focus-visible {
+  outline: 3px solid var(--accent);
+  outline-offset: 1px;
+}
+
+.appearance-swatch {
+  width: 16px;
+  height: 16px;
+  flex: none;
+  border: 1px solid rgba(0, 0, 0, 0.4);
+  border-radius: 50%;
+}

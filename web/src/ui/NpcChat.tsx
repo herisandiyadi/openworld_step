@@ -17,6 +17,7 @@ export function NpcChat() {
   const addMet = useGameStore((state) => state.addMet);
   const settings = useAiSettings((state) => state.settings);
   const username = usePlayerProfile((state) => state.profile?.username);
+  const appearance = usePlayerProfile((state) => state.profile?.appearance);
   const npc = worldState.index?.npcs.find((item) => item.id === npcId);
   const [messages, setMessages] = useState<ChatMessage[]>(() => (npcId ? (histories.get(npcId) ?? []) : []));
   const [partial, setPartial] = useState<string | null>(null);
@@ -59,7 +60,7 @@ export function NpcChat() {
     const controller = new AbortController();
     abortRef.current = controller;
     try {
-      const reply = await streamChat(settings, buildMessages(npcId, npc.name, next, username), setPartial, controller.signal);
+      const reply = await streamChat(settings, buildMessages(npcId, npc.name, next, username, appearance), setPartial, controller.signal);
       const withReply: ChatMessage[] = [...next, { role: 'assistant', content: reply }];
       histories.set(npcId, withReply);
       setMessages(withReply);

@@ -10,7 +10,8 @@ export interface Budget {
 
 /** Per-category hard limits (prompt section 6B), checked after optimisation. */
 export const BUDGETS: Record<Category, Budget> = {
-  hero: { maxTriangles: 5000, maxMaterials: 2, maxDrawCalls: 2, maxBytes: 400_000, maxBones: 40 },
+  // Hero kustomisasi: 11 node varian + 4 material slot di file; runtime menggabung yang terlihat jadi 1 draw call.
+  hero: { maxTriangles: 5000, maxMaterials: 4, maxDrawCalls: 11, maxBytes: 400_000, maxBones: 40 },
   npc: { maxTriangles: 3000, maxMaterials: 2, maxDrawCalls: 2, maxBytes: 300_000, maxBones: 40 },
   vehicle_bike: { maxTriangles: 800, maxMaterials: 2, maxDrawCalls: 4, maxBytes: 60_000 },
   vehicle_small: { maxTriangles: 500, maxMaterials: 2, maxDrawCalls: 2, maxBytes: 40_000 },

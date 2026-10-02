@@ -1,8 +1,10 @@
-import { useMemo } from 'react';
+import { useEffect, useMemo } from 'react';
 import { useFrame } from '@react-three/fiber';
 import { ClipPlayer, useCharacter } from './character';
 import { animState, playerMotion } from './runtime';
 import { ANIM, BIKE } from './vehicleSpec';
+import { applyAppearance, heroAssetId } from './HeroAppearance';
+import { DEFAULT_APPEARANCE, usePlayerProfile } from '../state/profile';
 import type { MoveMode } from '../state/gameStore';
 
 const clamp = (value: number, min: number, max: number) => Math.min(max, Math.max(min, value));
@@ -19,8 +21,11 @@ function selectClip(mode: MoveMode, speed: number): { name: string; timeScale: n
 }
 
 export function Hero({ mode }: { mode: MoveMode }) {
-  const { scene, mixer, actions } = useCharacter('char_hero');
+  // Penampilan milik profil (bukan save game), jadi dibaca sekali saat hero dipasang.
+  const appearance = usePlayerProfile((state) => state.profile?.appearance) ?? DEFAULT_APPEARANCE;
+  const { scene, mixer, actions } = useCharacter(heroAssetId(appearance));
   const player = useMemo(() => new ClipPlayer(), []);
+  useEffect(() => applyAppearance(scene, appearance), [scene, appearance]);
 
   useFrame((_, delta) => {
     const { name, timeScale } = selectClip(mode, playerMotion.speed);

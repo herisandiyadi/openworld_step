@@ -1,4 +1,4 @@
-import type { Document, Node } from '@gltf-transform/core';
+import type { Document, Material, Node } from '@gltf-transform/core';
 import { MeshBuilder } from '../lib/builder';
 import { addMesh, createAccessor, createBaseDocument } from '../lib/gltf';
 import { solveTwoBone } from '../lib/ik';
@@ -117,6 +117,223 @@ export function buildBody(spec: BodySpec): MeshBuilder {
 
   spec.extras?.(b);
   return b;
+}
+
+// --- Karakter yang bisa dikustomisasi (NEXT_FEATURES 9.3) ---------------------------------------
+// Satu GLB per gender berisi semua varian sebagai node mesh terpisah; runtime hanya menyalakan
+// node terpilih. Bagian ber-slot (rambut/baju/celana) dibangun dengan vertex colour abu-abu:
+// warnanya datang dari material yang di-clone runtime, jadi palet bisa diubah tanpa rebuild aset.
+// ponytail: pratinjau PNG di asset-previews jadi abu-abu untuk bagian ber-slot dan menampilkan
+// semua varian sekaligus; kalau perlu pratinjau per kombinasi, render per node di build.ts.
+
+export type Gender = 'm' | 'f';
+
+/** Vertex colour bagian ber-slot: hanya faktor bayangan, hue dari material runtime. */
+const shade = (factor: number): Rgb => [factor, factor, factor];
+
+export type Slot = 'hair' | 'shirt' | 'pants';
+
+export interface CharacterPart {
+  name: string;
+  builder: MeshBuilder;
+  /** Slot material; tanpa slot = material palet biasa. */
+  slot?: Slot;
+}
+
+const DOWN: Vec3 = [Math.PI, 0, 0];
+
+function limb(b: MeshBuilder, bone: BoneName, height: number, radiusBottom: number, radiusTop: number, color: Rgb, lift = 0): void {
+  const rest = boneRest(bone);
+  b.frustum(
+    { radiusBottom, radiusTop, height, segments: 6 },
+    { at: [rest[0], rest[1] - lift, rest[2]], rot: DOWN, color, bone: boneIndex(bone) },
+  );
+}
+
+/** Kulit, kepala, tangan, dan sepatu: selalu terlihat. */
+function baseBody(spec: Pick<BodySpec, 'skin' | 'eye' | 'shoe' | 'sole'>): MeshBuilder {
+  const b = new MeshBuilder();
+  const head = boneIndex('head');
+  b.frustum({ radiusBottom: 0.055, radiusTop: 0.05, height: 0.09, segments: 6, capBottom: false, capTop: false }, {
+    at: [0, 1.45, 0],
+    color: spec.skin,
+    bone: head,
+  });
+  b.blob({ radius: 0.13, stretch: [0.95, 1.05, 1], subdivide: true }, { at: [0, 1.62, 0], color: spec.skin, bone: head });
+  b.box([0.035, 0.045, 0.02], { at: [0.05, 1.635, -0.122], color: spec.eye, bone: head });
+  b.box([0.035, 0.045, 0.02], { at: [-0.05, 1.635, -0.122], color: spec.eye, bone: head });
+
+  for (const side of ['L', 'R'] as const) {
+    const x = side === 'R' ? 0.22 : -0.22;
+    limb(b, `upperArm_${side}`, UPPER_ARM, 0.055, 0.048, spec.skin);
+    limb(b, `lowerArm_${side}`, 0.22, 0.046, 0.04, spec.skin);
+    b.box([0.075, 0.09, 0.085], { at: [x, 0.875, 0], color: spec.skin, bone: boneIndex(`lowerArm_${side}`) });
+
+    const legX = side === 'R' ? 0.1 : -0.1;
+    limb(b, `upperLeg_${side}`, THIGH, 0.072, 0.062, spec.skin);
+    limb(b, `lowerLeg_${side}`, 0.42, 0.058, 0.05, spec.skin);
+    const shin = boneIndex(`lowerLeg_${side}`);
+    b.box([0.12, 0.08, 0.25], { at: [legX, 0.05, -0.04], color: spec.shoe, bone: shin });
+    b.box([0.125, 0.025, 0.255], { at: [legX, 0.0125, -0.04], color: spec.sole, bone: shin });
+  }
+  return b;
+}
+
+/** Rambut: pendek untuk `m`, sebahu untuk `f`. */
+function hairPart(gender: Gender): MeshBuilder {
+  const b = new MeshBuilder();
+  const head = boneIndex('head');
+  b.blob({ radius: 0.137, stretch: [1, 0.62, 1.02], subdivide: true }, { at: [0, 1.69, 0.012], color: shade(1), bone: head });
+  if (gender === 'f') {
+    b.box([0.26, 0.3, 0.1], { at: [0, 1.5, 0.085], color: shade(0.92), bone: head });
+    b.box([0.07, 0.24, 0.16], { at: [0.125, 1.54, 0.02], color: shade(0.92), bone: head });
+    b.box([0.07, 0.24, 0.16], { at: [-0.125, 1.54, 0.02], color: shade(0.92), bone: head });
+  }
+  return b;
+}
+
+/** Setengah-lebar badan tiap gaya: dipakai cek tembus (baju harus melingkupi pinggang celana). */
+interface Clothing {
+  name: string;
+  builder: MeshBuilder;
+  /** Setengah ukuran X/Z pada pinggang. */
+  waist: [number, number];
+}
+
+function torso(b: MeshBuilder, halfX: number, halfZ: number, hemY: number): void {
+  const spine = boneIndex('spine');
+  const chest = boneIndex('chest');
+  const height = 1.22 - hemY;
+  b.box([halfX * 2, height, halfZ * 2], { at: [0, hemY + height / 2, 0], color: shade(1), bone: spine });
+  b.box([0.4, 0.26, 0.23], { at: [0, 1.33, 0], color: shade(1), bone: chest });
+  b.box([0.26, 0.05, 0.2], { at: [0, 1.47, 0.02], color: shade(0.8), bone: chest });
+}
+
+function sleeves(b: MeshBuilder, long: boolean): void {
+  for (const side of ['L', 'R'] as const) {
+    limb(b, `upperArm_${side}`, long ? UPPER_ARM : 0.15, 0.07, long ? 0.058 : 0.062, shade(1));
+    if (long) limb(b, `lowerArm_${side}`, 0.19, 0.058, 0.05, shade(1));
+  }
+}
+
+function shirtParts(): Clothing[] {
+  const kaos = new MeshBuilder();
+  torso(kaos, 0.165, 0.1, 1.02);
+  sleeves(kaos, false);
+
+  const hoodie = new MeshBuilder();
+  torso(hoodie, 0.172, 0.105, 1.0);
+  sleeves(hoodie, true);
+  hoodie.blob({ radius: 0.12, stretch: [1.1, 0.7, 0.8] }, { at: [0, 1.48, 0.1], color: shade(0.85), bone: boneIndex('chest') });
+  hoodie.box([0.24, 0.1, 0.03], { at: [0, 1.15, -0.11], color: shade(0.8), bone: boneIndex('spine') });
+
+  const kemeja = new MeshBuilder();
+  torso(kemeja, 0.175, 0.108, 0.98);
+  sleeves(kemeja, true);
+  kemeja.box([0.04, 0.22, 0.02], { at: [0, 1.12, -0.112], color: shade(0.85), bone: boneIndex('spine') });
+  kemeja.box([0.18, 0.06, 0.1], { at: [0, 1.45, -0.06], color: shade(0.9), bone: boneIndex('chest') });
+
+  return [
+    { name: 'shirt_0', builder: kaos, waist: [0.165, 0.1] },
+    { name: 'shirt_1', builder: hoodie, waist: [0.172, 0.105] },
+    { name: 'shirt_2', builder: kemeja, waist: [0.175, 0.108] },
+  ];
+}
+
+function hips(b: MeshBuilder): void {
+  b.box([0.3, 0.17, 0.18], { at: [0, 0.94, 0], color: shade(1), bone: boneIndex('hips') });
+}
+
+function pantsParts(): Clothing[] {
+  const waist: [number, number] = [0.15, 0.09];
+
+  const jeans = new MeshBuilder();
+  hips(jeans);
+  const pendek = new MeshBuilder();
+  hips(pendek);
+  const jogger = new MeshBuilder();
+  hips(jogger);
+  for (const side of ['L', 'R'] as const) {
+    limb(jeans, `upperLeg_${side}`, THIGH, 0.088, 0.076, shade(1));
+    limb(jeans, `lowerLeg_${side}`, 0.4, 0.072, 0.062, shade(1));
+    limb(pendek, `upperLeg_${side}`, 0.24, 0.09, 0.082, shade(1));
+    limb(jogger, `upperLeg_${side}`, THIGH, 0.09, 0.078, shade(1));
+    limb(jogger, `lowerLeg_${side}`, 0.34, 0.074, 0.058, shade(1));
+    limb(jogger, `lowerLeg_${side}`, 0.08, 0.062, 0.058, shade(0.85), 0.34);
+  }
+
+  return [
+    { name: 'pants_0', builder: jeans, waist },
+    { name: 'pants_1', builder: pendek, waist },
+    { name: 'pants_2', builder: jogger, waist },
+  ];
+}
+
+/** Ekspresi: alis + mulut di depan kepala, satu yang terlihat. */
+function facePart(index: number, line: Rgb): MeshBuilder {
+  const b = new MeshBuilder();
+  const head = boneIndex('head');
+  const brow = index === 2 ? 1.675 : index === 1 ? 1.665 : 1.67;
+  for (const x of [0.05, -0.05]) b.box([0.045, 0.012, 0.015], { at: [x, brow, -0.125], color: line, bone: head });
+  if (index === 1) {
+    b.box([0.055, 0.012, 0.015], { at: [0, 1.57, -0.126], color: line, bone: head });
+  } else if (index === 0) {
+    b.box([0.035, 0.012, 0.015], { at: [0, 1.566, -0.126], color: line, bone: head });
+    for (const x of [0.026, -0.026]) b.box([0.016, 0.012, 0.015], { at: [x, 1.574, -0.124], color: line, bone: head });
+  } else {
+    b.box([0.055, 0.035, 0.015], { at: [0, 1.567, -0.126], color: line, bone: head });
+  }
+  return b;
+}
+
+/**
+ * GLB kustomisasi: badan dasar + 1 rambut + 3 baju + 3 celana + 3 ekspresi sebagai node terpisah.
+ * Melempar error (dilaporkan validator `npm run assets`) kalau ada kombinasi baju x celana yang
+ * saling menembus atau budget segitiga 9.3 terlampaui.
+ * ponytail: cek tembus memakai aturan "pinggang celana harus di dalam badan baju" di XZ, bukan uji
+ * potong segitiga per pose. Kalau nanti ada rok atau jaket panjang, ganti dengan uji potong nyata.
+ */
+export function buildCustomCharacter(
+  id: string,
+  gender: Gender,
+  body: Pick<BodySpec, 'skin' | 'eye' | 'shoe' | 'sole'>,
+  slotColors: Record<Slot, Rgb>,
+  clips: Clip[],
+): Document {
+  const shirts = shirtParts();
+  const pants = pantsParts();
+  for (const shirt of shirts) {
+    for (const trouser of pants) {
+      const gapX = shirt.waist[0] - trouser.waist[0];
+      const gapZ = shirt.waist[1] - trouser.waist[1];
+      if (gapX < 0.01 || gapZ < 0.005) {
+        throw new Error(`${shirt.name} x ${trouser.name} menembus di pinggang (gap ${gapX.toFixed(3)}/${gapZ.toFixed(3)} m)`);
+      }
+    }
+  }
+
+  const base = baseBody(body);
+  const hair = hairPart(gender);
+  const faces = [0, 1, 2].map((i) => facePart(i, body.eye));
+  const parts: CharacterPart[] = [
+    { name: id, builder: base },
+    { name: 'hair', builder: hair, slot: 'hair' },
+    ...shirts.map((s): CharacterPart => ({ name: s.name, builder: s.builder, slot: 'shirt' })),
+    ...pants.map((p): CharacterPart => ({ name: p.name, builder: p.builder, slot: 'pants' })),
+    ...faces.map((builder, i) => ({ name: `face_${i}`, builder })),
+  ];
+
+  const total = parts.reduce((sum, part) => sum + part.builder.triangleCount, 0);
+  const visible =
+    base.triangleCount +
+    hair.triangleCount +
+    Math.max(...shirts.map((s) => s.builder.triangleCount)) +
+    Math.max(...pants.map((p) => p.builder.triangleCount)) +
+    Math.max(...faces.map((f) => f.triangleCount));
+  if (total > 3500) throw new Error(`Total segitiga ${total} > 3500`);
+  if (visible > 2000) throw new Error(`Segitiga terlihat ${visible} > 2000`);
+
+  return buildSkinnedDocument(id, parts, clips, slotColors);
 }
 
 export interface Pose {
@@ -308,8 +525,23 @@ const ANIMATION_FPS = 30;
 
 /** Builds a skinned GLB document: joints, inverse bind matrices, mesh, and sampled looping clips. */
 export function buildCharacterDocument(id: string, body: BodySpec, clips: Clip[]): Document {
+  return buildSkinnedDocument(id, [{ name: id, builder: buildBody(body) }], clips);
+}
+
+/** Satu node mesh ber-skin per part, semua memakai skin yang sama. Slot material diberi warna bawaan (pratinjau). */
+function buildSkinnedDocument(id: string, parts: CharacterPart[], clips: Clip[], slotColors?: Record<Slot, Rgb>): Document {
   const { doc, material } = createBaseDocument();
-  const mesh = addMesh(doc, id, [{ builder: buildBody(body), material }], true);
+  const slotMaterials = new Map<Slot, Material>();
+  const materialFor = (slot: Slot | undefined): Material => {
+    if (!slot) return material;
+    let slotMaterial = slotMaterials.get(slot);
+    if (!slotMaterial) {
+      const color = slotColors?.[slot] ?? [1, 1, 1];
+      slotMaterial = doc.createMaterial(slot).setBaseColorFactor([...color, 1]).setMetallicFactor(0).setRoughnessFactor(0.85);
+      slotMaterials.set(slot, slotMaterial);
+    }
+    return slotMaterial;
+  };
 
   const joints: Node[] = BONES.map((bone) => {
     const parent = BONES[bone.parent];
@@ -333,9 +565,12 @@ export function buildCharacterDocument(id: string, body: BodySpec, clips: Clip[]
   const skin = doc.createSkin(`skin_${id}`).setSkeleton(rootJoint).setInverseBindMatrices(createAccessor(doc, 'MAT4', inverseBind));
   joints.forEach((joint) => skin.addJoint(joint));
 
-  // Skinned mesh node and skeleton sit at the scene root (glTF: parent transforms don't affect skinned meshes).
-  const meshNode = doc.createNode(id).setMesh(mesh).setSkin(skin);
-  const scene = doc.createScene(id).addChild(rootJoint).addChild(meshNode);
+  // Skinned mesh nodes and skeleton sit at the scene root (glTF: parent transforms don't affect skinned meshes).
+  const scene = doc.createScene(id).addChild(rootJoint);
+  for (const part of parts) {
+    const mesh = addMesh(doc, part.name, [{ builder: part.builder, material: materialFor(part.slot) }], true);
+    scene.addChild(doc.createNode(part.name).setMesh(mesh).setSkin(skin));
+  }
   doc.getRoot().setDefaultScene(scene);
 
   const hipsIndex = boneIndex('hips');

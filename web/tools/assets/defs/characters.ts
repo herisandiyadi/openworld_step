@@ -1,4 +1,4 @@
-import { boneIndex, buildCharacterDocument, BIKE_RIDE, IDLE, RUN, SKATE_RIDE, TALK, WALK } from './humanoid';
+import { boneIndex, buildCharacterDocument, buildCustomCharacter, BIKE_RIDE, IDLE, RUN, SKATE_RIDE, TALK, WALK } from './humanoid';
 import { PALETTE } from '../lib/palette';
 import type { AssetDef } from './types';
 
@@ -74,4 +74,27 @@ export const characterAssets: AssetDef[] = [
         [IDLE, TALK, WALK],
       ),
   },
+  // Dua GLB kustomisasi (NEXT_FEATURES 9.3). Node varian: hair, shirt_0..2, pants_0..2, face_0..2.
+  ...(['m', 'f'] as const).map((gender): AssetDef => ({
+    id: `char_hero_${gender}`,
+    category: 'hero',
+    tags: [...CHARACTER_TAGS, 'player', 'custom'],
+    collider: { type: 'capsule', radius: 0.3, height: 1.75, center: [0, 0.875, 0] },
+    requiredAnimations: ['anim_Idle', 'anim_Walk', 'anim_Run', 'anim_Skate', 'anim_Bike', 'anim_Talk'],
+    requiredNodes: ['hair', 'shirt_0', 'shirt_1', 'shirt_2', 'pants_0', 'pants_1', 'pants_2', 'face_0', 'face_1', 'face_2'],
+    previews: [
+      { clip: 'anim_Walk', phase: 0.25 },
+      { clip: 'anim_Run', phase: 0.25 },
+      { clip: 'anim_Skate', phase: 0, with: 'veh_skateboard' },
+      { clip: 'anim_Bike', phase: 0, with: 'veh_bicycle' },
+    ],
+    build: () =>
+      buildCustomCharacter(
+        `char_hero_${gender}`,
+        gender,
+        { skin: PALETTE.skin, eye: PALETTE.eye, shoe: PALETTE.shoe, sole: PALETTE.sole },
+        { hair: PALETTE.hair, shirt: PALETTE.hoodie, pants: PALETTE.jeans },
+        [IDLE, WALK, RUN, SKATE_RIDE, BIKE_RIDE, TALK],
+      ),
+  })),
 ];

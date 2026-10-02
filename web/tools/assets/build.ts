@@ -142,7 +142,10 @@ async function processAsset(def: AssetDef, io: NodeIO, built: Map<string, Docume
   checkPivot(sourceBounds, result);
 
   const optimized = (await io.readBinary(await io.writeBinary(source))).setLogger(source.getLogger());
-  await optimized.transform(dedup(), prune(), weld(), meshopt({ encoder: MeshoptEncoder, level: 'medium' }));
+  // Hero kustomisasi: kuantisasi satu volume untuk semua node supaya runtime bisa menggabung node terpilih
+  // jadi satu SkinnedMesh (HeroAppearance.ts) tanpa beda skala posisi antar-node.
+  const quantizationVolume = def.category === 'hero' ? 'scene' : 'mesh';
+  await optimized.transform(dedup(), prune(), weld(), meshopt({ encoder: MeshoptEncoder, level: 'medium', quantizationVolume }));
   const glb = await io.writeBinary(optimized);
   summarizeValidation(await validateBytes(glb, { uri: `${def.id}.glb`, maxIssues: 50 }), 'final', result);
 

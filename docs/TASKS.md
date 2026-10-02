@@ -166,37 +166,37 @@ bangku berjalan tanpa pemain terjebak, dan anggaran ambient terpenuhi.
 Acuan: `NEXT_FEATURES.md` bagian 9. Bisa dikerjakan terpisah dari A-D, tapi harus selesai **sebelum multiplayer**
 (`MULTIPLAYER.md` M1), karena penampilan pemain ikut disinkron.
 
-- [ ] **E1. Aset karakter dasar** (1.25 hari): `tools/assets/defs/characters.ts`, `humanoid.ts`
+- [x] **E1. Aset karakter dasar** (1.25 hari): `tools/assets/defs/characters.ts`, `humanoid.ts`
   - `char_hero_m` dan `char_hero_f` dengan rig dan semua klip hero yang ada (Idle, Walk, Run, Skate, Bike, Talk,
     plus Sit jika C10 sudah ada).
   - Rambut per gender (pendek / sebahu) dengan slot material `hair`.
   - 3 ekspresi wajah (senyum, datar, ceria) sebagai node alis + mulut, satu yang terlihat.
   - Selesai jika: `npm run assets` lulus validator, total ≤ 3.5k segitiga per file, terlihat ≤ 2k.
-- [ ] **E2. Gaya baju dan celana** (0.75 hari)
+- [x] **E2. Gaya baju dan celana** (0.75 hari)
   - Node mesh terpisah: baju (kaos, hoodie, kemeja) dan celana (jeans panjang, celana pendek, jogger), slot
     material `shirt` dan `pants`.
   - Palet 3 warna per slot (rambut: hitam/cokelat/pirang, baju: biru/merah/hijau, celana: denim/hitam/krem).
   - Validator: semua kombinasi baju × celana × gender tidak saling menembus di pose preview (walk, run, skate,
     bike, sit).
-- [ ] **E3. Model data dan penyimpanan** (0.5 hari): `src/state/profile.ts`, `PlayerDbPlugin.java`
+- [x] **E3. Model data dan penyimpanan** (0.5 hari): `src/state/profile.ts`, `PlayerDbPlugin.java`
   - Tipe `Appearance` (gender `m`/`f`, 6 field 0-2), default = tampilan hero sekarang, fungsi validasi.
   - SQLite `VERSION = 2`, `onUpgrade` dengan `ALTER TABLE ... ADD COLUMN appearance TEXT`, tanpa menghapus baris lama.
     Validasi yang sama di Java.
   - Fallback browser di Preferences `player_profile_v1`.
   - Selesai jika: unit test validasi dan default lulus, profil v1 terbaca dengan penampilan default.
-- [ ] **E4. Komponen karakter yang bisa dikustomisasi** (0.5 hari): `src/game/HeroAppearance.ts`
+- [x] **E4. Komponen karakter yang bisa dikustomisasi** (0.5 hari): `src/game/HeroAppearance.ts`
   - Pilih GLB per gender, tampilkan node terpilih (`visible`), clone material per karakter dan warnai dari palet.
   - Dipakai oleh pemain lokal, pratinjau, dan nanti `RemotePlayers` (multiplayer) serta `ped_citizen`.
   - Selesai jika: draw call hero sama dengan sekarang.
-- [ ] **E5. UI pilihan penampilan** (1 hari): `src/ui/ProfileScreen.tsx`, `src/ui/AppearancePicker.tsx`
+- [x] **E5. UI pilihan penampilan** (1 hari): `src/ui/ProfileScreen.tsx`, `src/ui/AppearancePicker.tsx`
   - Username + 7 kategori dalam satu layar, grup pilihan 3 tombol (gender 2) dengan swatch warna dan nama teks,
     ukuran sentuh ≥ 48 px, tombol "Acak" dan "Simpan".
   - Aksesibilitas: `role="radiogroup"` per kategori, `role="radio"` + `aria-checked`, navigasi panah kiri/kanan.
   - Pemain lama: layar penampilan muncul sekali dengan username terisi.
-- [ ] **E6. Pratinjau 3D** (0.5 hari): `src/ui/CharacterPreview.tsx`
+- [x] **E6. Pratinjau 3D** (0.5 hari): `src/ui/CharacterPreview.tsx`
   - `Canvas` kecil terpisah, animasi idle, geser untuk memutar, `frameloop="demand"`.
   - Selesai jika: pratinjau sama persis dengan tampilan di game untuk kombinasi yang sama.
-- [ ] **E7. Integrasi AI dan game** (0.25 hari): `src/ai/chat.ts`
+- [x] **E7. Integrasi AI dan game** (0.25 hari): `src/ai/chat.ts`
   - Sapaan "Mas {username}" / "Mbak {username}" dan ringkasan penampilan singkat di system prompt.
   - Penampilan tidak masuk save game, jadi "Mulai baru" tidak mengubah tampilan.
   - Selesai jika: unit test isi prompt untuk kedua gender lulus.

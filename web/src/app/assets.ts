@@ -2,6 +2,8 @@ import { useGLTF } from '@react-three/drei';
 
 export type AssetId =
   | 'char_hero'
+  | 'char_hero_m'
+  | 'char_hero_f'
   | 'npc_vendor'
   | 'veh_bicycle'
   | 'veh_skateboard'
@@ -12,7 +14,8 @@ export type AssetId =
   | 'prop_busstop_01';
 
 const PRELOAD: AssetId[] = [
-  'char_hero',
+  'char_hero_m',
+  'char_hero_f',
   'npc_vendor',
   'veh_bicycle',
   'veh_skateboard',

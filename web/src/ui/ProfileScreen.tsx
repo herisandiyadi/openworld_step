@@ -1,14 +1,21 @@
 import { type FormEvent, useEffect, useId, useRef, useState } from 'react';
-import { USERNAME_MAX, usePlayerProfile, validateUsername } from '../state/profile';
+import { type Appearance, DEFAULT_APPEARANCE, USERNAME_MAX, usePlayerProfile, validateUsername } from '../state/profile';
+import { AppearancePicker, randomAppearance } from './AppearancePicker';
+import { CharacterPreview } from './CharacterPreview';
 import { useGameStore } from '../state/gameStore';
 
-/** Username form: shown once after install (firstRun) and from the title screen to rename. */
+/**
+ * Username + penampilan dalam satu layar: muncul sekali setelah instal (firstRun) dan dari layar
+ * judul untuk mengubah. Pemain lama (profil v1) melihat layar ini dengan username sudah terisi dan
+ * penampilan default.
+ */
 export function ProfileScreen({ firstRun = false }: { firstRun?: boolean }) {
   const profile = usePlayerProfile((state) => state.profile);
   const loadError = usePlayerProfile((state) => state.error);
   const save = usePlayerProfile((state) => state.save);
   const setScreen = useGameStore((state) => state.setScreen);
   const [name, setName] = useState(profile?.username ?? '');
+  const [look, setLook] = useState<Appearance>(profile?.appearance ?? DEFAULT_APPEARANCE);
   const [error, setError] = useState<string | null>(loadError);
   const [busy, setBusy] = useState(false);
   const inputRef = useRef<HTMLInputElement>(null);
@@ -27,7 +34,7 @@ export function ProfileScreen({ firstRun = false }: { firstRun?: boolean }) {
     }
     setBusy(true);
     try {
-      await save(name);
+      await save(name, look);
       setScreen('title');
     } catch (saveError) {
       setError(saveError instanceof Error ? saveError.message : String(saveError));
@@ -40,9 +47,10 @@ export function ProfileScreen({ firstRun = false }: { firstRun?: boolean }) {
     <main className="menu-screen" aria-labelledby="profile-heading">
       <form className="menu-panel" onSubmit={onSubmit} noValidate>
         <h1 id="profile-heading" className={firstRun ? 'menu-title' : 'menu-heading'}>
-          {firstRun ? 'Selamat datang' : 'Ganti nama'}
+          {firstRun ? 'Selamat datang' : 'Profil'}
         </h1>
         {firstRun && <p className="menu-subtitle">Siapa namamu? Warga kota akan memanggilmu dengan nama ini.</p>}
+        <CharacterPreview appearance={look} />
 
         <label className="field" htmlFor={inputId}>
           <span>Username</span>
@@ -70,14 +78,19 @@ export function ProfileScreen({ firstRun = false }: { firstRun?: boolean }) {
           {error ?? `2-${USERNAME_MAX} karakter. Disimpan di database perangkat ini.`}
         </p>
 
+        <AppearancePicker value={look} onChange={setLook} />
+
         <div className="menu-buttons settings-buttons">
+          <button type="button" className="overlay-button secondary" onClick={() => setLook(randomAppearance())} disabled={busy}>
+            Acak
+          </button>
           {!firstRun && (
             <button type="button" className="overlay-button secondary" onClick={() => setScreen('title')} disabled={busy}>
               Batal
             </button>
           )}
           <button type="submit" className="overlay-button" disabled={busy}>
-            {firstRun ? 'Lanjut' : 'Simpan'}
+            Simpan
           </button>
         </div>
       </form>
