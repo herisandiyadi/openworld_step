@@ -46,6 +46,4 @@ export const useGraphicsSettings = create<GraphicsSettingsState>()((set, get) =>
   },
 }));
 
-// ponytail: AmbientLayer (wave 2) membaca `useGraphicsSettings.getState().settings.density` dan
-// meneruskannya ke updateSpawns(..., preset, ...). Sambungan itu dibuat lead saat merge.
 if (typeof window !== 'undefined') void useGraphicsSettings.getState().load();

@@ -13,6 +13,7 @@ import { busPose, createBus, planBusRoute, stepBus } from './busRoute';
 import { isNight } from './density';
 import { buildLaneGraph, type LaneGraph, type LanesData } from './laneGraph';
 import { updateSpawns, VEHICLE_POOL } from './spawner';
+import { useGraphicsSettings } from '../state/graphicsSettings';
 import { LAMP_NODES, type LampState, lampAt, signalBlocks, signalisedIntersections } from './trafficLights';
 import { createTraffic, FAR_DISTANCE, playerGap, stepTrafficTiered, TICK_HZ_NEAR, type Vehicle, VEHICLE_LENGTH, vehiclePose } from './trafficSim';
 
@@ -180,7 +181,9 @@ export function AmbientLayer({ busStops }: { busStops: readonly BusStop[] }) {
   useFrame((_, delta) => {
     const sim = clock.current;
     const dt = Math.min(delta, 0.05);
-    const { mode, quality } = useGameStore.getState();
+    const { mode } = useGameStore.getState();
+    // Preset "Keramaian kota" (D4) menentukan pool kendaraan, terpisah dari kualitas grafis.
+    const density = useGraphicsSettings.getState().settings.density;
     const player = { x: playerState.x, z: playerState.z, radius: MODE_RADIUS[mode] };
     const isNear = (vehicle: Vehicle) => {
       const pose = vehiclePose(graph, vehicle);
@@ -208,7 +211,7 @@ export function AmbientLayer({ busStops }: { busStops: readonly BusStop[] }) {
       if (sim.tick % TICK_HZ_NEAR === 0) {
         camera.getWorldDirection(VIEW_DIR);
         const halfFov = Math.atan(Math.tan(((camera.fov ?? 45) * Math.PI) / 360) * (camera.aspect ?? 1));
-        updateSpawns(graph, traffic, { x: camera.position.x, z: camera.position.z, dirX: VIEW_DIR.x, dirZ: VIEW_DIR.z, halfFov }, quality, Math.random, () => sim.nextId++);
+        updateSpawns(graph, traffic, { x: camera.position.x, z: camera.position.z, dirX: VIEW_DIR.x, dirZ: VIEW_DIR.z, halfFov }, density, Math.random, () => sim.nextId++);
       }
     }
 
