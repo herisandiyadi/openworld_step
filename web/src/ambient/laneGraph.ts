@@ -47,6 +47,8 @@ export interface LanesData {
   intersections: LaneNode[];
   walkNodes: LaneNode[];
   walkEdges: WalkEdge[];
+  /** Opsional: titik tiang lampu per persimpangan, kalau sudah dibake generator dunia. */
+  poles?: LaneNode[];
 }
 
 export interface LaneGraph {

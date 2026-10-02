@@ -1,9 +1,10 @@
-import { use, useEffect, useMemo, useRef, useState } from 'react';
+import { Suspense, use, useEffect, useMemo, useRef, useState } from 'react';
 import { useFrame } from '@react-three/fiber';
 import { useGLTF } from '@react-three/drei';
 import type { Mesh } from 'three';
 import { assetUrl } from '../app/assets';
 import { AmbientLayer } from '../ambient/AmbientLayer';
+import { PedestrianLayer } from '../ambient/PedestrianLayer';
 import { Npcs } from '../game/Npc';
 import { playerState, sceneRefs } from '../game/runtime';
 import { useGameStore } from '../state/gameStore';
@@ -85,6 +86,9 @@ export function World() {
       <Impostors />
       <Npcs spawns={index.npcs} />
       <AmbientLayer busStops={index.busStops} />
+      <Suspense fallback={null}>
+        <PedestrianLayer />
+      </Suspense>
     </>
   );
 }

@@ -2,7 +2,7 @@ import { describe, expect, it, vi } from 'vitest';
 
 vi.mock('@capacitor/preferences', () => ({ Preferences: { get: vi.fn(), set: vi.fn(() => Promise.resolve()), remove: vi.fn() } }));
 
-const { AUDIBLE_RANGE, bedLevels, cueChance, dopplerPitch, pickCue, spatial } = await import('./ambientAudio');
+const { AUDIBLE_RANGE, bedLevels, cueSource, cueChance, dopplerPitch, pickCue, spatial } = await import('./ambientAudio');
 
 const listener = { x: 0, z: 0, dirX: 0, dirZ: -1 };
 const at = (hour: number) => hour / 24;
@@ -48,5 +48,16 @@ describe('audio ambient', () => {
   it('pickCue hening saat peluang nol dan memilih saat selalu lolos', () => {
     expect(pickCue('downtown', at(12), 0.25, () => 0.999)).toBeUndefined();
     expect(pickCue('downtown', at(12), 0.25, () => 0)).toBe('horn');
+  });
+
+  it('cueSource memakai agen nyata dan diam saat tidak ada yang terdengar', () => {
+    const car = { x: 10, z: 0, speed: 8 };
+    const ped = { x: -10, z: 0, speed: 1 };
+    expect(cueSource('horn', listener, [car], [ped], () => 0)).toEqual(spatial(listener, 10, 0));
+    expect(cueSource('bark', listener, [car], [ped], () => 0)?.pan).toBeCloseTo(-1, 2);
+    expect(cueSource('pass', listener, [], [ped], () => 0)).toBeUndefined();
+    expect(cueSource('horn', listener, [{ x: AUDIBLE_RANGE, z: 0, speed: 5 }], [], () => 0)).toBeUndefined();
+    // Hewan tanpa pejalan terdekat: cincin 10-50 m, tetap terdengar.
+    expect(cueSource('meow', listener, [], [], () => 0.5)?.gain).toBeGreaterThan(0);
   });
 });

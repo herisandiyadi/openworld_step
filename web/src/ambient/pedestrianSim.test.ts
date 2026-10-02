@@ -136,6 +136,34 @@ describe('simulasi pejalan kaki', () => {
     expect(ped.s).toBe(0);
   });
 
+  it('menunggu selama lampu merah, menyeberang begitu hijau, dengan titik tengah dan sumbu zebra', () => {
+    const random = mulberry(7);
+    const crossIndex = graph.edges.findIndex((edge) => edge.cross);
+    const ped = createPedestrian(graph, 1, crossIndex, 0, random);
+    ped.state = 'wait';
+    ped.timer = 0;
+    const entry = graph.nodes[ped.from]!;
+    const exit = graph.nodes[ped.to]!;
+    const world = createPedWorld([ped]);
+    let green = false;
+    const calls: number[][] = [];
+    world.pedGreen = (x, z, axis) => {
+      calls.push([x, z, axis]);
+      return green;
+    };
+    for (let tick = 0; tick < 60; tick++) stepPedestrians(graph, world, 1 / TICK_HZ, random);
+    expect(ped.state).toBe('wait');
+    const [x, z, axis] = calls[0]!;
+    expect(x).toBeCloseTo((entry.x + exit.x) / 2);
+    expect(z).toBeCloseTo((entry.z + exit.z) / 2);
+    expect(axis).toBe(Math.abs(exit.z - entry.z) > Math.abs(exit.x - entry.x) ? 0 : 1);
+
+    green = true;
+    stepPedestrians(graph, world, 1 / TICK_HZ, random);
+    expect(ped.state).toBe('cross');
+    expect(ped.s).toBeGreaterThan(0);
+  });
+
   it('berhenti di belakang pejalan lain dan saat pemain menghalangi', () => {
     const random = mulberry(11);
     const lane = graph.edges.findIndex((edge) => !edge.cross && edge.length > 8);

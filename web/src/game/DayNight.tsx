@@ -1,6 +1,7 @@
 import { useEffect, useRef } from 'react';
 import { useFrame, useThree } from '@react-three/fiber';
-import { Color, Fog, type HemisphereLight, type InstancedMesh, type Material, type Mesh, MeshLambertMaterial, MeshStandardMaterial } from 'three';
+import { Color, Fog, type HemisphereLight, type InstancedMesh, type Material, type Mesh, MeshLambertMaterial, MeshStandardMaterial, Vector3 } from 'three';
+import type { Listener } from '../audio/ambientAudio';
 import { ambientAudio } from '../audio/ambientAudio';
 import { DAY_SECONDS, clockLabel, daylightAt } from './dayCycle';
 import { dayClock, lighting } from './runtime';
@@ -38,6 +39,8 @@ export function DayNight() {
   const lamps = useRef(new Map<LitMaterial, number>());
   const windows = useRef(new Set<MeshLambertMaterial>());
   const lampScan = useRef(0);
+  const forward = useRef(new Vector3());
+  const listener = useRef<Listener>({ x: 0, z: 0, dirX: 0, dirZ: -1 });
 
   // Kamera rendah: fog 60-140 m menutupi batas streaming (radius muat 2 chunk = 128 m).
   useEffect(() => {
@@ -58,12 +61,15 @@ export function DayNight() {
     };
   }, []);
 
-  useFrame((_, delta) => {
+  useFrame(({ camera }, delta) => {
     dayClock.t = (dayClock.t + Math.min(delta, 0.05) / DAY_SECONDS) % 1;
     const { daylight, dusk } = daylightAt(dayClock.t);
     const night = 1 - daylight;
     const store = useGameStore.getState();
-    ambientAudio.update(store.district, dayClock.t, Math.min(delta, 0.05), !store.mapOpen);
+    // Pendengar ambient = kamera, arah pandang diproyeksikan ke bidang XZ.
+    camera.getWorldDirection(forward.current);
+    Object.assign(listener.current, { x: camera.position.x, z: camera.position.z, dirX: forward.current.x, dirZ: forward.current.z });
+    ambientAudio.update(store.district, dayClock.t, Math.min(delta, 0.05), !store.mapOpen, listener.current);
 
     // Cari material bohlam dan gedung tiap 2 detik (chunk baru terus di-stream masuk).
     lampScan.current -= delta;

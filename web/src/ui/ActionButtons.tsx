@@ -49,7 +49,7 @@ export function ActionButtons() {
       )}
 
       {nearbyNpc && (
-        <button type="button" className="action-button action-skill action-slot-2 action-ask" aria-label="Tanya NPC" onClick={askNearby}>
+        <button type="button" className="action-button action-skill action-slot-2 action-ask" aria-label="Tanya warga" onClick={askNearby}>
           <span className="action-icon" aria-hidden="true">
             ?
           </span>

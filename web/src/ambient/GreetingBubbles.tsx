@@ -30,8 +30,8 @@ interface Bubble extends GreetDecision {
  * Aksesibilitas: gelembung bukan satu-satunya kanal. Teks yang sama juga diumumkan di live region
  * `aria-live="polite"` di luar Canvas, jadi pembaca layar tetap mendapat sapaan.
  *
- * ponytail: `walkers` kosong selama PedestrianLayer (wave 2) belum ada, jadi komponen ini diam saja.
- * Saat PedestrianLayer mendarat, kirim pejalan kaki aktif beserta Resident-nya ke prop ini.
+ * `walkers` diisi PedestrianLayer tiap frame (array yang sama dipakai ulang); tanpa prop itu
+ * komponen ini diam saja.
  */
 export function GreetingBubbles({ walkers = [] }: { walkers?: readonly GreetWalker[] }) {
   const playerGender = usePlayerProfile((state) => state.profile?.appearance.gender);

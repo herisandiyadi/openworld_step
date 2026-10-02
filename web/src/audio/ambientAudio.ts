@@ -8,7 +8,8 @@
  */
 import type { DistrictId } from '../world/worldSpec';
 import { hourOf, isNight } from '../ambient/density';
-import { useAudioSettings } from '../state/audioSettings';
+import { audio } from './audioEngine';
+import { ambientRuntime, type AmbientAgent } from '../ambient/ambientRuntime';
 
 /** Maksimum bunyi ambient sekali jalan yang berbunyi bersamaan (NEXT_FEATURES 3.6). */
 export const MAX_VOICES = 6;
@@ -98,6 +99,32 @@ export function pickCue(district: DistrictId | null, t: number, dt: number, rand
   return undefined;
 }
 
+/**
+ * Posisi cue dari agen nyata: klakson/mesin dari kendaraan, sisanya dari pejalan kaki.
+ * Dipilih acak di antara agen yang terdengar (reservoir, tanpa alokasi). Undefined kalau tidak ada.
+ */
+export function cueSource(
+  kind: CueKind,
+  listener: Listener,
+  vehicles: readonly AmbientAgent[],
+  peds: readonly AmbientAgent[],
+  random: () => number,
+): { gain: number; pan: number } | undefined {
+  const traffic = kind === 'horn' || kind === 'pass';
+  let picked: { gain: number; pan: number } | undefined;
+  let audible = 0;
+  for (const agent of traffic ? vehicles : peds) {
+    const s = spatial(listener, agent.x, agent.z);
+    if (s.gain > 0 && random() * ++audible < 1) picked = s;
+  }
+  if (picked || traffic) return picked;
+  // ponytail: belum ada agen hewan, jadi meong/gonggong/kepak tanpa pejalan terdekat jatuh ke
+  // cincin acak 10-50 m. Ganti dengan daftar hewan di ambientRuntime saat lapisan hewan ada.
+  const angle = random() * Math.PI * 2;
+  const distance = 10 + random() * 40;
+  return spatial(listener, listener.x + Math.cos(angle) * distance, listener.z + Math.sin(angle) * distance);
+}
+
 // ---------- pembungkus Web Audio ----------
 
 interface Bed {
@@ -111,11 +138,7 @@ const SILENT = 0.0001;
 const BED_LEVEL = 0.12;
 const CUE_LEVEL = 0.35;
 
-/**
- * ponytail: memakai AudioContext sendiri karena `audioEngine.ts` di luar cakupan tugas ini.
- * Saat lead menyambungkan AmbientLayer, pindahkan node-node di sini ke `sfxBus` audioEngine
- * supaya hanya ada satu AudioContext di perangkat.
- */
+/** Node ambient menumpang AudioContext dan sfxBus audioEngine: volume SFX, mute, dan suspend latar belakang ikut dari sana. */
 class AmbientAudio {
   private ctx: AudioContext | null = null;
   private master: GainNode | null = null;
@@ -124,39 +147,21 @@ class AmbientAudio {
   private voices = 0;
   private cueTimer = 0;
 
-  /** Dibuat saat frame pertama setelah gestur pengguna; aman dipanggil berulang. */
+  /** Menunggu audioEngine dibuka gestur pengguna; aman dipanggil berulang. */
   private ensure(): boolean {
-    if (this.ctx) {
-      // Pemain sudah mengetuk menu sebelum masuk game, jadi resume diizinkan WebView.
-      if (this.ctx.state === 'suspended' && document.visibilityState === 'visible') this.ctx.resume().catch(() => undefined);
-      return this.ctx.state === 'running';
-    }
-    if (typeof window === 'undefined') return false;
-    const Ctor = window.AudioContext ?? (window as unknown as { webkitAudioContext?: typeof AudioContext }).webkitAudioContext;
-    if (!Ctor) return false;
-    try {
-      const ctx = new Ctor();
-      const master = ctx.createGain();
-      master.gain.value = 0;
-      master.connect(ctx.destination);
-      const noise = ctx.createBuffer(1, ctx.sampleRate * 2, ctx.sampleRate);
-      const samples = noise.getChannelData(0);
-      for (let i = 0; i < samples.length; i++) samples[i] = Math.random() * 2 - 1;
-      // Hemat baterai: hentikan bed saat aplikasi di latar belakang.
-      document.addEventListener('visibilitychange', () => {
-        if (document.visibilityState === 'hidden') ctx.suspend().catch(() => undefined);
-      });
-      this.ctx = ctx;
-      this.master = master;
-      this.noise = noise;
+    if (!this.ctx) {
+      const out = audio.output;
+      if (!out) return false;
+      this.ctx = out.ctx;
+      this.noise = out.noise;
+      this.master = out.ctx.createGain();
+      this.master.gain.value = 0;
+      this.master.connect(out.sfxBus);
       this.bed = {
-        traffic: this.loop(noise, 'lowpass', 220, 0.9),
-        crowd: this.loop(noise, 'bandpass', 620, 1.4),
-        birds: this.loop(noise, 'highpass', 3600, 0.7),
+        traffic: this.loop(out.noise, 'lowpass', 220, 0.9),
+        crowd: this.loop(out.noise, 'bandpass', 620, 1.4),
+        birds: this.loop(out.noise, 'highpass', 3600, 0.7),
       };
-    } catch (error) {
-      console.error('[ambient] init', error);
-      return false;
     }
     return this.ctx.state === 'running';
   }
@@ -178,13 +183,12 @@ class AmbientAudio {
   }
 
   /** Dipanggil tiap frame: setel bed sesuai kawasan/jam dan kadang bunyikan satu cue. */
-  update(district: DistrictId | null, t: number, dt: number, active: boolean): void {
+  update(district: DistrictId | null, t: number, dt: number, active: boolean, listener?: Listener): void {
     if (!this.ensure() || !this.ctx || !this.master || !this.bed) return;
-    const { muted, sfx } = useAudioSettings.getState().settings;
     const time = this.ctx.currentTime;
-    const volume = muted || !active ? 0 : sfx;
-    this.master.gain.setTargetAtTime(volume, time, 0.4);
-    if (volume <= 0) return;
+    // Hanya fade aktif/jeda; volume SFX dan mute sudah diterapkan sfxBus/master audioEngine.
+    this.master.gain.setTargetAtTime(active ? 1 : 0, time, 0.4);
+    if (!active) return;
     const levels = bedLevels(district, t);
     this.bed.traffic.gain.setTargetAtTime(levels.traffic * BED_LEVEL, time, 1.5);
     this.bed.crowd.gain.setTargetAtTime(levels.crowd * BED_LEVEL * 0.7, time, 1.5);
@@ -196,13 +200,10 @@ class AmbientAudio {
     const step = this.cueTimer;
     this.cueTimer = 0;
     const kind = pickCue(district, t, step, Math.random);
-    // ponytail: posisi cue masih acak di cincin 10-50 m. Saat AmbientLayer/pedestrianSim tersambung,
-    // kirim posisi agen sebenarnya ke playCue lewat spatial(listener, agent.x, agent.z).
-    if (!kind) return;
-    const angle = Math.random() * Math.PI * 2;
-    const distance = 10 + Math.random() * 40;
-    const gain = 1 / (1 + distance / 8);
-    this.playCue(kind, gain, Math.sin(angle));
+    if (!kind || !listener) return;
+    // ponytail: AmbientAgent hanya punya laju skalar (tanpa arah), jadi doppler radial dilewati (0).
+    const source = cueSource(kind, listener, ambientRuntime.vehicles, ambientRuntime.peds, Math.random);
+    if (source) this.playCue(kind, source.gain, source.pan);
   }
 
   /** Bunyi sekali jalan di posisi stereo tertentu; dibatasi MAX_VOICES suara bersamaan. */

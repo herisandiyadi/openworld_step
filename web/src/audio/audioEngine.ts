@@ -142,6 +142,11 @@ class AudioEngine {
     if (ctx.state === 'suspended' && document.visibilityState === 'visible') ctx.resume().catch(() => undefined);
   }
 
+  /** Konteks, bus SFX, dan buffer noise bersama (null sebelum unlock); dipakai audio ambient. */
+  get output(): Pick<Graph, 'ctx' | 'sfxBus' | 'noise'> | null {
+    return this.graph;
+  }
+
   /** Suspend in the background (saves battery), resume when visible again. */
   onVisibility(): void {
     const ctx = this.graph?.ctx;

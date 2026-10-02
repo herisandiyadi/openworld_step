@@ -5,7 +5,7 @@
  * untuk menyalakan node `lamp_red/lamp_yellow/lamp_green`, dan simulasi memakai `signalBlocks`.
  */
 import { chunkCoord, districtOf } from '../world/worldSpec';
-import { edgeAt, type LaneGraph } from './laneGraph';
+import { edgeAt, type LaneGraph, type LaneNode } from './laneGraph';
 
 export const CYCLE_SECONDS = 12;
 export const YELLOW_SECONDS = 2;
@@ -48,6 +48,71 @@ export function isSignalised(graph: LaneGraph, isec: number): boolean {
 /** Daftar persimpangan berlampu (indeks ke `intersections`). */
 export const signalisedIntersections = (graph: LaneGraph): number[] =>
   graph.data.intersections.flatMap((_, isec) => (isSignalised(graph, isec) ? [isec] : []));
+
+/** Radius pencarian persimpangan berlampu untuk lampu penyeberangan (m). */
+export const PED_LIGHT_RANGE = 25;
+/** Tiang lampu di sudut persimpangan (m dari titik tengah) kalau tidak ada data trotoar. */
+export const POLE_CORNER = 5.5;
+
+/**
+ * Persimpangan berlampu terdekat dari titik (x, z) dalam radius `range`, atau -1 kalau tidak ada.
+ * Seri dimenangkan indeks terkecil supaya hasilnya deterministik.
+ */
+export function nearestSignal(graph: LaneGraph, signals: readonly number[], x: number, z: number, range = PED_LIGHT_RANGE): number {
+  let best = -1;
+  let bestDistance = range;
+  for (const isec of signals) {
+    const point = graph.data.intersections[isec];
+    if (!point) continue;
+    const distance = Math.hypot(point.x - x, point.z - z);
+    if (distance <= range && distance < bestDistance) {
+      bestDistance = distance;
+      best = isec;
+    }
+  }
+  return best;
+}
+
+/**
+ * Lampu penyeberangan untuk zebra di (x, z) yang menyeberangi jalan bersumbu `axis`:
+ * pejalan boleh menyeberang kalau lampu persimpangan berlampu terdekat untuk sumbu itu merah.
+ * Tanpa persimpangan berlampu dalam radius, kembalikan true (pejalan menilai dari kendaraan saja).
+ */
+export function pedGreenAt(
+  graph: LaneGraph,
+  signals: readonly number[],
+  x: number,
+  z: number,
+  axis: number,
+  time: number,
+  range = PED_LIGHT_RANGE,
+): boolean {
+  const isec = nearestSignal(graph, signals, x, z, range);
+  return isec < 0 || lampAt(isec, axis, time) === 'red';
+}
+
+/**
+ * Titik tiang lampu untuk sebuah persimpangan: pakai yang sudah dibake (`data.poles`) kalau ada,
+ * kalau tidak ambil node trotoar terdekat dari sudut (-POLE_CORNER, -POLE_CORNER) supaya tiang
+ * berdiri di trotoar, bukan di tengah jalan atau di dalam bangunan.
+ */
+export function poleAt(graph: LaneGraph, isec: number): LaneNode {
+  const point = graph.data.intersections[isec];
+  if (!point) return { x: 0, z: 0 };
+  const baked = graph.data.poles?.[isec];
+  if (baked) return baked;
+  const target = { x: point.x - POLE_CORNER, z: point.z - POLE_CORNER };
+  let best = target;
+  let bestDistance = Number.POSITIVE_INFINITY;
+  for (const walk of graph.data.walkNodes) {
+    const distance = Math.hypot(walk.x - target.x, walk.z - target.z);
+    if (distance < bestDistance) {
+      bestDistance = distance;
+      best = walk;
+    }
+  }
+  return best;
+}
 
 /**
  * Benar kalau kendaraan di lajur `edge` tidak boleh masuk persimpangan lewat belokan `turn`.

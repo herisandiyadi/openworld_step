@@ -173,5 +173,11 @@ export function bakeLanes(): LanesData {
     }
   }
 
-  return { version: WORLD_DATA_VERSION, nodes, edges, intersections, walkNodes, walkEdges };
+  // Tiang lampu lalu lintas: sudut trotoar barat-laut tiap persimpangan, jadi tidak pernah di jalan.
+  const poles: LaneNode[] = intersections.map((center) => ({
+    x: round2(center.x - WALK_OFFSET),
+    z: round2(center.z - WALK_OFFSET),
+  }));
+
+  return { version: WORLD_DATA_VERSION, nodes, edges, intersections, walkNodes, walkEdges, poles };
 }

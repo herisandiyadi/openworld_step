@@ -69,7 +69,7 @@ Status: `[ ]` belum, `[~]` dikerjakan, `[x]` selesai.
 - [x] **B3. Simulasi lalu lintas** (1.5 hari): `src/ambient/trafficSim.ts`
   - Posisi 1D per edge, car-following (2 m + 0.8 detik x kecepatan), reservasi persimpangan, 15/5 Hz.
   - Selesai jika: test 10.000 tick tanpa tabrakan atau deadlock lulus.
-- [x] **B4. Lampu lalu lintas** (1 hari) — selesai: aset `prop_trafficlight_01` + siklus `src/ambient/trafficLights.ts` (12 detik, kuning 2 detik, satu arah hijau) yang menahan mobil di `trafficSim` lewat `gate`
+- [x] **B4. Lampu lalu lintas** (1 hari) — selesai: aset `prop_trafficlight_01` + siklus `src/ambient/trafficLights.ts` (12 detik, kuning 2 detik, satu arah hijau) yang menahan mobil di `trafficSim` lewat `gate`; zebra ikut siklus yang sama lewat `pedGreenAt` (`ambientRuntime.pedGreen`); posisi tiang dibake ke `lanes.json` (`poles`)
   - Aset `prop_trafficlight_01`, siklus 12 detik dengan kuning 2 detik di Pusat Kota, emissive diatur shader.
   - Status lampu dibagi ke simulasi mobil dan pejalan kaki.
 - [x] **B5. Aset kendaraan GLB** (1.5 hari) — GLB selesai; wiring runtime `vehicleModels.tsx` -> GLB oleh lead
@@ -79,7 +79,7 @@ Status: `[ ]` belum, `[~]` dikerjakan, `[x]` selesai.
 - [x] **B6. Spawner dan pool** (0.75 hari): `src/ambient/spawner.ts`
   - Cincin spawn 40-110 m di luar pandangan, despawn > 130 m, jumlah pool per preset (8/14/20).
   - Selesai jika: test memastikan tidak ada spawn di dalam frustum kamera.
-- [x] **B7. Render instanced** (1 hari): `src/ambient/AmbientLayer.tsx` — 15 InstancedMesh (dihitung, belum diukur di HP); simulasi 15/5 Hz lewat `stepTrafficTiered`
+- [x] **B7. Render instanced** (1 hari): `src/ambient/AmbientLayer.tsx` — 15 InstancedMesh (dihitung, belum diukur di HP); simulasi 15/5 Hz lewat `stepTrafficTiered`, pose diinterpolasi antar tick
   - InstancedMesh per bagian kendaraan, interpolasi antar tick, roda berputar, lampu depan menyala di malam hari.
   - Selesai jika: draw call ambient ≤ 15.
 - [x] **B8. Interaksi dengan pemain** (0.5 hari) — `playerGap` di `trafficSim.ts` + dorong keluar di `AmbientLayer.tsx`
@@ -98,9 +98,11 @@ Status: `[ ]` belum, `[~]` dikerjakan, `[x]` selesai.
 - [x] **C2. Simulasi pejalan kaki** (1.5 hari): `src/ambient/pedestrianSim.ts` — duduk warga di bangku (state `sit`) belum dipakai runtime
   - Jalan di trotoar, menyeberang saat lampu pejalan hijau, duduk di bangku (memakai reservasi kursi dari C10), menghindari pemain.
   - Selesai jika: test memastikan tidak ada agen di dalam AABB gedung.
-- [ ] **C3. Aset dan animasi warga** (2 hari) — separuh aset selesai: `ped_citizen` (atribut `_TINT`, 6 varian di meta, klip idle/walk/sit); shader instanced & uji HP belum
-  - `ped_citizen` dengan 6 variasi warna lewat atribut instance.
-  - Animasi vertex shader prosedural (walk, idle, sit), dan skinned hanya untuk ≤ 4 agen terdekat.
+- [x] **C3. Aset dan animasi warga** (2 hari) — aset + shader instanced selesai (`src/ambient/pedAnim.ts`, 1 draw call); uji performa di HP ikut C11
+  - `ped_citizen` dengan 6 variasi warna lewat atribut instance (`aShirt`/`aPants`/`aHair` dari `_TINT` 3 region).
+  - Animasi vertex shader prosedural (walk, idle, sit) lewat `PED_ANIM_GLSL` + `onBeforeCompile`; rumusnya
+    dikembar di TS (`pedAnimPose`) dan diuji. Skinned untuk agen terdekat tidak dipakai: satu draw call
+    sudah cukup, lihat ponytail di `PedestrianLayer`.
   - Ini task paling berisiko, jadi prototipe dulu performanya di HP.
 - [x] **C4. Aset hewan** (1.5 hari)
   - `animal_cat`, `animal_dog`, dan `bird_pigeon` dengan vertex anim (walk, run, sit, sniff, peck, fly).
@@ -137,7 +139,7 @@ Status: `[ ]` belum, `[~]` dikerjakan, `[x]` selesai.
   - SFX duduk dan berdiri, shortcut keyboard, `aria-label`. Posisi duduk tidak disimpan di save.
   - Selesai jika: unit test reservasi (tidak ada dua karakter di satu kursi) dan berdiri tanpa terjebak lulus,
     dan duduk/berdiri berjalan di HP.
-- [ ] **C11. Uji dan rilis fase C** (0.75 hari) — kode tersambung (`PedestrianLayer` via `Proximity`); uji anggaran di HP belum
+- [ ] **C11. Uji dan rilis fase C** (0.75 hari) — kode tersambung (`PedestrianLayer` dipasang di `World`, zebra/kendaraan lewat `ambientRuntime`); uji anggaran di HP belum
   - Anggaran ambient (≤ 30 draw call, ≤ 40k segitiga, simulasi ≤ 1.5 ms per frame) dan uji di HP.
 
 **Gerbang C:** tidak ada agen di dalam gedung, reaksi hewan benar, chat warga jalan di HP, duduk/berdiri di
@@ -145,14 +147,14 @@ bangku berjalan tanpa pemain terjebak, dan anggaran ambient terpenuhi.
 
 ## Fase D: Polish dan Rilis (4 hari)
 
-- [x] **D1. Audio ambient spasial** (1.25 hari)
+- [x] **D1. Audio ambient spasial** (1.25 hari) — satu AudioContext (lewat `sfxBus` audioEngine); cue di posisi kendaraan/warga nyata
   - Klakson, mesin lewat dengan pitch doppler sederhana, meong, gonggong, dan kepak sayap.
   - Pan dan volume mengikuti jarak, maks 6 suara bersamaan, memakai mesin `src/audio` yang sudah ada.
 - [x] **D2. Suasana malam** (0.5 hari)
   - Lampu mobil, lampu jalan menyala (emissive), dan jendela gedung terang acak.
-- [x] **D3. Sapaan gelembung** (0.5 hari)
+- [x] **D3. Sapaan gelembung** (0.5 hari) — dipasang dari `PedestrianLayer`
   - Warga kadang menyapa singkat saat pemain lewat, memakai teks lokal tanpa AI.
-- [x] **D4. Preset kepadatan** (0.25 hari)
+- [x] **D4. Preset kepadatan** (0.25 hari) — dibaca spawner kendaraan dan pejalan kaki
   - Pengaturan "Keramaian kota": Sepi, Normal, atau Ramai, terpisah dari preset grafis.
 - [ ] **D5. Uji performa per preset dan tuning** (1 hari)
   - Preset Rendah, Sedang, dan Tinggi di HP, lalu sesuaikan pool dan jarak spawn.

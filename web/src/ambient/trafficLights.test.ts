@@ -2,7 +2,21 @@ import { describe, expect, it } from 'vitest';
 import { bakeLanes } from '../../tools/world/lanes';
 import { mulberry32 } from '../world/worldGen';
 import { buildLaneGraph, edgeAt } from './laneGraph';
-import { AXIS_COUNT, CYCLE_SECONDS, edgeAxis, GREEN_SECONDS, lampAt, signalBlocks, signalisedIntersections, YELLOW_SECONDS } from './trafficLights';
+import { ROAD_WIDTH } from '../world/worldSpec';
+import {
+  AXIS_COUNT,
+  CYCLE_SECONDS,
+  edgeAxis,
+  GREEN_SECONDS,
+  lampAt,
+  nearestSignal,
+  PED_LIGHT_RANGE,
+  pedGreenAt,
+  poleAt,
+  signalBlocks,
+  signalisedIntersections,
+  YELLOW_SECONDS,
+} from './trafficLights';
 import { createTraffic, createVehicle, playerGap, stepTraffic, TICK_HZ_NEAR, VEHICLE_LENGTH, vehiclePose } from './trafficSim';
 
 const graph = buildLaneGraph(bakeLanes());
@@ -68,6 +82,64 @@ describe('siklus lampu lalu lintas', () => {
     // Lampu dibuka: kendaraan melewati persimpangan.
     for (let tick = 0; tick < 300; tick++) stepTraffic(graph, state, dt, random);
     expect(vehicle.edge).not.toBe(lane);
+  });
+});
+
+describe('lampu penyeberangan', () => {
+  const signals = signalisedIntersections(graph);
+
+  it('boleh menyeberang hanya saat lampu persimpangan terdekat merah', () => {
+    const isec = signals[0] as number;
+    const point = graph.data.intersections[isec] as { x: number; z: number };
+    // Zebra beberapa meter dari titik tengah: masih di dalam radius pencarian.
+    const x = point.x + 6;
+    const z = point.z + 6;
+    for (let step = 0; step < CYCLE_SECONDS * 20; step++) {
+      const time = step / 20;
+      for (const axis of [0, 1]) {
+        expect(pedGreenAt(graph, signals, x, z, axis, time)).toBe(lampAt(isec, axis, time) === 'red');
+      }
+    }
+  });
+
+  it('tanpa persimpangan berlampu dalam jangkauan, pejalan menilai sendiri (true)', () => {
+    const isec = signals[0] as number;
+    const point = graph.data.intersections[isec] as { x: number; z: number };
+    expect(nearestSignal(graph, signals, point.x + 500, point.z + 500)).toBe(-1);
+    expect(pedGreenAt(graph, signals, point.x + 500, point.z + 500, 0, 3)).toBe(true);
+    // Radius dihormati: persimpangan yang sama tidak terpilih dari jarak > PED_LIGHT_RANGE.
+    expect(nearestSignal(graph, signals, point.x, point.z + PED_LIGHT_RANGE + 1, PED_LIGHT_RANGE)).not.toBe(isec);
+  });
+
+  it('memilih persimpangan berlampu terdekat', () => {
+    const a = graph.data.intersections[signals[0] as number] as { x: number; z: number };
+    expect(nearestSignal(graph, signals, a.x + 1, a.z - 2)).toBe(signals[0]);
+  });
+});
+
+describe('tiang lampu lalu lintas', () => {
+  it('tiang berdiri di trotoar, bukan di badan jalan, dan deterministik', () => {
+    for (const isec of signalisedIntersections(graph).slice(0, 20)) {
+      const point = graph.data.intersections[isec] as { x: number; z: number };
+      const pole = poleAt(graph, isec);
+      expect(poleAt(graph, isec)).toEqual(pole);
+      // Di luar badan jalan pada kedua sumbu, tapi masih di sudut persimpangan.
+      expect(Math.abs(pole.x - point.x)).toBeGreaterThan(ROAD_WIDTH / 2);
+      expect(Math.abs(pole.z - point.z)).toBeGreaterThan(ROAD_WIDTH / 2);
+      expect(Math.hypot(pole.x - point.x, pole.z - point.z)).toBeLessThan(ROAD_WIDTH);
+      // Berimpit dengan salah satu node trotoar (sudut zebra).
+      expect(graph.data.walkNodes.some((walk) => Math.hypot(walk.x - pole.x, walk.z - pole.z) < 0.01)).toBe(true);
+    }
+  });
+
+  it('jatuh ke node trotoar terdekat kalau lanes.json belum punya poles', () => {
+    const data = { ...graph.data, poles: undefined };
+    const fallback = buildLaneGraph(data);
+    const isec = signalisedIntersections(fallback)[0] as number;
+    const point = fallback.data.intersections[isec] as { x: number; z: number };
+    const pole = poleAt(fallback, isec);
+    expect(Math.abs(pole.x - point.x)).toBeGreaterThan(ROAD_WIDTH / 2);
+    expect(Math.abs(pole.z - point.z)).toBeGreaterThan(ROAD_WIDTH / 2);
   });
 });
 
