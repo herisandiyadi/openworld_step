@@ -365,10 +365,10 @@
         "player",
         "custom"
       ],
-      "triangles": 2230,
+      "triangles": 2278,
       "drawCalls": 16,
       "materials": 5,
-      "bytes": 108500,
+      "bytes": 109732,
       "bones": 13,
       "animations": [
         {
@@ -422,12 +422,12 @@
         "min": [
           -0.248,
           0,
-          -0.238
+          -0.223
         ],
         "max": [
           0.248,
           1.795,
-          0.238
+          0.235
         ]
       },
       "collider": {

@@ -426,6 +426,9 @@ function hips(b: MeshBuilder, f: Figure): void {
   b.box([f.hipX * 2, 0.17, f.hipZ * 2], { at: [0, 0.94, 0], color: shade(1), bone: hipBone });
 }
 
+/** Geser sumbu panel rok ke depan (m) supaya sisi bawahnya tidak menembus bangku saat duduk. */
+const SKIRT_FORWARD = 0.055;
+
 function pantsParts(gender: Gender): Clothing[] {
   const f = FIGURES[gender];
   // Pinggang celana selalu di dalam badan baju (cek tembus di buildCustomCharacter).
@@ -450,17 +453,44 @@ function pantsParts(gender: Gender): Clothing[] {
     }
   }
   if (gender === 'f') {
-    // Rok A-line: kerucut terbalik dari panggul ke atas lutut, dipasang di tulang hips.
-    ketiga.frustum({ radiusBottom: 0.235, radiusTop: f.hipX + 0.02, height: 0.3, segments: 8, capTop: false }, {
-      at: [0, 0.6, 0],
+    // Rok A-line selutut, DUA bagian (pola yang sama dipakai warga wanita di defs/creatures.ts):
+    //
+    //   1. Yoke kaku di tulang hips: bagian pinggang yang memang tidak boleh ikut kaki.
+    //   2. Dua panel bawah yang di-skin ke tulang upperLeg_L/R.
+    //
+    // Versi lama memasang SELURUH rok di tulang hips, jadi saat klip anim_Sit menekuk paha 88
+    // derajat ke depan, rok tetap menggantung lurus ke bawah mengikuti panggul dan menembus
+    // dudukan bangku. Dengan panel bawah menempel di paha, rok ikut mendatar di atas paha saat
+    // duduk dan tetap mengayun wajar saat jalan.
+    const hipBone = boneIndex('hips');
+    // Yoke 0.86 -> 0.92: BERHENTI di sendi panggul (tulang upperLeg rest y = 0.92). Yoke kaku yang
+    // menjulur di bawah sendi ini tidak punya tulang yang mengangkatnya saat duduk, jadi ia turun
+    // bersama panggul dan menembus dudukan bangku.
+    ketiga.frustum({ radiusBottom: f.hipX + 0.05, radiusTop: f.hipX + 0.022, height: 0.06, segments: 8, capTop: false }, {
+      at: [0, 0.86, 0],
       color: shade(1),
-      bone: boneIndex('hips'),
+      bone: hipBone,
     });
-    ketiga.frustum({ radiusBottom: 0.238, radiusTop: 0.228, height: 0.035, segments: 8, capTop: false, capBottom: false }, {
-      at: [0, 0.6, 0],
-      color: shade(0.86),
-      bone: boneIndex('hips'),
-    });
+    for (const side of ['L', 'R'] as const) {
+      const sx = side === 'R' ? 1 : -1;
+      // Panel paha 0.60 -> 0.87: naik sampai menyentuh yoke supaya tidak ada celah di pangkal.
+      // Saat duduk paha berputar ~90 derajat ke depan, jadi sisi BELAKANG paha (+Z di rest)
+      // menjadi sisi BAWAH yang menempel di bangku. Karena itu sumbu panel digeser ke depan
+      // (SKIRT_FORWARD): sisi belakangnya hanya ~0.08 m dari sumbu paha (setara celana pendek),
+      // sementara kembang rok tetap ada di depan dan samping. Panel yang simetris dengan radius
+      // 0.14 m menggantung 0.08 m di bawah dudukan.
+      ketiga.frustum({ radiusBottom: 0.128, radiusTop: 0.112, height: 0.27, segments: 6 }, {
+        at: [sx * 0.098, 0.6, -SKIRT_FORWARD],
+        color: shade(1),
+        bone: boneIndex(`upperLeg_${side}`),
+      });
+      // Pelipit bawah: pita tipis lebih gelap, menegaskan hem rok.
+      ketiga.frustum({ radiusBottom: 0.131, radiusTop: 0.124, height: 0.03, segments: 6, capTop: false, capBottom: false }, {
+        at: [sx * 0.098, 0.6, -SKIRT_FORWARD],
+        color: shade(0.86),
+        bone: boneIndex(`upperLeg_${side}`),
+      });
+    }
   }
 
   return [
