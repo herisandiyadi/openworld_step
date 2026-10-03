@@ -1,50 +1,110 @@
 import { useMemo, useRef } from 'react';
-import { useFrame, useThree } from '@react-three/fiber';
-import { DirectionalLight, Group, MathUtils, Mesh, Object3D, Vector3 } from 'three';
-import { stepPlayer } from './movement';
+import { useFrame } from '@react-three/fiber';
+import { DirectionalLight, Group, Mesh, Object3D, Vector3 } from 'three';
+import { clampToBounds, hasInput, pushOutOfBoxes, stepPlayer } from './movement';
+import { standUp, travelTo } from './actions';
+import { busTrip, PICKUP_WATCHDOG } from './busTrip';
+import { playerSeat, SIT_TRANSITION } from './seating';
 import { Hero } from './Hero';
 import { audio } from '../audio/audioEngine';
 import { PlayerVehicle } from './PlayerVehicle';
 import { MODE_RADIUS, MODE_SPEED, joystickInput, jumpState, keyboardInput, lighting, playerMotion, playerState } from './runtime';
+import { DRIVE, stepDrive } from './vehicleSpec';
+import { cameraState, rotateCameraInput } from '../camera/followCamera';
+import { CameraRig } from '../camera/CameraRig';
 import { useGameStore } from '../state/gameStore';
 import { groundHeightAt, worldState } from '../world/worldState';
 
-const CAMERA_PITCH = MathUtils.degToRad(55);
-const CAMERA_DISTANCE = 30;
-const CAMERA_OFFSET = new Vector3(0, Math.sin(CAMERA_PITCH), Math.cos(CAMERA_PITCH)).multiplyScalar(CAMERA_DISTANCE);
-const CAMERA_SMOOTHING = 8;
 const TURN_SMOOTHING = 14;
 const LIGHT_OFFSET = new Vector3(18, 30, 12);
+/** Bayangan dipusatkan sejauh ini di depan arah pandang kamera, dengan frustum ±20 m. */
+const SHADOW_LEAD = 12;
 const MAX_DT = 0.05;
 const SPEED_SMOOTHING = 12;
 const GRAVITY = 20;
 const SUN_INTENSITY = 2.2;
+/** Kecepatan kendaraan sepanjang arah hadap (m/s), lihat stepDrive. */
+const driveState = { speed: 0 };
 
 function lerpAngle(from: number, to: number, alpha: number): number {
   const delta = Math.atan2(Math.sin(to - from), Math.cos(to - from));
   return from + delta * alpha;
 }
 
-/** Animated GLB hero (+ skateboard/bicycle), MOBA follow camera, and the player-centred shadow light. */
+/** Animated GLB hero (+ skateboard/bicycle) and the shadow light. The camera lives in camera/CameraRig.tsx. */
 export function PlayerController({ shadows }: { shadows: boolean }) {
   const mode = useGameStore((state) => state.mode);
-  const camera = useThree((state) => state.camera);
+  const seated = useGameStore((state) => state.seated);
+  /** Naik bus (menunggu, duduk di dalam, sampai turun): kontrol jalan kaki dan gravitasi mati. */
+  const onBus = useGameStore((state) => state.busRide !== null);
+  /** Sudah di dalam bus (bukan sekadar menunggu di halte): hero memakai pose duduk. */
+  const boarded = useGameStore((state) => state.busRide !== null && state.busRide.phase !== 'menunggu');
+  /** Posisi akhir frame sebelumnya: posisi di bus ditulis sebelum frame ini, jadi kecepatan diukur dari sini. */
+  const lastPos = useRef({ x: 0, z: 0 });
   const playerRef = useRef<Group>(null);
   const bodyRef = useRef<Group>(null);
   const markerRef = useRef<Mesh>(null);
   const lightRef = useRef<DirectionalLight>(null);
   const lightTarget = useMemo(() => new Object3D(), []);
-  const cameraGoal = useMemo(() => new Vector3(), []);
-  const input = useMemo(() => ({ x: 0, z: 0 }), []);
 
   useFrame((state, rawDelta) => {
     const dt = Math.min(rawDelta, MAX_DT);
-    input.x = joystickInput.x + keyboardInput.x;
-    input.z = joystickInput.z + keyboardInput.z;
-    const startX = playerState.x;
-    const startZ = playerState.z;
-    stepPlayer(playerState, input, MODE_SPEED[mode], MODE_RADIUS[mode], dt, worldState.collision);
-    const speed = dt > 0 ? Math.hypot(playerState.x - startX, playerState.z - startZ) / dt : 0;
+    const raw = { x: joystickInput.x + keyboardInput.x, z: joystickInput.z + keyboardInput.z };
+    const startX = onBus ? lastPos.current.x : playerState.x;
+    const startZ = onBus ? lastPos.current.z : playerState.z;
+
+    const seat = playerSeat.seat;
+    if (onBus) {
+      // Posisi di kursi bus ditulis AmbientLayer (useFrame prioritas -1, jadi sudah terjadi frame ini).
+      // Tidak ada stepPlayer/pushOutOfBoxes di sini: collider jalan/halte tidak boleh mendorong pemain
+      // keluar dari bus. Selama bus belum datang pemain diam menunggu di halte.
+      driveState.speed = 0;
+      jumpState.y = 0;
+      jumpState.vy = 0;
+      // Watchdog: AmbientLayer belum dimuat / gagal mengambil permintaan -> fast travel lama.
+      if (busTrip.request) {
+        busTrip.pending += dt;
+        if (busTrip.pending > PICKUP_WATCHDOG) travelTo(busTrip.request.to);
+      } else if (!busTrip.ride && busTrip.to) {
+        // Store masih bilang naik bus tapi perjalanan sudah hilang (mis. AmbientLayer di-unmount).
+        travelTo(busTrip.to);
+      }
+    } else if (seat) {
+      // Duduk: joystick/WASD membuat berdiri; selain itu meluncur ke titik duduk dalam ~0.4 detik.
+      // Collider bangku tidak dipakai di sini, jadi pemain tidak didorong keluar dari kursinya.
+      if (hasInput(raw)) {
+        standUp();
+      } else {
+        const alpha = 1 - Math.exp((-4 / SIT_TRANSITION) * dt);
+        playerState.x += (seat.x - playerState.x) * alpha;
+        playerState.z += (seat.z - playerState.z) * alpha;
+        playerState.heading = seat.yaw;
+      }
+    } else if (mode === 'walk') {
+      driveState.speed = 0;
+      // Joystick dan WASD relatif kamera: atas = arah pandang kamera.
+      stepPlayer(playerState, rotateCameraInput(raw, cameraState.yaw), MODE_SPEED.walk, MODE_RADIUS.walk, dt, worldState.collision);
+    } else {
+      // Kendaraan: atas/bawah = gas/rem, kiri/kanan = belok (relatif kendaraan, seperti GTA).
+      playerState.heading = stepDrive(driveState, playerState.heading, raw, DRIVE[mode], dt);
+      if (driveState.speed !== 0) {
+        playerState.target = null;
+        playerState.path.length = 0;
+        const step = driveState.speed * dt;
+        playerState.x -= Math.sin(playerState.heading) * step;
+        playerState.z -= Math.cos(playerState.heading) * step;
+        pushOutOfBoxes(playerState, MODE_RADIUS[mode], worldState.collision.boxes);
+        clampToBounds(playerState, MODE_RADIUS[mode], worldState.collision.bounds);
+        // Menabrak gedung menghentikan kendaraan, bukan meluncur terus menempel dinding.
+        const travelled = Math.hypot(playerState.x - startX, playerState.z - startZ);
+        if (travelled < Math.abs(step) * 0.4) driveState.speed = 0;
+      }
+    }
+
+    // Batas 40 m/s: lompatan posisi (bus muncul, fallback teleport) tidak boleh terbaca sebagai ngebut.
+    const speed = dt > 0 ? Math.min(40, Math.hypot(playerState.x - startX, playerState.z - startZ) / dt) : 0;
+    lastPos.current.x = playerState.x;
+    lastPos.current.z = playerState.z;
     playerMotion.speed += (speed - playerMotion.speed) * (1 - Math.exp(-SPEED_SMOOTHING * dt));
 
     if (jumpState.vy !== 0 || jumpState.y > 0) {
@@ -75,21 +135,20 @@ export function PlayerController({ shadows }: { shadows: boolean }) {
       }
     }
 
-    cameraGoal.set(playerState.x, groundY, playerState.z).add(CAMERA_OFFSET);
-    camera.position.lerp(cameraGoal, 1 - Math.exp(-CAMERA_SMOOTHING * dt));
-    camera.lookAt(camera.position.x - CAMERA_OFFSET.x, camera.position.y - CAMERA_OFFSET.y, camera.position.z - CAMERA_OFFSET.z);
-
     const light = lightRef.current;
     if (light) {
       light.intensity = SUN_INTENSITY * lighting.sun;
-      light.position.set(playerState.x + LIGHT_OFFSET.x, groundY + LIGHT_OFFSET.y, playerState.z + LIGHT_OFFSET.z);
-      lightTarget.position.set(playerState.x, groundY, playerState.z);
+      const focusX = playerState.x - Math.sin(cameraState.yaw) * SHADOW_LEAD;
+      const focusZ = playerState.z - Math.cos(cameraState.yaw) * SHADOW_LEAD;
+      light.position.set(focusX + LIGHT_OFFSET.x, groundY + LIGHT_OFFSET.y, focusZ + LIGHT_OFFSET.z);
+      lightTarget.position.set(focusX, groundY, focusZ);
       lightTarget.updateMatrixWorld();
     }
   });
 
   return (
     <>
+      <CameraRig />
       <primitive object={lightTarget} />
       <directionalLight
         ref={lightRef}
@@ -97,10 +156,10 @@ export function PlayerController({ shadows }: { shadows: boolean }) {
         intensity={SUN_INTENSITY}
         castShadow={shadows}
         shadow-mapSize={[1024, 1024]}
-        shadow-camera-left={-28}
-        shadow-camera-right={28}
-        shadow-camera-top={28}
-        shadow-camera-bottom={-28}
+        shadow-camera-left={-20}
+        shadow-camera-right={20}
+        shadow-camera-top={20}
+        shadow-camera-bottom={-20}
         shadow-camera-near={1}
         shadow-camera-far={90}
         shadow-bias={-0.0005}
@@ -108,7 +167,7 @@ export function PlayerController({ shadows }: { shadows: boolean }) {
 
       <group ref={playerRef}>
         <group ref={bodyRef}>
-          {mode !== 'car' && <Hero mode={mode} />}
+          {mode !== 'car' && <Hero mode={mode} seated={seated || boarded} />}
           <PlayerVehicle />
         </group>
       </group>

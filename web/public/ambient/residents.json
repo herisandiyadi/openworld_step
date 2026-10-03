@@ -1,0 +1,1142 @@
+[
+  {
+    "id": "res_00",
+    "name": "Pak Dimas",
+    "gender": "m",
+    "age": 45,
+    "job": "satpam gedung",
+    "home": {
+      "district": "residential",
+      "cx": 4,
+      "cz": 0
+    },
+    "office": {
+      "district": "downtown",
+      "cx": 5,
+      "cz": 2
+    },
+    "hobby": "main gitar",
+    "mood": "penasaran"
+  },
+  {
+    "id": "res_01",
+    "name": "Mbak Wulan",
+    "gender": "f",
+    "age": 26,
+    "job": "pegawai bank",
+    "home": {
+      "district": "residential",
+      "cx": 0,
+      "cz": 2
+    },
+    "office": {
+      "district": "downtown",
+      "cx": 3,
+      "cz": 2
+    },
+    "hobby": "memasak rendang",
+    "mood": "sibuk"
+  },
+  {
+    "id": "res_02",
+    "name": "Pak Yusuf",
+    "gender": "m",
+    "age": 40,
+    "job": "mekanik bengkel",
+    "home": {
+      "district": "residential",
+      "cx": 0,
+      "cz": 1
+    },
+    "office": {
+      "district": "industrial",
+      "cx": 6,
+      "cz": 2
+    },
+    "hobby": "jogging sore",
+    "mood": "humoris"
+  },
+  {
+    "id": "res_03",
+    "name": "Mbak Galuh",
+    "gender": "f",
+    "age": 28,
+    "job": "operator pabrik",
+    "home": {
+      "district": "residential",
+      "cx": 1,
+      "cz": 2
+    },
+    "office": {
+      "district": "industrial",
+      "cx": 6,
+      "cz": 2
+    },
+    "hobby": "main gitar",
+    "mood": "penasaran"
+  },
+  {
+    "id": "res_04",
+    "name": "Mas Slamet",
+    "gender": "m",
+    "age": 22,
+    "job": "mekanik bengkel",
+    "home": {
+      "district": "residential",
+      "cx": 4,
+      "cz": 1
+    },
+    "office": {
+      "district": "industrial",
+      "cx": 6,
+      "cz": 6
+    },
+    "hobby": "fotografi",
+    "mood": "sibuk"
+  },
+  {
+    "id": "res_05",
+    "name": "Bu Hesti",
+    "gender": "f",
+    "age": 69,
+    "job": "pensiunan",
+    "home": {
+      "district": "residential",
+      "cx": 0,
+      "cz": 0
+    },
+    "office": {
+      "district": "residential",
+      "cx": 5,
+      "cz": 7
+    },
+    "hobby": "memasak rendang",
+    "mood": "humoris"
+  },
+  {
+    "id": "res_06",
+    "name": "Pak Yanto",
+    "gender": "m",
+    "age": 40,
+    "job": "satpam gedung",
+    "home": {
+      "district": "residential",
+      "cx": 5,
+      "cz": 7
+    },
+    "office": {
+      "district": "downtown",
+      "cx": 3,
+      "cz": 4
+    },
+    "hobby": "menjahit",
+    "mood": "agak murung"
+  },
+  {
+    "id": "res_07",
+    "name": "Bu Mega",
+    "gender": "f",
+    "age": 41,
+    "job": "guru SD",
+    "home": {
+      "district": "residential",
+      "cx": 4,
+      "cz": 6
+    },
+    "office": {
+      "district": "residential",
+      "cx": 0,
+      "cz": 5
+    },
+    "hobby": "main gitar",
+    "mood": "humoris"
+  },
+  {
+    "id": "res_08",
+    "name": "Mas Wahyu",
+    "gender": "m",
+    "age": 29,
+    "job": "pegawai bank",
+    "home": {
+      "district": "residential",
+      "cx": 4,
+      "cz": 7
+    },
+    "office": {
+      "district": "downtown",
+      "cx": 4,
+      "cz": 5
+    },
+    "hobby": "memasak rendang",
+    "mood": "santai"
+  },
+  {
+    "id": "res_09",
+    "name": "Mbak Fransiska",
+    "gender": "f",
+    "age": 38,
+    "job": "penjahit",
+    "home": {
+      "district": "downtown",
+      "cx": 4,
+      "cz": 5
+    },
+    "office": {
+      "district": "residential",
+      "cx": 0,
+      "cz": 0
+    },
+    "hobby": "mengoleksi batik",
+    "mood": "bersemangat"
+  },
+  {
+    "id": "res_10",
+    "name": "Mas Adi",
+    "gender": "m",
+    "age": 28,
+    "job": "pegawai minimarket",
+    "home": {
+      "district": "residential",
+      "cx": 0,
+      "cz": 0
+    },
+    "office": {
+      "district": "downtown",
+      "cx": 4,
+      "cz": 5
+    },
+    "hobby": "menjahit",
+    "mood": "humoris"
+  },
+  {
+    "id": "res_11",
+    "name": "Bu Umi",
+    "gender": "f",
+    "age": 54,
+    "job": "pegawai bank",
+    "home": {
+      "district": "downtown",
+      "cx": 5,
+      "cz": 3
+    },
+    "office": {
+      "district": "downtown",
+      "cx": 5,
+      "cz": 3
+    },
+    "hobby": "main badminton",
+    "mood": "lelah"
+  },
+  {
+    "id": "res_12",
+    "name": "Pak Tono",
+    "gender": "m",
+    "age": 40,
+    "job": "mekanik bengkel",
+    "home": {
+      "district": "residential",
+      "cx": 3,
+      "cz": 0
+    },
+    "office": {
+      "district": "industrial",
+      "cx": 7,
+      "cz": 3
+    },
+    "hobby": "mengoleksi batik",
+    "mood": "penasaran"
+  },
+  {
+    "id": "res_13",
+    "name": "Bu Nur",
+    "gender": "f",
+    "age": 47,
+    "job": "satpam gedung",
+    "home": {
+      "district": "downtown",
+      "cx": 5,
+      "cz": 2
+    },
+    "office": {
+      "district": "downtown",
+      "cx": 3,
+      "cz": 4
+    },
+    "hobby": "main futsal",
+    "mood": "ceria"
+  },
+  {
+    "id": "res_14",
+    "name": "Mas Hadi",
+    "gender": "m",
+    "age": 27,
+    "job": "barista",
+    "home": {
+      "district": "residential",
+      "cx": 0,
+      "cz": 1
+    },
+    "office": {
+      "district": "downtown",
+      "cx": 5,
+      "cz": 2
+    },
+    "hobby": "menonton sepak bola",
+    "mood": "santai"
+  },
+  {
+    "id": "res_15",
+    "name": "Mbak Yanti",
+    "gender": "f",
+    "age": 21,
+    "job": "pengemudi ojek online",
+    "home": {
+      "district": "residential",
+      "cx": 5,
+      "cz": 1
+    },
+    "office": {
+      "district": "downtown",
+      "cx": 4,
+      "cz": 5
+    },
+    "hobby": "menjahit",
+    "mood": "bersemangat"
+  },
+  {
+    "id": "res_16",
+    "name": "Mas Putra",
+    "gender": "m",
+    "age": 27,
+    "job": "pengemudi ojek online",
+    "home": {
+      "district": "residential",
+      "cx": 1,
+      "cz": 1
+    },
+    "office": {
+      "district": "downtown",
+      "cx": 2,
+      "cz": 2
+    },
+    "hobby": "memancing",
+    "mood": "humoris"
+  },
+  {
+    "id": "res_17",
+    "name": "Bu Lestari",
+    "gender": "f",
+    "age": 55,
+    "job": "sopir truk",
+    "home": {
+      "district": "residential",
+      "cx": 5,
+      "cz": 0
+    },
+    "office": {
+      "district": "industrial",
+      "cx": 6,
+      "cz": 1
+    },
+    "hobby": "menonton sepak bola",
+    "mood": "humoris"
+  },
+  {
+    "id": "res_18",
+    "name": "Mas Dedi",
+    "gender": "m",
+    "age": 26,
+    "job": "satpam gedung",
+    "home": {
+      "district": "residential",
+      "cx": 0,
+      "cz": 5
+    },
+    "office": {
+      "district": "downtown",
+      "cx": 5,
+      "cz": 5
+    },
+    "hobby": "menonton sepak bola",
+    "mood": "pendiam"
+  },
+  {
+    "id": "res_19",
+    "name": "Bu Lina",
+    "gender": "f",
+    "age": 73,
+    "job": "pensiunan",
+    "home": {
+      "district": "residential",
+      "cx": 0,
+      "cz": 2
+    },
+    "office": {
+      "district": "residential",
+      "cx": 0,
+      "cz": 6
+    },
+    "hobby": "fotografi",
+    "mood": "santai"
+  },
+  {
+    "id": "res_20",
+    "name": "Mas Rudi",
+    "gender": "m",
+    "age": 38,
+    "job": "guru SD",
+    "home": {
+      "district": "residential",
+      "cx": 5,
+      "cz": 0
+    },
+    "office": {
+      "district": "residential",
+      "cx": 5,
+      "cz": 1
+    },
+    "hobby": "memancing",
+    "mood": "ramah"
+  },
+  {
+    "id": "res_21",
+    "name": "Mbak Eka",
+    "gender": "f",
+    "age": 32,
+    "job": "pedagang bakso",
+    "home": {
+      "district": "residential",
+      "cx": 1,
+      "cz": 6
+    },
+    "office": {
+      "district": "downtown",
+      "cx": 5,
+      "cz": 4
+    },
+    "hobby": "menonton sepak bola",
+    "mood": "santai"
+  },
+  {
+    "id": "res_22",
+    "name": "Pak Gilang",
+    "gender": "m",
+    "age": 53,
+    "job": "mekanik bengkel",
+    "home": {
+      "district": "downtown",
+      "cx": 5,
+      "cz": 4
+    },
+    "office": {
+      "district": "industrial",
+      "cx": 6,
+      "cz": 1
+    },
+    "hobby": "main catur",
+    "mood": "sibuk"
+  },
+  {
+    "id": "res_23",
+    "name": "Mbak Endah",
+    "gender": "f",
+    "age": 39,
+    "job": "penjahit",
+    "home": {
+      "district": "downtown",
+      "cx": 5,
+      "cz": 3
+    },
+    "office": {
+      "district": "residential",
+      "cx": 1,
+      "cz": 2
+    },
+    "hobby": "memelihara burung kicau",
+    "mood": "agak murung"
+  },
+  {
+    "id": "res_24",
+    "name": "Pak Sigit",
+    "gender": "m",
+    "age": 60,
+    "job": "pedagang bakso",
+    "home": {
+      "district": "residential",
+      "cx": 3,
+      "cz": 0
+    },
+    "office": {
+      "district": "downtown",
+      "cx": 3,
+      "cz": 3
+    },
+    "hobby": "memancing",
+    "mood": "santai"
+  },
+  {
+    "id": "res_25",
+    "name": "Mbak Ani",
+    "gender": "f",
+    "age": 25,
+    "job": "satpam gedung",
+    "home": {
+      "district": "residential",
+      "cx": 1,
+      "cz": 2
+    },
+    "office": {
+      "district": "downtown",
+      "cx": 2,
+      "cz": 2
+    },
+    "hobby": "membaca novel",
+    "mood": "ceria"
+  },
+  {
+    "id": "res_26",
+    "name": "Mas Bayu",
+    "gender": "m",
+    "age": 24,
+    "job": "barista",
+    "home": {
+      "district": "residential",
+      "cx": 1,
+      "cz": 3
+    },
+    "office": {
+      "district": "downtown",
+      "cx": 2,
+      "cz": 4
+    },
+    "hobby": "memelihara burung kicau",
+    "mood": "penasaran"
+  },
+  {
+    "id": "res_27",
+    "name": "Mbak Ayu",
+    "gender": "f",
+    "age": 28,
+    "job": "guru SD",
+    "home": {
+      "district": "residential",
+      "cx": 5,
+      "cz": 6
+    },
+    "office": {
+      "district": "residential",
+      "cx": 5,
+      "cz": 6
+    },
+    "hobby": "main gitar",
+    "mood": "sibuk"
+  },
+  {
+    "id": "res_28",
+    "name": "Mas Rahmat",
+    "gender": "m",
+    "age": 23,
+    "job": "operator pabrik",
+    "home": {
+      "district": "residential",
+      "cx": 2,
+      "cz": 6
+    },
+    "office": {
+      "district": "industrial",
+      "cx": 6,
+      "cz": 4
+    },
+    "hobby": "memancing",
+    "mood": "humoris"
+  },
+  {
+    "id": "res_29",
+    "name": "Bu Kartini",
+    "gender": "f",
+    "age": 48,
+    "job": "pemilik warung",
+    "home": {
+      "district": "residential",
+      "cx": 2,
+      "cz": 6
+    },
+    "office": {
+      "district": "residential",
+      "cx": 4,
+      "cz": 7
+    },
+    "hobby": "merawat tanaman hias",
+    "mood": "sibuk"
+  },
+  {
+    "id": "res_30",
+    "name": "Mas Nanang",
+    "gender": "m",
+    "age": 20,
+    "job": "mekanik bengkel",
+    "home": {
+      "district": "downtown",
+      "cx": 2,
+      "cz": 4
+    },
+    "office": {
+      "district": "industrial",
+      "cx": 6,
+      "cz": 1
+    },
+    "hobby": "menonton sepak bola",
+    "mood": "humoris"
+  },
+  {
+    "id": "res_31",
+    "name": "Bu Novi",
+    "gender": "f",
+    "age": 52,
+    "job": "sopir truk",
+    "home": {
+      "district": "downtown",
+      "cx": 4,
+      "cz": 5
+    },
+    "office": {
+      "district": "industrial",
+      "cx": 6,
+      "cz": 2
+    },
+    "hobby": "menonton sepak bola",
+    "mood": "bersemangat"
+  },
+  {
+    "id": "res_32",
+    "name": "Pak Eko",
+    "gender": "m",
+    "age": 40,
+    "job": "pengemudi ojek online",
+    "home": {
+      "district": "residential",
+      "cx": 0,
+      "cz": 7
+    },
+    "office": {
+      "district": "downtown",
+      "cx": 3,
+      "cz": 3
+    },
+    "hobby": "memasak rendang",
+    "mood": "bersemangat"
+  },
+  {
+    "id": "res_33",
+    "name": "Mbak Vina",
+    "gender": "f",
+    "age": 27,
+    "job": "operator pabrik",
+    "home": {
+      "district": "residential",
+      "cx": 1,
+      "cz": 0
+    },
+    "office": {
+      "district": "industrial",
+      "cx": 6,
+      "cz": 4
+    },
+    "hobby": "memasak rendang",
+    "mood": "penasaran"
+  },
+  {
+    "id": "res_34",
+    "name": "Mas Imam",
+    "gender": "m",
+    "age": 21,
+    "job": "mahasiswa",
+    "home": {
+      "district": "downtown",
+      "cx": 3,
+      "cz": 3
+    },
+    "office": {
+      "district": "downtown",
+      "cx": 4,
+      "cz": 3
+    },
+    "hobby": "mengoleksi batik",
+    "mood": "humoris"
+  },
+  {
+    "id": "res_35",
+    "name": "Bu Winda",
+    "gender": "f",
+    "age": 61,
+    "job": "pemilik warung",
+    "home": {
+      "district": "downtown",
+      "cx": 5,
+      "cz": 5
+    },
+    "office": {
+      "district": "residential",
+      "cx": 1,
+      "cz": 0
+    },
+    "hobby": "memasak rendang",
+    "mood": "pendiam"
+  },
+  {
+    "id": "res_36",
+    "name": "Mas Hendra",
+    "gender": "m",
+    "age": 25,
+    "job": "barista",
+    "home": {
+      "district": "residential",
+      "cx": 1,
+      "cz": 4
+    },
+    "office": {
+      "district": "downtown",
+      "cx": 3,
+      "cz": 2
+    },
+    "hobby": "menjahit",
+    "mood": "pendiam"
+  },
+  {
+    "id": "res_37",
+    "name": "Mbak Tuti",
+    "gender": "f",
+    "age": 34,
+    "job": "penjahit",
+    "home": {
+      "district": "residential",
+      "cx": 0,
+      "cz": 5
+    },
+    "office": {
+      "district": "residential",
+      "cx": 0,
+      "cz": 4
+    },
+    "hobby": "main futsal",
+    "mood": "penasaran"
+  },
+  {
+    "id": "res_38",
+    "name": "Pak Teguh",
+    "gender": "m",
+    "age": 56,
+    "job": "guru SD",
+    "home": {
+      "district": "residential",
+      "cx": 5,
+      "cz": 1
+    },
+    "office": {
+      "district": "residential",
+      "cx": 0,
+      "cz": 2
+    },
+    "hobby": "karaoke dangdut",
+    "mood": "santai"
+  },
+  {
+    "id": "res_39",
+    "name": "Mbak Puspita",
+    "gender": "f",
+    "age": 22,
+    "job": "pengemudi ojek online",
+    "home": {
+      "district": "residential",
+      "cx": 1,
+      "cz": 4
+    },
+    "office": {
+      "district": "downtown",
+      "cx": 2,
+      "cz": 4
+    },
+    "hobby": "main catur",
+    "mood": "lelah"
+  },
+  {
+    "id": "res_40",
+    "name": "Mas Danu",
+    "gender": "m",
+    "age": 22,
+    "job": "mahasiswa",
+    "home": {
+      "district": "residential",
+      "cx": 1,
+      "cz": 5
+    },
+    "office": {
+      "district": "downtown",
+      "cx": 4,
+      "cz": 4
+    },
+    "hobby": "memasak rendang",
+    "mood": "santai"
+  },
+  {
+    "id": "res_41",
+    "name": "Bu Yuni",
+    "gender": "f",
+    "age": 45,
+    "job": "mekanik bengkel",
+    "home": {
+      "district": "residential",
+      "cx": 2,
+      "cz": 0
+    },
+    "office": {
+      "district": "industrial",
+      "cx": 6,
+      "cz": 6
+    },
+    "hobby": "fotografi",
+    "mood": "penasaran"
+  },
+  {
+    "id": "res_42",
+    "name": "Pak Ujang",
+    "gender": "m",
+    "age": 48,
+    "job": "sopir truk",
+    "home": {
+      "district": "residential",
+      "cx": 0,
+      "cz": 1
+    },
+    "office": {
+      "district": "industrial",
+      "cx": 7,
+      "cz": 1
+    },
+    "hobby": "memasak rendang",
+    "mood": "bersemangat"
+  },
+  {
+    "id": "res_43",
+    "name": "Bu Dwi",
+    "gender": "f",
+    "age": 43,
+    "job": "satpam gedung",
+    "home": {
+      "district": "residential",
+      "cx": 1,
+      "cz": 2
+    },
+    "office": {
+      "district": "downtown",
+      "cx": 2,
+      "cz": 2
+    },
+    "hobby": "main futsal",
+    "mood": "sibuk"
+  },
+  {
+    "id": "res_44",
+    "name": "Mas Rizky",
+    "gender": "m",
+    "age": 37,
+    "job": "guru SD",
+    "home": {
+      "district": "residential",
+      "cx": 1,
+      "cz": 4
+    },
+    "office": {
+      "district": "residential",
+      "cx": 1,
+      "cz": 2
+    },
+    "hobby": "main gitar",
+    "mood": "santai"
+  },
+  {
+    "id": "res_45",
+    "name": "Bu Siti",
+    "gender": "f",
+    "age": 54,
+    "job": "sopir truk",
+    "home": {
+      "district": "residential",
+      "cx": 5,
+      "cz": 0
+    },
+    "office": {
+      "district": "industrial",
+      "cx": 7,
+      "cz": 7
+    },
+    "hobby": "main futsal",
+    "mood": "sibuk"
+  },
+  {
+    "id": "res_46",
+    "name": "Mas Kurniawan",
+    "gender": "m",
+    "age": 30,
+    "job": "pemilik warung",
+    "home": {
+      "district": "residential",
+      "cx": 2,
+      "cz": 6
+    },
+    "office": {
+      "district": "residential",
+      "cx": 4,
+      "cz": 6
+    },
+    "hobby": "fotografi",
+    "mood": "sibuk"
+  },
+  {
+    "id": "res_47",
+    "name": "Mbak Tika",
+    "gender": "f",
+    "age": 30,
+    "job": "pengemudi ojek online",
+    "home": {
+      "district": "residential",
+      "cx": 4,
+      "cz": 0
+    },
+    "office": {
+      "district": "downtown",
+      "cx": 3,
+      "cz": 4
+    },
+    "hobby": "karaoke dangdut",
+    "mood": "penasaran"
+  },
+  {
+    "id": "res_48",
+    "name": "Pak Bagus",
+    "gender": "m",
+    "age": 63,
+    "job": "pensiunan",
+    "home": {
+      "district": "residential",
+      "cx": 0,
+      "cz": 2
+    },
+    "office": {
+      "district": "residential",
+      "cx": 1,
+      "cz": 2
+    },
+    "hobby": "menonton sepak bola",
+    "mood": "pendiam"
+  },
+  {
+    "id": "res_49",
+    "name": "Mbak Rini",
+    "gender": "f",
+    "age": 25,
+    "job": "barista",
+    "home": {
+      "district": "residential",
+      "cx": 1,
+      "cz": 7
+    },
+    "office": {
+      "district": "downtown",
+      "cx": 2,
+      "cz": 3
+    },
+    "hobby": "menonton sepak bola",
+    "mood": "ceria"
+  },
+  {
+    "id": "res_50",
+    "name": "Mas Agus",
+    "gender": "m",
+    "age": 19,
+    "job": "pegawai minimarket",
+    "home": {
+      "district": "residential",
+      "cx": 1,
+      "cz": 7
+    },
+    "office": {
+      "district": "downtown",
+      "cx": 3,
+      "cz": 2
+    },
+    "hobby": "mengoleksi batik",
+    "mood": "humoris"
+  },
+  {
+    "id": "res_51",
+    "name": "Mbak Fitri",
+    "gender": "f",
+    "age": 21,
+    "job": "pengemudi ojek online",
+    "home": {
+      "district": "residential",
+      "cx": 3,
+      "cz": 6
+    },
+    "office": {
+      "district": "downtown",
+      "cx": 5,
+      "cz": 4
+    },
+    "hobby": "fotografi",
+    "mood": "ceria"
+  },
+  {
+    "id": "res_52",
+    "name": "Mas Cahyo",
+    "gender": "m",
+    "age": 25,
+    "job": "satpam gedung",
+    "home": {
+      "district": "residential",
+      "cx": 4,
+      "cz": 6
+    },
+    "office": {
+      "district": "downtown",
+      "cx": 5,
+      "cz": 5
+    },
+    "hobby": "membaca novel",
+    "mood": "ramah"
+  },
+  {
+    "id": "res_53",
+    "name": "Bu Sri",
+    "gender": "f",
+    "age": 50,
+    "job": "guru SD",
+    "home": {
+      "district": "residential",
+      "cx": 2,
+      "cz": 7
+    },
+    "office": {
+      "district": "residential",
+      "cx": 0,
+      "cz": 5
+    },
+    "hobby": "merawat tanaman hias",
+    "mood": "ceria"
+  },
+  {
+    "id": "res_54",
+    "name": "Mas Arif",
+    "gender": "m",
+    "age": 34,
+    "job": "mekanik bengkel",
+    "home": {
+      "district": "residential",
+      "cx": 2,
+      "cz": 7
+    },
+    "office": {
+      "district": "industrial",
+      "cx": 6,
+      "cz": 3
+    },
+    "hobby": "memancing",
+    "mood": "penasaran"
+  },
+  {
+    "id": "res_55",
+    "name": "Mbak Maya",
+    "gender": "f",
+    "age": 19,
+    "job": "barista",
+    "home": {
+      "district": "residential",
+      "cx": 0,
+      "cz": 0
+    },
+    "office": {
+      "district": "downtown",
+      "cx": 5,
+      "cz": 4
+    },
+    "hobby": "bersepeda pagi",
+    "mood": "penasaran"
+  },
+  {
+    "id": "res_56",
+    "name": "Pak Lukman",
+    "gender": "m",
+    "age": 46,
+    "job": "mekanik bengkel",
+    "home": {
+      "district": "residential",
+      "cx": 0,
+      "cz": 2
+    },
+    "office": {
+      "district": "industrial",
+      "cx": 7,
+      "cz": 5
+    },
+    "hobby": "membaca novel",
+    "mood": "agak murung"
+  },
+  {
+    "id": "res_57",
+    "name": "Bu Ratna",
+    "gender": "f",
+    "age": 45,
+    "job": "staf gudang",
+    "home": {
+      "district": "residential",
+      "cx": 0,
+      "cz": 2
+    },
+    "office": {
+      "district": "industrial",
+      "cx": 6,
+      "cz": 2
+    },
+    "hobby": "main futsal",
+    "mood": "humoris"
+  },
+  {
+    "id": "res_58",
+    "name": "Mas Bambang",
+    "gender": "m",
+    "age": 27,
+    "job": "satpam gedung",
+    "home": {
+      "district": "downtown",
+      "cx": 3,
+      "cz": 5
+    },
+    "office": {
+      "district": "downtown",
+      "cx": 2,
+      "cz": 3
+    },
+    "hobby": "main catur",
+    "mood": "santai"
+  },
+  {
+    "id": "res_59",
+    "name": "Bu Dian",
+    "gender": "f",
+    "age": 42,
+    "job": "pemilik warung",
+    "home": {
+      "district": "residential",
+      "cx": 1,
+      "cz": 2
+    },
+    "office": {
+      "district": "residential",
+      "cx": 1,
+      "cz": 1
+    },
+    "hobby": "menjahit",
+    "mood": "pendiam"
+  }
+]

@@ -47,4 +47,19 @@ export const PALETTE = {
   grip: hex('#2a2a2e'),
   rubber: hex('#1d1d20'),
   frame: hex('#1f9d55'),
+  // Netral supaya runtime bisa mengalikan warna instance (variasi warna mobil/warga/hewan).
+  paint: hex('#cfd3d8'),
+  seat: hex('#2a2a2e'),
+  plate: hex('#e8e6df'),
+  lightRed: hex('#d8342a'),
+  lightYellow: hex('#e8b02a'),
+  lightGreen: hex('#3fb360'),
+  concrete: hex('#b8b4ac'),
+  // Detail karakter kustom (hero m/f): bibir, logam aksesori, lensa kacamata.
+  lip: hex('#b5564f'),
+  gold: hex('#d8ab3c'),
+  lens: hex('#cfe3ef'),
+  furGrey: hex('#9a948c'),
+  furDark: hex('#4a4440'),
+  beak: hex('#d79a3a'),
 } as const;

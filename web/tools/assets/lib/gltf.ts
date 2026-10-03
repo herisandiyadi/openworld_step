@@ -1,6 +1,6 @@
 import { Document, type Material, type Mesh, type Node, type TypedArray } from '@gltf-transform/core';
 import type { MeshBuilder } from './builder';
-import { PALETTE } from './palette';
+import { PALETTE, type Rgb } from './palette';
 
 export const GENERATOR = 'openworld-city procedural asset pipeline (Mode B)';
 
@@ -43,13 +43,19 @@ export function createBaseDocument(): BaseDocument {
 export interface MeshPart {
   builder: MeshBuilder;
   material: Material;
+  /**
+   * Indeks region warna per vertex, ditulis sebagai atribut kustom `_TINT` (legal di glTF).
+   * Shader instanced memakainya untuk memilih warna dari palet per instance (C3).
+   */
+  tint?: number[];
 }
 
 /** One primitive per part (= one draw call per part). */
 export function addMesh(doc: Document, name: string, parts: MeshPart[], skinned = false): Mesh {
   const mesh = doc.createMesh(name);
-  for (const { builder, material } of parts) {
+  for (const { builder, material, tint } of parts) {
     if (builder.triangleCount === 0) continue;
+    if (tint && tint.length !== builder.vertexCount) throw new Error(`${name}: tint ${tint.length} != vertex ${builder.vertexCount}`);
     const indices =
       builder.vertexCount > 65535 ? new Uint32Array(builder.indices) : new Uint16Array(builder.indices);
     const primitive = doc
@@ -59,6 +65,7 @@ export function addMesh(doc: Document, name: string, parts: MeshPart[], skinned 
       .setAttribute('COLOR_0', createAccessor(doc, 'VEC3', new Float32Array(builder.colors)))
       .setIndices(createAccessor(doc, 'SCALAR', indices))
       .setMaterial(material);
+    if (tint) primitive.setAttribute('_TINT', createAccessor(doc, 'SCALAR', new Uint8Array(tint)));
 
     if (skinned) {
       const joints = new Uint8Array(builder.vertexCount * 4);
@@ -74,6 +81,16 @@ export function addMesh(doc: Document, name: string, parts: MeshPart[], skinned 
     mesh.addPrimitive(primitive);
   }
   return mesh;
+}
+
+/** Region warna per vertex dari vertex colour: warna yang cocok dapat indeksnya, sisanya 0 (warna tetap). */
+export function tintRegions(builder: MeshBuilder, regions: [Rgb, number][]): number[] {
+  const out: number[] = [];
+  for (let i = 0; i < builder.vertexCount; i++) {
+    const c = builder.colors.slice(i * 3, i * 3 + 3);
+    out.push(regions.find(([rgb]) => rgb.every((v, k) => Math.abs(v - (c[k] ?? -1)) < 1e-6))?.[1] ?? 0);
+  }
+  return out;
 }
 
 /** Scene with a single root node carrying `mesh` (props). */

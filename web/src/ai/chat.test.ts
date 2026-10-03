@@ -22,7 +22,18 @@ describe('npc chat', () => {
   });
 
   it('memakai sapaan Mas/Mbak dan ringkasan penampilan', () => {
-    const look = { gender: 'm', hairColor: 0, expression: 0, shirtColor: 1, shirtStyle: 1, pantsColor: 0, pantsStyle: 0 } as const;
+    const look = {
+      gender: 'm',
+      skinTone: 0,
+      hairStyle: 0,
+      hairColor: 0,
+      expression: 0,
+      shirtColor: 1,
+      shirtStyle: 1,
+      pantsColor: 0,
+      pantsStyle: 0,
+      accessory: 0,
+    } as const;
     const male = buildMessages('npc_budi', 'Pak Budi', [], 'Andi', look)[0]?.content;
     expect(male).toContain('Mas Andi');
     expect(male).toContain('hoodie merah');
@@ -30,6 +41,10 @@ describe('npc chat', () => {
     expect(female).toContain('Mbak Sari');
     expect(female).not.toContain('Mas Sari');
     expect(female).toContain('kaos hijau');
+    // Gaya bawahan 2 = jogger untuk pria, rok untuk wanita (label ikut gender).
+    const skirt = buildMessages('npc_budi', 'Pak Budi', [], 'Sari', { ...look, gender: 'f', pantsStyle: 2 })[0]?.content;
+    expect(skirt).toContain('rok denim biru');
+    expect(buildMessages('npc_budi', 'Pak Budi', [], 'Andi', { ...look, pantsStyle: 2 })[0]?.content).toContain('jogger denim biru');
   });
 
   it('extracts content and strips think blocks', () => {

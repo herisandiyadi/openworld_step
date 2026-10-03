@@ -150,6 +150,15 @@ class AudioEngine {
     else ctx.resume().catch(() => undefined);
   }
 
+  /**
+   * Node induk untuk audio ambient (ambientAudio.ts) supaya perangkat hanya punya satu
+   * AudioContext. `bus` = sfxBus, jadi setelan Efek suara dan mute sudah ikut terpasang.
+   */
+  ambientTarget(): { ctx: AudioContext; bus: GainNode; noise: AudioBuffer } | null {
+    const graph = this.graph;
+    return graph ? { ctx: graph.ctx, bus: graph.sfxBus, noise: graph.noise } : null;
+  }
+
   setVolumes(volumes: AudioSettings): void {
     this.volumes = volumes;
     this.applyVolumes();
@@ -257,6 +266,18 @@ class AudioEngine {
   dismount(): void {
     this.tone(400, 250, 0.12, 'triangle', 0.1);
     this.noiseBurst(0.08, 'lowpass', 500, 0.2, 0.05);
+  }
+
+  /** Duduk: gesekan pendek lalu bunyi kayu rendah. */
+  sit(): void {
+    this.noiseBurst(0.18, 'lowpass', 600, 0.22);
+    this.tone(260, 150, 0.22, 'triangle', 0.09, 0.04);
+  }
+
+  /** Berdiri: kebalikan dari duduk (nada naik). */
+  stand(): void {
+    this.tone(170, 300, 0.18, 'triangle', 0.09);
+    this.noiseBurst(0.1, 'highpass', 1600, 0.16, 0.06);
   }
 
   click(): void {

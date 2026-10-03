@@ -1,0 +1,328 @@
+/**
+ * Audio ambient kota (NEXT_FEATURES 3.6): bed hum lalu lintas, gumam kerumunan, dan burung,
+ * ditambah bunyi sekali jalan (klakson, mesin lewat, meong, gonggong, kepak sayap).
+ * Semua dibangkitkan prosedural dengan Web Audio, tanpa file audio dan tanpa dependensi baru.
+ *
+ * Bagian hitungan (gain, pan, doppler, pemilihan bunyi) murni dan diuji; kelas `AmbientAudio`
+ * hanya membungkusnya ke Web Audio dan tidak aktif saat tidak ada `window` (unit test, SSR).
+ */
+import type { DistrictId } from '../world/worldSpec';
+import { hourOf, isNight } from '../ambient/density';
+import { audio } from './audioEngine';
+
+/** Maksimum bunyi ambient sekali jalan yang berbunyi bersamaan (NEXT_FEATURES 3.6). */
+export const MAX_VOICES = 6;
+/** Jarak pendengaran bunyi ambient (m). Di luar ini gain 0. */
+export const AUDIBLE_RANGE = 60;
+/** Kecepatan suara (m/s) untuk doppler sederhana. */
+const SOUND_SPEED = 343;
+
+export type CueKind = 'horn' | 'pass' | 'meow' | 'bark' | 'wings';
+
+export interface Listener {
+  x: number;
+  z: number;
+  /** Arah pandang kamera (tidak perlu unit). */
+  dirX: number;
+  dirZ: number;
+}
+
+/** Gain jarak (1 di telinga, 0 di AUDIBLE_RANGE) dan pan stereo (-1 kiri, +1 kanan). */
+export function spatial(listener: Listener, x: number, z: number): { gain: number; pan: number } {
+  const dx = x - listener.x;
+  const dz = z - listener.z;
+  const distance = Math.hypot(dx, dz);
+  if (distance >= AUDIBLE_RANGE) return { gain: 0, pan: 0 };
+  // Peluruhan 1/(1+d/8) dipotong halus ke 0 di tepi jangkauan supaya tidak ada klik.
+  const near = 1 / (1 + distance / 8);
+  const gain = near * (1 - distance / AUDIBLE_RANGE);
+  const length = Math.hypot(listener.dirX, listener.dirZ) || 1;
+  // Vektor kanan untuk arah pandang (dirX, dirZ) dengan Y ke atas = (-dirZ, dirX).
+  const right = (-listener.dirZ * dx + listener.dirX * dz) / length;
+  const pan = distance < 1e-6 ? 0 : Math.max(-1, Math.min(1, right / distance));
+  return { gain, pan };
+}
+
+/** Doppler sederhana: sumber mendekat (radialSpeed < 0) naik pitch, menjauh turun. */
+export function dopplerPitch(baseFreq: number, radialSpeed: number): number {
+  const ratio = SOUND_SPEED / Math.max(1, SOUND_SPEED + Math.max(-60, Math.min(60, radialSpeed)));
+  return baseFreq * ratio;
+}
+
+/** Agen ambient yang bisa berbunyi; diisi ulang tiap frame oleh AmbientLayer/PedestrianLayer. */
+export interface AmbientAgents {
+  listener: Listener;
+  /** Kendaraan (sumber klakson dan bunyi mesin lewat). */
+  vehicles: { x: number; z: number; dirX: number; dirZ: number; speed: number }[];
+  /** Pejalan kaki (acuan posisi bunyi hewan dan burung di sekitar kerumunan). */
+  peds: { x: number; z: number }[];
+}
+
+/** Runtime posisi agen, pola yang sama dengan `pedRuntime`: diisi tiap tick, dibaca saat cue. */
+export const ambientAgents: AmbientAgents = {
+  listener: { x: 0, z: 0, dirX: 0, dirZ: -1 },
+  vehicles: [],
+  peds: [],
+};
+
+/** Posisi stereo untuk sebuah cue dari agen yang sebenarnya; null kalau tidak ada agen terdengar. */
+export function cueSpatial(
+  kind: CueKind,
+  agents: AmbientAgents,
+  random: () => number,
+): { gain: number; pan: number; radialSpeed: number } | null {
+  const fromVehicle = kind === 'horn' || kind === 'pass';
+  const pool: readonly { x: number; z: number }[] = fromVehicle ? agents.vehicles : agents.peds;
+  const index = Math.floor(random() * pool.length);
+  const agent = pool[index];
+  if (!agent) return null;
+  const { gain, pan } = spatial(agents.listener, agent.x, agent.z);
+  if (gain <= 0) return null;
+  const vehicle = fromVehicle ? agents.vehicles[index] : undefined;
+  if (!vehicle) return { gain, pan, radialSpeed: 0 };
+  const dx = vehicle.x - agents.listener.x;
+  const dz = vehicle.z - agents.listener.z;
+  const distance = Math.hypot(dx, dz) || 1;
+  // Positif = menjauh (pitch turun), sesuai konvensi dopplerPitch.
+  return { gain, pan, radialSpeed: vehicle.speed * ((vehicle.dirX * dx + vehicle.dirZ * dz) / distance) };
+}
+
+export interface BedLevels {
+  traffic: number;
+  crowd: number;
+  birds: number;
+}
+
+/** Tingkat bed per kawasan dan jam. Malam: lalu lintas dan kerumunan turun, burung hampir diam. */
+export function bedLevels(district: DistrictId | null, t: number): BedLevels {
+  const base: Record<DistrictId, BedLevels> = {
+    downtown: { traffic: 1, crowd: 1, birds: 0.5 },
+    residential: { traffic: 0.35, crowd: 0.4, birds: 1 },
+    industrial: { traffic: 0.7, crowd: 0.1, birds: 0.2 },
+  };
+  const level = district ? base[district] : { traffic: 0.3, crowd: 0.2, birds: 0.4 };
+  const hour = hourOf(t);
+  const night = isNight(t);
+  // Jam sibuk pagi (7-9) dan sore (16-18) menambah lalu lintas.
+  const rush = (hour >= 7 && hour < 9) || (hour >= 16 && hour < 19) ? 1.25 : 1;
+  // Burung paling ramai pagi 5-9, diam saat malam.
+  const birdTime = night ? 0.05 : hour >= 5 && hour < 9 ? 1 : 0.5;
+  return {
+    traffic: level.traffic * rush * (night ? 0.35 : 1),
+    crowd: level.crowd * (night ? 0.25 : 1),
+    birds: level.birds * birdTime,
+  };
+}
+
+/** Peluang per detik tiap bunyi sekali jalan muncul, per kawasan dan jam. */
+export function cueChance(district: DistrictId | null, t: number): Record<CueKind, number> {
+  const levels = bedLevels(district, t);
+  const residential = district === 'residential';
+  return {
+    horn: 0.25 * levels.traffic,
+    pass: 0.5 * levels.traffic,
+    meow: residential ? 0.08 : 0.03,
+    bark: residential ? 0.1 : 0.02,
+    wings: 0.2 * levels.birds,
+  };
+}
+
+/** Pilih satu bunyi sekali jalan untuk selang `dt` detik, atau undefined kalau hening. */
+export function pickCue(district: DistrictId | null, t: number, dt: number, random: () => number): CueKind | undefined {
+  const chance = cueChance(district, t);
+  for (const kind of Object.keys(chance) as CueKind[]) {
+    if (random() < (chance[kind] ?? 0) * dt) return kind;
+  }
+  return undefined;
+}
+
+// ---------- pembungkus Web Audio ----------
+
+interface Bed {
+  traffic: GainNode;
+  crowd: GainNode;
+  birds: GainNode;
+}
+
+const SILENT = 0.0001;
+/** Skala akhir supaya bed tidak menutupi musik dan SFX pemain. */
+const BED_LEVEL = 0.12;
+const CUE_LEVEL = 0.35;
+
+/**
+ * Semua node menumpang di `sfxBus` audioEngine: satu AudioContext per perangkat, dan setelan
+ * Efek suara + mute sudah ikut terpasang di bus itu (lihat audioEngine.applyVolumes).
+ */
+class AmbientAudio {
+  private ctx: AudioContext | null = null;
+  private master: GainNode | null = null;
+  private bed: Bed | null = null;
+  private noise: AudioBuffer | null = null;
+  private voices = 0;
+  private cueTimer = 0;
+
+  /** Menunggu audioEngine.unlock() (gestur pengguna); aman dipanggil berulang. */
+  private ensure(): boolean {
+    if (this.ctx) return this.ctx.state === 'running';
+    const target = audio.ambientTarget();
+    if (!target) return false;
+    try {
+      const { ctx, bus, noise } = target;
+      const master = ctx.createGain();
+      master.gain.value = 0;
+      master.connect(bus);
+      this.ctx = ctx;
+      this.master = master;
+      this.noise = noise;
+      this.bed = {
+        traffic: this.loop(noise, 'lowpass', 220, 0.9),
+        crowd: this.loop(noise, 'bandpass', 620, 1.4),
+        birds: this.loop(noise, 'highpass', 3600, 0.7),
+      };
+    } catch (error) {
+      console.error('[ambient] init', error);
+      return false;
+    }
+    return target.ctx.state === 'running';
+  }
+
+  private loop(noise: AudioBuffer, type: BiquadFilterType, freq: number, q: number): GainNode {
+    const ctx = this.ctx as AudioContext;
+    const source = ctx.createBufferSource();
+    source.buffer = noise;
+    source.loop = true;
+    const filter = ctx.createBiquadFilter();
+    filter.type = type;
+    filter.frequency.value = freq;
+    filter.Q.value = q;
+    const gain = ctx.createGain();
+    gain.gain.value = 0;
+    source.connect(filter).connect(gain).connect(this.master as GainNode);
+    source.start();
+    return gain;
+  }
+
+  /** Dipanggil tiap frame: setel bed sesuai kawasan/jam dan kadang bunyikan satu cue. */
+  update(district: DistrictId | null, t: number, dt: number, active: boolean): void {
+    if (!this.ensure() || !this.ctx || !this.master || !this.bed) return;
+    const time = this.ctx.currentTime;
+    // Volume Efek suara dan mute sudah diterapkan sfxBus induk; di sini hanya buka/tutup.
+    this.master.gain.setTargetAtTime(active ? 1 : 0, time, 0.4);
+    if (!active) return;
+    const levels = bedLevels(district, t);
+    this.bed.traffic.gain.setTargetAtTime(levels.traffic * BED_LEVEL, time, 1.5);
+    this.bed.crowd.gain.setTargetAtTime(levels.crowd * BED_LEVEL * 0.7, time, 1.5);
+    this.bed.birds.gain.setTargetAtTime(levels.birds * BED_LEVEL * 0.25, time, 1.5);
+
+    // Cue dicoba 4x per detik supaya peluang per detik di cueChance tetap akurat.
+    this.cueTimer += dt;
+    if (this.cueTimer < 0.25) return;
+    const step = this.cueTimer;
+    this.cueTimer = 0;
+    const kind = pickCue(district, t, step, Math.random);
+    if (!kind) return;
+    // Cue berbunyi dari agen sebenarnya; tanpa agen terdengar (mis. jalan sepi) cue dilewati.
+    // ponytail: meong/gonggong/kepak memakai posisi pejalan kaki acak, bukan hewan dari animalSim
+    // (posisi hewan belum diekspos). Tambah `animals` ke ambientAgents kalau terdengar janggal.
+    const cue = cueSpatial(kind, ambientAgents, Math.random);
+    if (cue) this.playCue(kind, cue.gain, cue.pan, cue.radialSpeed);
+  }
+
+  /** Bunyi sekali jalan di posisi stereo tertentu; dibatasi MAX_VOICES suara bersamaan. */
+  playCue(kind: CueKind, gain: number, pan: number, radialSpeed = 0): void {
+    if (!this.ensure() || !this.ctx || this.voices >= MAX_VOICES || gain <= 0) return;
+    const ctx = this.ctx;
+    const panner = ctx.createStereoPanner?.();
+    const out = ctx.createGain();
+    out.gain.value = Math.min(1, gain) * CUE_LEVEL;
+    if (panner) {
+      panner.pan.value = Math.max(-1, Math.min(1, pan));
+      out.connect(panner).connect(this.master as GainNode);
+    } else {
+      out.connect(this.master as GainNode);
+    }
+    this.voices++;
+    const release = (duration: number) => {
+      window.setTimeout(() => {
+        this.voices = Math.max(0, this.voices - 1);
+        out.disconnect();
+        panner?.disconnect();
+      }, (duration + 0.2) * 1000);
+    };
+
+    if (kind === 'horn') {
+      this.tone(out, dopplerPitch(420, radialSpeed), 0.35, 'square', 0.5);
+      this.tone(out, dopplerPitch(560, radialSpeed), 0.35, 'square', 0.3);
+      release(0.4);
+    } else if (kind === 'pass') {
+      // Mesin lewat: noise lowpass naik lalu turun, pitch mengikuti doppler.
+      this.sweep(out, dopplerPitch(300, radialSpeed - 8), dopplerPitch(180, radialSpeed + 8), 1.4);
+      release(1.4);
+    } else if (kind === 'meow') {
+      this.tone(out, 700, 0.18, 'sawtooth', 0.25, 900);
+      release(0.3);
+    } else if (kind === 'bark') {
+      this.tone(out, 220, 0.12, 'square', 0.4, 120);
+      this.tone(out, 240, 0.1, 'square', 0.3, 130, 0.22);
+      release(0.4);
+    } else {
+      // Kepak sayap: tiga semburan noise pendek.
+      for (let i = 0; i < 3; i++) this.burst(out, 0.07, 1200, 0.5, i * 0.12);
+      release(0.4);
+    }
+  }
+
+  private tone(out: GainNode, freq: number, duration: number, type: OscillatorType, level: number, endFreq = freq, delay = 0): void {
+    const ctx = this.ctx as AudioContext;
+    const start = ctx.currentTime + delay;
+    const osc = ctx.createOscillator();
+    osc.type = type;
+    osc.frequency.setValueAtTime(freq, start);
+    if (endFreq !== freq) osc.frequency.exponentialRampToValueAtTime(endFreq, start + duration);
+    const gain = ctx.createGain();
+    gain.gain.setValueAtTime(SILENT, start);
+    gain.gain.exponentialRampToValueAtTime(level, start + 0.02);
+    gain.gain.exponentialRampToValueAtTime(SILENT, start + duration);
+    osc.connect(gain).connect(out);
+    osc.start(start);
+    osc.stop(start + duration + 0.05);
+  }
+
+  private burst(out: GainNode, duration: number, freq: number, level: number, delay = 0): void {
+    const ctx = this.ctx as AudioContext;
+    if (!this.noise) return;
+    const start = ctx.currentTime + delay;
+    const source = ctx.createBufferSource();
+    source.buffer = this.noise;
+    const filter = ctx.createBiquadFilter();
+    filter.type = 'bandpass';
+    filter.frequency.value = freq;
+    const gain = ctx.createGain();
+    gain.gain.setValueAtTime(level, start);
+    gain.gain.exponentialRampToValueAtTime(SILENT, start + duration);
+    source.connect(filter).connect(gain).connect(out);
+    source.start(start, Math.random() * 1.5, duration + 0.05);
+  }
+
+  private sweep(out: GainNode, fromFreq: number, toFreq: number, duration: number): void {
+    const ctx = this.ctx as AudioContext;
+    if (!this.noise) return;
+    const start = ctx.currentTime;
+    const source = ctx.createBufferSource();
+    source.buffer = this.noise;
+    source.loop = true;
+    const filter = ctx.createBiquadFilter();
+    filter.type = 'lowpass';
+    filter.frequency.setValueAtTime(fromFreq, start);
+    filter.frequency.linearRampToValueAtTime(toFreq, start + duration);
+    const gain = ctx.createGain();
+    gain.gain.setValueAtTime(SILENT, start);
+    gain.gain.linearRampToValueAtTime(0.6, start + duration * 0.4);
+    gain.gain.exponentialRampToValueAtTime(SILENT, start + duration);
+    source.connect(filter).connect(gain).connect(out);
+    source.start(start, Math.random() * 1.5);
+    source.stop(start + duration + 0.05);
+  }
+}
+
+export const ambientAudio = new AmbientAudio();

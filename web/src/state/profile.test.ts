@@ -53,11 +53,46 @@ describe('profile storage (web fallback)', () => {
   });
 });
 describe('appearance', () => {
-  const look = { gender: 'f', hairColor: 2, expression: 1, shirtColor: 1, shirtStyle: 0, pantsColor: 2, pantsStyle: 2 } as const;
+  // Field skinTone/hairStyle/accessory ditambahkan saat detail karakter m/f diperluas.
+  const look = {
+    gender: 'f',
+    skinTone: 1,
+    hairStyle: 1,
+    hairColor: 2,
+    expression: 1,
+    shirtColor: 1,
+    shirtStyle: 0,
+    pantsColor: 2,
+    pantsStyle: 2,
+    accessory: 2,
+  } as const;
+  /** Bentuk appearance sebelum skinTone/hairStyle/accessory ada (profil yang sudah tersimpan di HP tester). */
+  const legacy = { gender: 'f', hairColor: 2, expression: 1, shirtColor: 1, shirtStyle: 0, pantsColor: 2, pantsStyle: 2 } as const;
 
-  it('default = hero lama (laki-laki, hoodie biru, jeans)', () => {
-    expect(DEFAULT_APPEARANCE).toEqual({ gender: 'm', hairColor: 0, expression: 0, shirtColor: 0, shirtStyle: 1, pantsColor: 0, pantsStyle: 0 });
+  it('default = hero lama (laki-laki, hoodie biru, jeans) + field baru di nilai netral', () => {
+    expect(DEFAULT_APPEARANCE).toEqual({
+      gender: 'm',
+      skinTone: 0,
+      hairStyle: 0,
+      hairColor: 0,
+      expression: 0,
+      shirtColor: 0,
+      shirtStyle: 1,
+      pantsColor: 0,
+      pantsStyle: 0,
+      accessory: 0,
+    });
     expect(isValidAppearance(DEFAULT_APPEARANCE)).toBe(true);
+  });
+
+  it('profil lama tanpa skinTone/hairStyle/accessory dimigrasi ke default, pilihan lain dipertahankan', async () => {
+    expect(parseAppearance(legacy)).toEqual({ ...legacy, skinTone: 0, hairStyle: 0, accessory: 0 });
+    expect(isValidAppearance(legacy)).toBe(false);
+    store.set('player_profile_v1', JSON.stringify({ username: 'Sari', appearance: JSON.stringify(legacy) }));
+    const profile = await readProfile();
+    expect(profile?.appearance).toEqual({ ...legacy, skinTone: 0, hairStyle: 0, accessory: 0 });
+    // Hasil migrasi valid, jadi bisa langsung disimpan ulang tanpa error.
+    expect(isValidAppearance(profile?.appearance)).toBe(true);
   });
 
   it('menolak nilai di luar rentang', () => {
@@ -67,6 +102,8 @@ describe('appearance', () => {
     expect(isValidAppearance({ ...look, pantsStyle: -1 })).toBe(false);
     expect(isValidAppearance({ ...look, expression: 1.5 })).toBe(false);
     expect(isValidAppearance({ ...look, shirtColor: '1' })).toBe(false);
+    expect(isValidAppearance({ ...look, accessory: 3 })).toBe(false);
+    expect(isValidAppearance({ ...look, skinTone: -1 })).toBe(false);
     expect(isValidAppearance(null)).toBe(false);
     expect(parseAppearance({ ...look, hairColor: 9 })).toEqual({ ...look, hairColor: 0 });
   });

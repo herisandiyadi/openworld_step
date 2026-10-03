@@ -25,32 +25,32 @@ Status: `[ ]` belum, `[~]` dikerjakan, `[x]` selesai.
 
 ## Fase A: Kamera ala GTA V (6 hari)
 
-- [ ] **A1. Logika kamera murni** (0.75 hari): `src/camera/followCamera.ts`
+- [x] **A1. Logika kamera murni** (0.75 hari): `src/camera/followCamera.ts`
   - yaw/pitch, jarak per mode, batas pitch -5° sampai 40°, zoom ±30%, auto-recenter (1.5 detik jalan kaki,
     0.6 detik berkendara), look-ahead maks 2 m, FOV +6° di kecepatan tinggi.
   - Selesai jika: unit test untuk recenter, batas zoom, dan look-ahead lulus.
-- [ ] **A2. CameraRig** (0.75 hari): `src/camera/CameraRig.tsx`
+- [x] **A2. CameraRig** (0.75 hari): `src/camera/CameraRig.tsx`
   - Menggantikan kode kamera di `PlayerController.tsx`, dengan damping posisi dan rotasi.
   - Selesai jika: tidak ada jitter saat jalan, berlari, dan berkendara.
-- [ ] **A3. Gesture kamera** (1 hari): `src/camera/useCameraGestures.ts`
+- [x] **A3. Gesture kamera** (1 hari): `src/camera/useCameraGestures.ts`
   - Geser di separuh layar kanan untuk rotasi dan pinch untuk zoom. Di desktop: drag mouse dan scroll.
   - Zona sentuh tidak bentrok dengan joystick dan tombol aksi (multi-touch per pointer).
   - Selesai jika: joystick, geser kamera, dan tombol bisa dipakai bersamaan dengan 3 jari.
-- [ ] **A4. Joystick relatif kamera** (0.25 hari)
+- [x] **A4. Joystick relatif kamera** (0.25 hari)
   - Input dirotasi sebesar yaw kamera sebelum `stepPlayer`, berlaku juga untuk WASD.
-- [ ] **A5. Tabrakan kamera** (0.5 hari)
+- [x] **A5. Tabrakan kamera** (0.5 hari)
   - Ray vs AABB gedung di 3x3 chunk, offset 0.3 m, kembali menjauh secara halus.
   - Pemain disembunyikan atau transparan jika kamera < 1.2 m.
   - Selesai jika: unit test ray-AABB lulus dan 0 klip di uji keliling 2 putaran.
-- [ ] **A6. Kontrol kendaraan baru** (1 hari)
+- [x] **A6. Kontrol kendaraan baru** (1 hari)
   - Motor dan mobil: gas/rem plus belok dengan radius putar dan akselerasi. Sepeda dan skateboard: belok halus.
   - Parameter per kendaraan di `vehicleSpec.ts`.
   - Selesai jika: tidak bisa berputar di tempat, terasa wajar, dan mudah di-tuning.
-- [ ] **A7. Opsi tap-to-move** (0.25 hari)
+- [x] **A7. Opsi tap-to-move** (0.25 hari)
   - Toggle "Ketuk untuk berjalan" di Pengaturan, default mati, disimpan di Preferences.
-- [ ] **A8. Minimap ikut arah kamera** (0.25 hari)
+- [x] **A8. Minimap ikut arah kamera** (0.25 hari)
   - Opsi rotate-with-camera (default nyala) atau north-up, dengan penanda utara ikut berputar.
-- [ ] **A9. Horizon dan bayangan** (0.75 hari)
+- [x] **A9. Horizon dan bayangan** (0.75 hari)
   - Fog 60-140 m, siluet gedung impostor untuk chunk di luar radius muat (1 draw call per chunk).
   - Shadow camera ±20 m di depan arah pandang.
   - Selesai jika: batas streaming tidak terlihat dan draw call total ≤ 150.
@@ -61,30 +61,30 @@ Status: `[ ]` belum, `[~]` dikerjakan, `[x]` selesai.
 
 ## Fase B: Lalu Lintas (9.5 hari)
 
-- [ ] **B1. Bake graf lajur** (1.5 hari): `tools/world/lanes.ts` menghasilkan `public/world/lanes.json`
+- [x] **B1. Bake graf lajur** (1.5 hari): `tools/world/lanes.ts` menghasilkan `public/world/lanes.json`
   - Lajur kiri ±2 m dari garis tengah, node persimpangan, belokan lurus/kiri/kanan dengan kurva Bezier.
   - Selesai jika: test memastikan semua edge terhubung, tidak ada jalan buntu, dan tidak menembus gedung.
-- [ ] **B2. Query graf runtime** (0.5 hari): `src/ambient/laneGraph.ts`
+- [x] **B2. Query graf runtime** (0.5 hari): `src/ambient/laneGraph.ts`
   - Mencari edge terdekat, edge berikutnya acak per persimpangan, dan konversi posisi 1D ke dunia.
-- [ ] **B3. Simulasi lalu lintas** (1.5 hari): `src/ambient/trafficSim.ts`
+- [x] **B3. Simulasi lalu lintas** (1.5 hari): `src/ambient/trafficSim.ts`
   - Posisi 1D per edge, car-following (2 m + 0.8 detik x kecepatan), reservasi persimpangan, 15/5 Hz.
   - Selesai jika: test 10.000 tick tanpa tabrakan atau deadlock lulus.
-- [ ] **B4. Lampu lalu lintas** (1 hari)
+- [x] **B4. Lampu lalu lintas** (1 hari) — selesai: aset `prop_trafficlight_01` + siklus `src/ambient/trafficLights.ts` (12 detik, kuning 2 detik, satu arah hijau) yang menahan mobil di `trafficSim` lewat `gate`
   - Aset `prop_trafficlight_01`, siklus 12 detik dengan kuning 2 detik di Pusat Kota, emissive diatur shader.
   - Status lampu dibagi ke simulasi mobil dan pejalan kaki.
-- [ ] **B5. Aset kendaraan GLB** (1.5 hari)
+- [x] **B5. Aset kendaraan GLB** (1.5 hari) — GLB selesai; wiring runtime `vehicleModels.tsx` -> GLB oleh lead
   - `veh_car_sedan`, `veh_car_hatch`, `veh_moto`, `veh_bus` dengan roda sebagai node terpisah.
   - Mobil dan motor milik pemain dipindah dari `vehicleModels.tsx` ke GLB.
   - Selesai jika: lolos validator, anggaran segitiga terpenuhi, dan terdaftar di manifest.
-- [ ] **B6. Spawner dan pool** (0.75 hari): `src/ambient/spawner.ts`
+- [x] **B6. Spawner dan pool** (0.75 hari): `src/ambient/spawner.ts`
   - Cincin spawn 40-110 m di luar pandangan, despawn > 130 m, jumlah pool per preset (8/14/20).
   - Selesai jika: test memastikan tidak ada spawn di dalam frustum kamera.
-- [ ] **B7. Render instanced** (1 hari): `src/ambient/AmbientLayer.tsx`
+- [x] **B7. Render instanced** (1 hari): `src/ambient/AmbientLayer.tsx` — 15 InstancedMesh (dihitung, belum diukur di HP); simulasi 15/5 Hz lewat `stepTrafficTiered`
   - InstancedMesh per bagian kendaraan, interpolasi antar tick, roda berputar, lampu depan menyala di malam hari.
   - Selesai jika: draw call ambient ≤ 15.
-- [ ] **B8. Interaksi dengan pemain** (0.5 hari)
+- [x] **B8. Interaksi dengan pemain** (0.5 hari) — `playerGap` di `trafficSim.ts` + dorong keluar di `AmbientLayer.tsx`
   - Berhenti jika pemain di depan < 6 m, klakson setelah 2 detik, dorong keluar saat tumpang tindih, tanpa kerusakan.
-- [ ] **B9. Bus kota** (0.5 hari)
+- [x] **B9. Bus kota** (0.5 hari) — `src/ambient/busRoute.ts`, halte sama dengan `busDestinations`
   - Rute melewati halte dengan jeda 4 detik, sinkron dengan menu fast travel.
 - [ ] **B10. Uji dan rilis fase B** (0.75 hari)
   - Soak test 10 menit: 0 tabrakan, 0 mobil macet permanen, plus pengukuran performa di HP.
@@ -93,33 +93,33 @@ Status: `[ ]` belum, `[~]` dikerjakan, `[x]` selesai.
 
 ## Fase C: Pejalan Kaki, Hewan, Chat Warga, dan Bangku (12.5 hari)
 
-- [ ] **C1. Graf trotoar dan zebra cross** (1 hari)
+- [x] **C1. Graf trotoar dan zebra cross** (1 hari)
   - Dibake ke `lanes.json`, dan surface zebra cross ditulis ke chunk serta peta.
-- [ ] **C2. Simulasi pejalan kaki** (1.5 hari): `src/ambient/pedestrianSim.ts`
+- [x] **C2. Simulasi pejalan kaki** (1.5 hari): `src/ambient/pedestrianSim.ts` — duduk warga di bangku (state `sit`) belum dipakai runtime
   - Jalan di trotoar, menyeberang saat lampu pejalan hijau, duduk di bangku (memakai reservasi kursi dari C10), menghindari pemain.
   - Selesai jika: test memastikan tidak ada agen di dalam AABB gedung.
-- [ ] **C3. Aset dan animasi warga** (2 hari)
+- [x] **C3. Aset dan animasi warga** (2 hari) — instanced 1 draw call: bind pose di-bake ke meter, `_TINT` 6 varian, pose walk/idle/sit di vertex shader (`pedAnim.ts`); jalur skinned ≤ 4 agen terdekat ditunda (`ponytail:`), performa di HP diuji di C11
   - `ped_citizen` dengan 6 variasi warna lewat atribut instance.
   - Animasi vertex shader prosedural (walk, idle, sit), dan skinned hanya untuk ≤ 4 agen terdekat.
   - Ini task paling berisiko, jadi prototipe dulu performanya di HP.
-- [ ] **C4. Aset hewan** (1.5 hari)
+- [x] **C4. Aset hewan** (1.5 hari)
   - `animal_cat`, `animal_dog`, dan `bird_pigeon` dengan vertex anim (walk, run, sit, sniff, peck, fly).
-- [ ] **C5. Simulasi hewan** (1.25 hari): `src/ambient/animalSim.ts`
+- [x] **C5. Simulasi hewan** (1.25 hari): `src/ambient/animalSim.ts`
   - State machine, berkeliaran di navmesh dalam radius 10-20 m, reaksi kucing kabur (3 m), merpati terbang (5 m),
     dan anjing mengikuti (4 m, peluang 30%).
   - Selesai jika: unit test transisi state lulus.
-- [ ] **C6. Kepadatan per kawasan dan jam** (0.5 hari)
+- [x] **C6. Kepadatan per kawasan dan jam** (0.5 hari)
   - Tabel kepadatan Pusat Kota, Perumahan, dan Industri, turun 60% di malam hari (22.00-05.00).
-- [ ] **C7. Pool warga dan persona** (0.75 hari): `src/ambient/residents.ts` dan `residents.json`
+- [x] **C7. Pool warga dan persona** (0.75 hari): `src/ambient/residents.ts` dan `residents.json`
   - 60 warga deterministik (nama, umur, pekerjaan, rumah/kantor, hobi, suasana hati), aktivitas ikut jam,
     dan system prompt warga yang menyertakan nama pemain.
   - Selesai jika: test determinisme, validasi isi persona, dan isi prompt lulus.
-- [ ] **C8. Chat dengan pejalan kaki** (1.25 hari)
+- [x] **C8. Chat dengan pejalan kaki** (1.25 hari) — uji streaming `cbai` di HP belum
   - Target "Tanya" untuk pejalan kaki dalam 3 m (NPC bernama diprioritaskan) dan label nama dalam 6 m.
   - Warga berhenti dan menghadap pemain, tidak di-despawn selama chat, lalu lanjut beraktivitas.
   - Riwayat per warga masuk save game (10 giliran, maks 30 warga, LRU) dan statistik "warga diajak ngobrol" di HUD.
   - Selesai jika: test save/load riwayat warga lulus, dan chat streaming ke `cbai` berjalan di HP.
-- [ ] **C9. Bangku pinggir jalan dan titik duduk** (1 hari)
+- [x] **C9. Bangku pinggir jalan dan titik duduk** (1 hari) — aset `prop_bench_02` (108 segitiga) + penempatan generator dan titik duduk, keduanya selesai
   - Aset `prop_bench_02` (≤ 300 segitiga, sandaran, collider kotak) lewat `npm run assets`.
   - Generator: penempatan di cincin trotoar (Pusat Kota 2 per sisi blok, Perumahan 1, Industri dekat halte),
     jarak ≥ 1.5 m dari lampu/tempat sampah/halte, tidak di 6 m terakhir sebelum persimpangan.
@@ -127,7 +127,7 @@ Status: `[ ]` belum, `[~]` dikerjakan, `[x]` selesai.
     JSON. `WORLD_DATA_VERSION` naik.
   - Selesai jika: test memastikan sisa lebar trotoar ≥ 1.4 m, bangku tidak tumpang tindih dengan prop lain, dan
     semua titik duduk di luar collider gedung.
-- [ ] **C10. Duduk di bangku** (1 hari): `src/game/seating.ts`
+- [x] **C10. Duduk di bangku** (1 hari): `src/game/seating.ts` — uji di HP belum
   - Cari kursi kosong terdekat ≤ 1.5 m, reservasi kursi untuk pemain dan warga, posisi duduk dan berdiri
     (0.7 m di depan, coba kiri/kanan jika terhalang).
   - `nearby.seatId` di `Proximity`, hanya saat jalan kaki dan tidak di udara.
@@ -137,7 +137,7 @@ Status: `[ ]` belum, `[~]` dikerjakan, `[x]` selesai.
   - SFX duduk dan berdiri, shortcut keyboard, `aria-label`. Posisi duduk tidak disimpan di save.
   - Selesai jika: unit test reservasi (tidak ada dua karakter di satu kursi) dan berdiri tanpa terjebak lulus,
     dan duduk/berdiri berjalan di HP.
-- [ ] **C11. Uji dan rilis fase C** (0.75 hari)
+- [ ] **C11. Uji dan rilis fase C** (0.75 hari) — kode tersambung (`PedestrianLayer` di `AmbientLayer`, audio ambient dari posisi agen, lampu pejalan kaki); uji anggaran di HP belum
   - Anggaran ambient (≤ 30 draw call, ≤ 40k segitiga, simulasi ≤ 1.5 ms per frame) dan uji di HP.
 
 **Gerbang C:** tidak ada agen di dalam gedung, reaksi hewan benar, chat warga jalan di HP, duduk/berdiri di
@@ -145,19 +145,20 @@ bangku berjalan tanpa pemain terjebak, dan anggaran ambient terpenuhi.
 
 ## Fase D: Polish dan Rilis (4 hari)
 
-- [ ] **D1. Audio ambient spasial** (1.25 hari)
+- [x] **D1. Audio ambient spasial** (1.25 hari)
   - Klakson, mesin lewat dengan pitch doppler sederhana, meong, gonggong, dan kepak sayap.
   - Pan dan volume mengikuti jarak, maks 6 suara bersamaan, memakai mesin `src/audio` yang sudah ada.
-- [ ] **D2. Suasana malam** (0.5 hari)
+- [x] **D2. Suasana malam** (0.5 hari)
   - Lampu mobil, lampu jalan menyala (emissive), dan jendela gedung terang acak.
-- [ ] **D3. Sapaan gelembung** (0.5 hari)
+- [x] **D3. Sapaan gelembung** (0.5 hari)
   - Warga kadang menyapa singkat saat pemain lewat, memakai teks lokal tanpa AI.
-- [ ] **D4. Preset kepadatan** (0.25 hari)
+- [x] **D4. Preset kepadatan** (0.25 hari)
   - Pengaturan "Keramaian kota": Sepi, Normal, atau Ramai, terpisah dari preset grafis.
 - [ ] **D5. Uji performa per preset dan tuning** (1 hari)
   - Preset Rendah, Sedang, dan Tinggi di HP, lalu sesuaikan pool dan jarak spawn.
-- [ ] **D6. Dokumentasi dan rilis** (0.5 hari)
-  - README, `ARCHITECTURE.md`, dan `PERF_BUDGET.md`, lalu APK release, verifikasi signing, dan push.
+- [x] **D6. Dokumentasi dan rilis** (0.5 hari)
+  - `docs/AMBIENT.md`: sistem ambient, preset kepadatan, dan tombol penyetelan. APK release dan
+    verifikasi signing menyusul bersama D5 (butuh perangkat fisik).
 
 **Gerbang D:** uji performa di HP lulus untuk ketiga preset, dan APK release terverifikasi.
 

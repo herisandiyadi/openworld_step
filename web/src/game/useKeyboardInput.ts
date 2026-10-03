@@ -1,13 +1,16 @@
 import { useEffect } from 'react';
 import { keyboardInput } from './runtime';
-import { askNearby, jump, openBus, toggleVehicle } from './actions';
+import { askNearby, jump, openBus, toggleSeat, toggleVehicle } from './actions';
 
 const LEFT = ['KeyA', 'ArrowLeft'];
 const RIGHT = ['KeyD', 'ArrowRight'];
 const UP = ['KeyW', 'ArrowUp'];
 const DOWN = ['KeyS', 'ArrowDown'];
 
-/** Desktop fallback for development: WASD / arrow keys feed the same input vector as the joystick. */
+/**
+ * Desktop fallback for development: WASD / arrow keys feed the same input vector as the joystick
+ * (dirotasi ke ruang kamera di PlayerController, sama seperti joystick).
+ */
 export function useKeyboardInput(): void {
   useEffect(() => {
     const pressed = new Set<string>();
@@ -28,6 +31,7 @@ export function useKeyboardInput(): void {
         if (event.code === 'KeyE') toggleVehicle();
         if (event.code === 'KeyQ') askNearby();
         if (event.code === 'KeyB') openBus();
+        if (event.code === 'KeyF') toggleSeat();
       }
       pressed.add(event.code);
       update();

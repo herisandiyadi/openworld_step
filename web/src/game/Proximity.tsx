@@ -1,14 +1,17 @@
 import { useRef } from 'react';
 import { useFrame } from '@react-three/fiber';
+import { pedRuntime, RESIDENTS } from '../ambient/PedestrianLayer';
+import { nearestPed, PED_TALK_DISTANCE } from '../ambient/pedestrianSim';
 import { markExplored } from './exploration';
-import { BUS_DISTANCE, MODE_RADIUS, TALK_DISTANCE, USE_DISTANCE, playerState } from './runtime';
+import { BUS_DISTANCE, MODE_RADIUS, TALK_DISTANCE, USE_DISTANCE, jumpState, playerState } from './runtime';
+import { findNearestFreeSeat } from './seating';
 import { useGameStore } from '../state/gameStore';
 import { chunkAt, worldState } from '../world/worldState';
 
 const INTERVAL = 0.15;
 
 /**
- * Throttled (~7 Hz) scan for the NPC, parked vehicle, and bus stop the action buttons should target.
+ * Throttled (~7 Hz) scan for the NPC (named NPC or ambient resident), parked vehicle, and bus stop the action buttons should target.
  * Also reveals the fog of war around the player. The store is only touched when a target changes.
  */
 export function Proximity() {
@@ -45,6 +48,12 @@ export function Proximity() {
       }
     }
 
+    // Warga ambient dalam 3 m hanya kalau tidak ada NPC bernama di dekat (NPC bernama diprioritaskan).
+    if (!npcId && onFoot && pedRuntime.graph) {
+      const ped = nearestPed(pedRuntime.graph, pedRuntime.world, playerState.x, playerState.z, PED_TALK_DISTANCE);
+      npcId = ped ? (RESIDENTS[ped.residentIndex]?.id ?? null) : null;
+    }
+
     let busStopId: string | null = null;
     if (onFoot) {
       let bestStop = BUS_DISTANCE;
@@ -57,11 +66,19 @@ export function Proximity() {
       }
     }
 
+    // Kursi bangku: hanya saat jalan kaki, tidak di udara, dan belum duduk.
+    const airborne = jumpState.y > 0 || jumpState.vy !== 0;
+    const seatId =
+      onFoot && !airborne && !state.seated
+        ? (findNearestFreeSeat(worldState.index?.seats ?? [], playerState.x, playerState.z)?.id ?? null)
+        : null;
+
     const current = state.nearby;
-    if (vehicleId !== current.vehicleId || npcId !== current.npcId || busStopId !== current.busStopId) {
-      state.setNearby({ npcId, vehicleId, busStopId });
+    if (vehicleId !== current.vehicleId || npcId !== current.npcId || busStopId !== current.busStopId || seatId !== current.seatId) {
+      state.setNearby({ npcId, vehicleId, busStopId, seatId });
     }
   });
 
+  // Render pejalan kaki ada di AmbientLayer (B7); di sini hanya pemindaian target aksi.
   return null;
 }

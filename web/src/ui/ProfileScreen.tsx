@@ -45,7 +45,7 @@ export function ProfileScreen({ firstRun = false }: { firstRun?: boolean }) {
 
   return (
     <main className="menu-screen" aria-labelledby="profile-heading">
-      <form className="menu-panel" onSubmit={onSubmit} noValidate>
+      <form className="menu-panel profile-panel" onSubmit={onSubmit} noValidate>
         <h1 id="profile-heading" className={firstRun ? 'menu-title' : 'menu-heading'}>
           {firstRun ? 'Selamat datang' : 'Profil'}
         </h1>

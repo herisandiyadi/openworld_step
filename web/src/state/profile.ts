@@ -5,28 +5,48 @@ import { create } from 'zustand';
 /** Pilihan penampilan (NEXT_FEATURES 9.4). Semua angka 0-2, indeks ke palet di game/HeroAppearance.ts. */
 export interface Appearance {
   gender: 'm' | 'f';
+  skinTone: number;
+  hairStyle: number;
   hairColor: number;
   expression: number;
   shirtColor: number;
   shirtStyle: number;
   pantsColor: number;
   pantsStyle: number;
+  accessory: number;
 }
 
-/** Default = tampilan hero lama: laki-laki, hoodie biru, jeans. */
+/** Default = tampilan hero lama: laki-laki, kulit terang, rambut pendek, hoodie biru, jeans, tanpa aksesori. */
 export const DEFAULT_APPEARANCE: Appearance = {
   gender: 'm',
+  skinTone: 0,
+  hairStyle: 0,
   hairColor: 0,
   expression: 0,
   shirtColor: 0,
   shirtStyle: 1,
   pantsColor: 0,
   pantsStyle: 0,
+  accessory: 0,
 };
 
-export const APPEARANCE_FIELDS = ['hairColor', 'expression', 'shirtColor', 'shirtStyle', 'pantsColor', 'pantsStyle'] as const;
+export const APPEARANCE_FIELDS = [
+  'skinTone',
+  'hairStyle',
+  'hairColor',
+  'expression',
+  'shirtColor',
+  'shirtStyle',
+  'pantsColor',
+  'pantsStyle',
+  'accessory',
+] as const;
 
-/** Memaksa nilai ke rentang valid; field yang salah/absen kembali ke default (profil v1 tanpa appearance). */
+/**
+ * Memaksa nilai ke rentang valid; field yang salah/absen kembali ke default. Dipakai untuk profil v1
+ * (tanpa appearance) dan profil lama yang belum punya skinTone/hairStyle/accessory: field baru
+ * diisi default, jadi profil tersimpan tetap bisa dimuat tanpa crash.
+ */
 export function parseAppearance(value: unknown): Appearance {
   const data = value as Partial<Record<string, unknown>> | null | undefined;
   if (!data || typeof data !== 'object') return DEFAULT_APPEARANCE;

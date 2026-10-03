@@ -8,11 +8,16 @@ import {
   validateSettings,
 } from '../state/aiSettings';
 import { useGameStore } from '../state/gameStore';
+import { DENSITY_LABELS, DENSITY_PRESETS, useGraphicsSettings } from '../state/graphicsSettings';
 import { AudioControls } from './AudioControls';
 
 /** AI endpoint settings (base URL, API key, model), saved on the device with Capacitor Preferences. */
 export function SettingsScreen() {
   const setScreen = useGameStore((state) => state.setScreen);
+  const controls = useGameStore((state) => state.controls);
+  const setControls = useGameStore((state) => state.setControls);
+  const density = useGraphicsSettings((state) => state.settings.density);
+  const setGraphics = useGraphicsSettings((state) => state.update);
   const stored = useAiSettings((state) => state.settings);
   const save = useAiSettings((state) => state.save);
   const [form, setForm] = useState<AiSettings>(stored);
@@ -121,6 +126,46 @@ export function SettingsScreen() {
         <fieldset className="audio-fieldset">
           <legend>Audio</legend>
           <AudioControls />
+        </fieldset>
+
+        <fieldset className="audio-fieldset">
+          <legend>Kontrol</legend>
+          <label className="audio-row">
+            <span>Ketuk untuk berjalan</span>
+            <input
+              type="checkbox"
+              checked={controls.tapToMove}
+              onChange={(event) => setControls({ tapToMove: event.target.checked })}
+            />
+          </label>
+          <label className="audio-row">
+            <span>Minimap ikut arah kamera</span>
+            <input
+              type="checkbox"
+              checked={controls.minimapRotate}
+              onChange={(event) => setControls({ minimapRotate: event.target.checked })}
+            />
+          </label>
+        </fieldset>
+
+        <fieldset className="audio-fieldset">
+          <legend>Keramaian kota</legend>
+          {/* Radio native di dalam fieldset: Tab lalu panah, fokus terlihat, label >= 48 px (.appearance-option). */}
+          <div className="appearance-options">
+            {DENSITY_PRESETS.map((preset) => (
+              <label key={preset} className={`appearance-option${density === preset ? ' selected' : ''}`}>
+                <input
+                  type="radio"
+                  name="density"
+                  value={preset}
+                  checked={density === preset}
+                  onChange={() => setGraphics({ density: preset })}
+                />
+                <span>{DENSITY_LABELS[preset]}</span>
+              </label>
+            ))}
+          </div>
+          <p className="appearance-label">Makin ramai, makin banyak kendaraan dan pejalan kaki (butuh HP lebih kuat).</p>
         </fieldset>
 
         <p id={ids.status} className={`settings-status${error || (status && !status.ok) ? ' error' : ''}`} role="status" aria-live="polite">
