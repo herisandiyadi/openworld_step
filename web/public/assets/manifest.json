@@ -365,10 +365,10 @@
         "player",
         "custom"
       ],
-      "triangles": 1236,
-      "drawCalls": 11,
-      "materials": 4,
-      "bytes": 81828,
+      "triangles": 2158,
+      "drawCalls": 16,
+      "materials": 5,
+      "bytes": 106916,
       "bones": 13,
       "animations": [
         {
@@ -402,7 +402,10 @@
       ],
       "nodes": [
         "char_hero_f",
-        "hair",
+        "skin",
+        "hair_0",
+        "hair_1",
+        "hair_2",
         "shirt_0",
         "shirt_1",
         "shirt_2",
@@ -411,18 +414,20 @@
         "pants_2",
         "face_0",
         "face_1",
-        "face_2"
+        "face_2",
+        "acc_1",
+        "acc_2"
       ],
       "bounds": {
         "min": [
-          -0.311,
+          -0.273,
           0,
-          -0.167
+          -0.238
         ],
         "max": [
-          0.311,
-          1.775,
-          0.182
+          0.273,
+          1.795,
+          0.238
         ]
       },
       "collider": {
@@ -448,10 +453,10 @@
         "player",
         "custom"
       ],
-      "triangles": 1200,
-      "drawCalls": 11,
-      "materials": 4,
-      "bytes": 80972,
+      "triangles": 1748,
+      "drawCalls": 16,
+      "materials": 5,
+      "bytes": 98308,
       "bones": 13,
       "animations": [
         {
@@ -485,7 +490,10 @@
       ],
       "nodes": [
         "char_hero_m",
-        "hair",
+        "skin",
+        "hair_0",
+        "hair_1",
+        "hair_2",
         "shirt_0",
         "shirt_1",
         "shirt_2",
@@ -494,18 +502,20 @@
         "pants_2",
         "face_0",
         "face_1",
-        "face_2"
+        "face_2",
+        "acc_1",
+        "acc_2"
       ],
       "bounds": {
         "min": [
           -0.311,
           0,
-          -0.167
+          -0.235
         ],
         "max": [
           0.311,
-          1.775,
-          0.182
+          1.83,
+          0.176
         ]
       },
       "collider": {
