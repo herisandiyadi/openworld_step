@@ -13,7 +13,20 @@ import { chunkCoord, districtOf } from '../world/worldSpec';
 import type { LanesData } from './laneGraph';
 import { densityAt } from './density';
 import { generateResidents } from './residents';
-import { ANIM_CODE, bakeBindPose, PED_ANIM_GLSL, type PedAnim, STRIDE } from './pedAnim';
+import {
+  ANIM_CODE,
+  bakeBindPose,
+  PED_ANIM_GLSL,
+  PED_MESHES,
+  PED_SLOTS,
+  PED_VARIANTS,
+  type PedAnim,
+  type PedGender,
+  pedStyleMask,
+  pedVariantIndex,
+  splitPedsByMesh,
+  STRIDE,
+} from './pedAnim';
 import {
   buildWalkGraph,
   createPedWorld,
@@ -61,12 +74,24 @@ function targetCount(preset: 'low' | 'medium' | 'high', x: number, z: number, t:
   return Math.max(2, Math.round((pool * densityAt(district, 'pedestrian', t)) / 14));
 }
 
+/** Mesh sumber pertama (SkinnedMesh) di dalam GLB warga. */
+function firstSkinned(scene: Object3D): SkinnedMesh | null {
+  let found: SkinnedMesh | null = null;
+  scene.traverse((child) => {
+    if (!found && (child as SkinnedMesh).isSkinnedMesh) found = child as SkinnedMesh;
+  });
+  return found;
+}
+
 /**
- * Render pejalan kaki ambient dengan satu InstancedMesh (1 draw call) dan menjalankan
- * `pedestrianSim` di 15 Hz dengan interpolasi di frame render.
+ * Render pejalan kaki ambient dengan dua InstancedMesh (pria `ped_citizen`, wanita
+ * `ped_citizen_f`; maks 2 draw call) dan menjalankan `pedestrianSim` di 15 Hz dengan interpolasi
+ * di frame render. Pejalan dibagi ke mesh menurut gender warganya (`splitPedsByMesh`), jadi warga
+ * "Bu/Mbak" selalu memakai model wanita.
  *
- * C3: warna baju/celana/rambut per warga dari palet `meta.variants` lewat atribut `_TINT`,
- * dan animasi jalan/diam/duduk dihitung di vertex shader (pedAnim.ts). Tetap 1 draw call.
+ * C3: warna dan gaya (topi, rok, jilbab, kuncir) per warga dari palet `PED_VARIANTS` dan atribut
+ * `_TINT`; animasi jalan/diam/duduk dihitung di vertex shader (pedAnim.ts). Kedua GLB memakai rig
+ * yang sama, jadi pivot shader sama untuk keduanya.
  *
  * ponytail: semua warga lewat jalur instanced; jalur SkinnedMesh untuk <= 4 warga terdekat dan
  * blob shadow belum dibuat. Tambahkan kalau di HP pose prosedural terlihat kaku dari dekat.
@@ -74,27 +99,29 @@ function targetCount(preset: 'low' | 'medium' | 'high', x: number, z: number, t:
 export function PedestrianLayer() {
   const density = useGraphicsSettings((state) => state.settings.density);
   const [data, setData] = useState<LanesData | null>(null);
-  const meshRef = useRef<InstancedMesh>(null);
+  const maleRef = useRef<InstancedMesh>(null);
+  const femaleRef = useRef<InstancedMesh>(null);
   const dummy = useMemo(() => new Object3D(), []);
   const timer = useRef(0);
   const nextId = useRef(0);
   const random = useRef(mulberry32(20261002));
   const yaw = useRef(new Map<number, number>());
-  const gltf = useGLTF(assetUrl('ped_citizen'));
-  const source = useMemo(() => {
-    let found: SkinnedMesh | null = null;
-    gltf.scene.traverse((child) => {
-      if (!found && (child as SkinnedMesh).isSkinnedMesh) found = child as SkinnedMesh;
-    });
-    return found as SkinnedMesh | null;
-  }, [gltf]);
+  const maleGltf = useGLTF(assetUrl(PED_MESHES[0]!.asset));
+  const femaleGltf = useGLTF(assetUrl(PED_MESHES[1]!.asset));
   const max = PED_POOL.high;
   // Geometri di-clone supaya atribut instance tidak menempel ke cache useGLTF.
-  const instanced = useMemo(() => (source ? createPedMesh(source, max) : null), [source, max]);
+  // Tiap mesh berkapasitas penuh `max`: bisa saja semua pejalan yang aktif berjenis kelamin sama.
+  const meshes = useMemo(() => {
+    const male = firstSkinned(maleGltf.scene);
+    const female = firstSkinned(femaleGltf.scene);
+    return male && female ? [createPedMesh(male, max, 'm'), createPedMesh(female, max, 'f')] : null;
+  }, [maleGltf, femaleGltf, max]);
   useEffect(() => () => {
-    instanced?.geometry.dispose();
-    instanced?.material.dispose();
-  }, [instanced]);
+    for (const mesh of meshes ?? []) {
+      mesh.geometry.dispose();
+      mesh.material.dispose();
+    }
+  }, [meshes]);
   const anim = useRef(new Map<number, { phase: number; x: number; z: number }>());
 
   useEffect(() => {
@@ -116,8 +143,8 @@ export function PedestrianLayer() {
 
   useFrame((state, delta) => {
     const graph = pedRuntime.graph;
-    const mesh = meshRef.current;
-    if (!graph || !mesh || !instanced) return;
+    const refs = [maleRef.current, femaleRef.current];
+    if (!graph || !meshes || !refs[0] || !refs[1]) return;
     const world = pedRuntime.world;
     world.player = { x: playerState.x, z: playerState.z };
     world.t = dayClock.t;
@@ -151,57 +178,67 @@ export function PedestrianLayer() {
 
     const dt = Math.min(delta, 0.05);
     walkers.length = 0;
-    const animAttr = instanced.anim;
     // Agen yang sudah despawn dibuang dari peta fase supaya tidak menumpuk.
     if (ticked) for (const id of anim.current.keys()) if (!world.peds.some((ped) => ped.id === id)) anim.current.delete(id);
     let nearestId: string | null = null;
     let nearestDistance = PED_LABEL_DISTANCE;
-    for (let i = 0; i < max; i++) {
-      const ped = world.peds[i];
-      if (!ped) {
-        dummy.position.set(0, -50, 0);
-        dummy.scale.setScalar(1);
-        dummy.rotation.set(0, 0, 0);
+    const { slots } = splitPedsByMesh(world.peds, RESIDENTS, max);
+    for (let m = 0; m < meshes.length; m++) {
+      const mesh = refs[m]!;
+      const { anim: animAttr, style: styleAttr, gender } = meshes[m]!;
+      const peds = slots[m]!;
+      // Slot 0..peds.length-1 terisi, sisanya disembunyikan di bawah tanah (y = -50).
+      for (let i = 0; i < max; i++) {
+        const ped = peds[i];
+        if (!ped) {
+          dummy.position.set(0, -50, 0);
+          dummy.scale.setScalar(1);
+          dummy.rotation.set(0, 0, 0);
+          dummy.updateMatrix();
+          mesh.setMatrixAt(i, dummy.matrix);
+          continue;
+        }
+        const pose = pedPose(graph, ped);
+        const resident = RESIDENTS[ped.residentIndex];
+        // 'talk' saat panel terbuka, 'linger' sebentar sesudahnya supaya pemain melihat warga menghadapnya.
+        const talking = ped.state === 'talk' || ped.state === 'linger';
+        const dx = playerState.x - pose.x;
+        const dz = playerState.z - pose.z;
+        const distance = Math.hypot(dx, dz);
+        // Saat chat, warga menghadap pemain; kalau tidak, menghadap arah jalannya.
+        const want = talking ? Math.atan2(-dx, -dz) + Math.PI : Math.atan2(-pose.dirX, -pose.dirZ) + Math.PI;
+        const current = yaw.current.get(ped.id) ?? want;
+        // Langsung menghadap saat chat dimulai: game loop dijeda selama panel terbuka, jadi tidak ada frame untuk berputar halus.
+        const next = talking ? want : current + Math.atan2(Math.sin(want - current), Math.cos(want - current)) * (1 - Math.exp(-TURN_SMOOTHING * dt));
+        yaw.current.set(ped.id, next);
+        dummy.position.set(pose.x, groundHeightAt(pose.x, pose.z), pose.z);
+        dummy.rotation.set(0, next, 0);
+        // Tinggi badan per warga (meta.heightScale: pria 0.92-1.06, wanita 0.88-1.00), tetap untuk id yang sama.
+        dummy.scale.setScalar(gender === 'f' ? 0.88 + ((ped.id * 37) % 13) / 100 : 0.92 + ((ped.id * 37) % 15) / 100);
         dummy.updateMatrix();
         mesh.setMatrixAt(i, dummy.matrix);
-        continue;
-      }
-      const pose = pedPose(graph, ped);
-      const resident = RESIDENTS[ped.residentIndex];
-      // 'talk' saat panel terbuka, 'linger' sebentar sesudahnya supaya pemain melihat warga menghadapnya.
-      const talking = ped.state === 'talk' || ped.state === 'linger';
-      const dx = playerState.x - pose.x;
-      const dz = playerState.z - pose.z;
-      const distance = Math.hypot(dx, dz);
-      // Saat chat, warga menghadap pemain; kalau tidak, menghadap arah jalannya.
-      const want = talking ? Math.atan2(-dx, -dz) + Math.PI : Math.atan2(-pose.dirX, -pose.dirZ) + Math.PI;
-      const current = yaw.current.get(ped.id) ?? want;
-      // Langsung menghadap saat chat dimulai: game loop dijeda selama panel terbuka, jadi tidak ada frame untuk berputar halus.
-      const next = talking ? want : current + Math.atan2(Math.sin(want - current), Math.cos(want - current)) * (1 - Math.exp(-TURN_SMOOTHING * dt));
-      yaw.current.set(ped.id, next);
-      dummy.position.set(pose.x, groundHeightAt(pose.x, pose.z), pose.z);
-      dummy.rotation.set(0, next, 0);
-      // Tinggi badan bervariasi per warga (meta.heightScale 0.92-1.06), tetap untuk id yang sama.
-      dummy.scale.setScalar(0.92 + ((ped.id * 37) % 15) / 100);
-      dummy.updateMatrix();
-      mesh.setMatrixAt(i, dummy.matrix);
 
-      const kind: PedAnim = ped.state === 'sit' ? 'sit' : ped.state === 'walk' || ped.state === 'cross' ? 'walk' : 'idle';
-      const track = anim.current.get(ped.id) ?? { phase: ped.id * 1.7, x: pose.x, z: pose.z };
-      // Fase jalan mengikuti jarak tempuh (kaki tidak meluncur); diam/duduk mengikuti waktu.
-      track.phase += kind === 'walk' ? (Math.hypot(pose.x - track.x, pose.z - track.z) / STRIDE) * Math.PI * 2 : dt;
-      track.x = pose.x;
-      track.z = pose.z;
-      anim.current.set(ped.id, track);
-      animAttr.setXYZ(i, ANIM_CODE[kind], track.phase % (Math.PI * 200), ped.id % VARIANTS.length);
-      if (resident && !talking) walkers.push({ resident, x: pose.x, z: pose.z });
-      if (resident && distance < nearestDistance) {
-        nearestDistance = distance;
-        nearestId = resident.id;
+        const kind: PedAnim = ped.state === 'sit' ? 'sit' : ped.state === 'walk' || ped.state === 'cross' ? 'walk' : 'idle';
+        const track = anim.current.get(ped.id) ?? { phase: ped.id * 1.7, x: pose.x, z: pose.z };
+        // Fase jalan mengikuti jarak tempuh (kaki tidak meluncur); diam/duduk mengikuti waktu.
+        track.phase += kind === 'walk' ? (Math.hypot(pose.x - track.x, pose.z - track.z) / STRIDE) * Math.PI * 2 : dt;
+        track.x = pose.x;
+        track.z = pose.z;
+        anim.current.set(ped.id, track);
+        // Warna dan gaya mengikuti warga (bukan id spawn), jadi warga yang sama selalu tampil sama.
+        const look = ped.residentIndex >= 0 ? ped.residentIndex : ped.id;
+        animAttr.setXYZ(i, ANIM_CODE[kind], track.phase % (Math.PI * 200), pedVariantIndex(gender, look));
+        styleAttr.setX(i, pedStyleMask(gender, look));
+        if (resident && !talking) walkers.push({ resident, x: pose.x, z: pose.z });
+        if (resident && distance < nearestDistance) {
+          nearestDistance = distance;
+          nearestId = resident.id;
+        }
       }
+      mesh.instanceMatrix.needsUpdate = true;
+      animAttr.needsUpdate = true;
+      styleAttr.needsUpdate = true;
     }
-    mesh.instanceMatrix.needsUpdate = true;
-    animAttr.needsUpdate = true;
     if (useNearestResident.getState().id !== nearestId) useNearestResident.setState({ id: nearestId });
   });
 
@@ -210,12 +247,13 @@ export function PedestrianLayer() {
   const labelPed = labelId ? pedOfResident(labelId) : undefined;
   const labelPose = labelPed && pedRuntime.graph ? pedPose(pedRuntime.graph, labelPed) : null;
 
-  if (!data || !instanced) return null;
+  if (!data || !meshes) return null;
 
   return (
     <group>
       <GreetingBubbles walkers={walkers} />
-      <instancedMesh ref={meshRef} args={[instanced.geometry, instanced.material, max]} frustumCulled={false} castShadow={false} />
+      <instancedMesh ref={maleRef} args={[meshes[0]!.geometry, meshes[0]!.material, max]} frustumCulled={false} castShadow={false} />
+      <instancedMesh ref={femaleRef} args={[meshes[1]!.geometry, meshes[1]!.material, max]} frustumCulled={false} castShadow={false} />
       {label && labelPose && (
         <Html position={[labelPose.x, groundHeightAt(labelPose.x, labelPose.z) + 2.1, labelPose.z]} center zIndexRange={[10, 0]} pointerEvents="none">
           <div className="npc-label">{label.name}</div>
@@ -226,31 +264,20 @@ export function PedestrianLayer() {
 }
 
 /**
- * Palet `ped_citizen` dari manifest aset (meta.variants, linear RGB): [baju, celana, rambut] x 6.
- * ponytail: disalin dari manifest, bukan dibaca saat runtime. Salin ulang kalau varian di
- * tools/assets/defs/creatures.ts berubah.
- */
-const VARIANTS: readonly (readonly [number, number, number])[][] = [
-  [[0.0284, 0.159, 0.7084], [0.0343, 0.0513, 0.1022], [0.0242, 0.0152, 0.0116]],
-  [[0.6867, 0.063, 0.0423], [0.0273, 0.0273, 0.0331], [0.0103, 0.0075, 0.006]],
-  [[0.0497, 0.3278, 0.1022], [0.1022, 0.0685, 0.0423], [0.0685, 0.0296, 0.0144]],
-  [[0.7454, 0.4397, 0.0284], [0.0232, 0.0356, 0.0802], [0.0242, 0.0152, 0.0116]],
-  [[0.2582, 0.1046, 0.552], [0.0423, 0.0343, 0.0296], [0.147, 0.0685, 0.0232]],
-  [[0.807, 0.7758, 0.7157], [0.0513, 0.0802, 0.162], [0.0075, 0.0075, 0.0075]],
-];
-
-/**
  * Geometri + material instanced warga. Bind pose dibakar ke ruang meter dulu (`bakeBindPose`),
  * karena POSITION di GLB terkuantisasi ke -1..1. Atribut instance `pedAnim` = (kode animasi, fase,
- * varian); vertex shader memilih pose dari atribut `bone` dan mengganti warna region `_tint`
- * (1 baju, 2 celana, 3 rambut) dengan palet varian.
+ * varian) dan `pedStyle` = mask grup gaya (pedStyleMask). Vertex shader memilih pose dari atribut
+ * `bone`, mengempiskan vertex grup gaya yang tidak aktif, dan mengganti warna region `_tint`
+ * dengan palet `PED_VARIANTS[gender]` (lihat pedTintSlot di pedAnim.ts).
  */
-export function createPedMesh(source: SkinnedMesh, count: number) {
+export function createPedMesh(source: SkinnedMesh, count: number, gender: PedGender) {
   const geometry = bakeBindPose(source);
   const anim = new InstancedBufferAttribute(new Float32Array(count * 3), 3);
+  const style = new InstancedBufferAttribute(new Float32Array(count), 1);
   geometry.setAttribute('pedAnim', anim);
+  geometry.setAttribute('pedStyle', style);
   const material = (source.material as Material).clone();
-  const palette = VARIANTS.flat().map(([r, g, b]) => new Color(r, g, b));
+  const palette = PED_VARIANTS[gender].flat().map(([r, g, b]) => new Color(r, g, b));
   material.onBeforeCompile = (shader) => {
     shader.uniforms.pedPalette = { value: palette };
     shader.vertexShader = shader.vertexShader
@@ -258,6 +285,7 @@ export function createPedMesh(source: SkinnedMesh, count: number) {
         '#include <common>',
         `#include <common>
 attribute vec3 pedAnim;
+attribute float pedStyle;
 attribute float _tint;
 attribute float bone;
 uniform vec3 pedPalette[${palette.length}];
@@ -267,7 +295,8 @@ ${PED_ANIM_GLSL}`,
         '#include <color_vertex>',
         `#include <color_vertex>
 #ifdef USE_COLOR
-  if (_tint > 0.5) vColor.rgb = pedPalette[int(pedAnim.z) * 3 + int(_tint + 0.5) - 1];
+  int pedSlot = pedStyleSlot(_tint, pedStyle);
+  if (pedSlot >= 0) vColor.rgb = pedPalette[int(pedAnim.z + 0.5) * ${PED_SLOTS} + pedSlot];
 #endif`,
       )
       .replace(
@@ -275,12 +304,14 @@ ${PED_ANIM_GLSL}`,
         `#include <begin_vertex>
   PedPose pedP = pedAnimPose(pedAnim.x, pedAnim.y);
   transformed = pedPoseVertex(transformed, bone, pedP);
-  transformed.y += pedP.bob;`,
+  transformed.y += pedP.bob;
+  // Grup gaya yang tidak dipakai warga ini: segitiganya dikempiskan ke satu titik (tidak tergambar).
+  if (!pedStyleVisible(_tint, pedStyle)) transformed = vec3(0.0);`,
       )
       // Normal ikut diputar kasar oleh bungkuk saja; cukup untuk low-poly flat shading.
       ;
   };
-  // Program shader dibedakan dari material lain yang memakai sumber yang sama.
-  material.customProgramCacheKey = () => 'ped-instanced-v1';
-  return { geometry, material, anim };
+  // Program shader dibedakan per gender (panjang palet uniform berbeda).
+  material.customProgramCacheKey = () => `ped-instanced-v2-${gender}`;
+  return { geometry, material, anim, style, gender };
 }
