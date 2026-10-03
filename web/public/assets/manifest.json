@@ -365,10 +365,10 @@
         "player",
         "custom"
       ],
-      "triangles": 2278,
+      "triangles": 2302,
       "drawCalls": 16,
       "materials": 5,
-      "bytes": 109732,
+      "bytes": 110220,
       "bones": 13,
       "animations": [
         {

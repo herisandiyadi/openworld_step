@@ -426,8 +426,23 @@ function hips(b: MeshBuilder, f: Figure): void {
   b.box([f.hipX * 2, 0.17, f.hipZ * 2], { at: [0, 0.94, 0], color: shade(1), bone: hipBone });
 }
 
-/** Geser sumbu panel rok ke depan (m) supaya sisi bawahnya tidak menembus bangku saat duduk. */
-const SKIRT_FORWARD = 0.055;
+/**
+ * Jarak sisi BELAKANG panel rok dari sumbu paha (m), di pangkal dan di hem. Dua kebutuhan yang
+ * saling tarik, jadi jangan diubah tanpa mengukur keduanya:
+ *
+ *   - Harus lebih besar dari radius paha (FIGURES.f.legUpper 0.068 di pangkal, melancip ke ~0.05
+ *     di tinggi hem). Kurang dari itu, paha menyembul di belakang rok, apalagi saat jalan ketika
+ *     paha berayun. Itu bug versi sebelumnya: sumbu panel digeser ke depan tanpa memperhitungkan
+ *     sisi belakang, jadi paha terlihat dari belakang.
+ *   - Saat duduk paha berputar ~90 derajat, jadi sisi belakang rok menjadi sisi BAWAH. Makin besar
+ *     angkanya, makin dalam rok turun ke dudukan bangku.
+ *
+ * Terukur (pose diam + dua fase jalan, dan anim_Sit): paha tertutup dengan margin terkecil 6 mm,
+ * dan saat duduk rok hanya 4 cm di bawah paha telanjang (kira-kira tebal kain), bukan menggantung
+ * lurus 26 cm menembus bangku seperti rok kaku di tulang hips.
+ */
+const SKIRT_BACK = 0.09;
+const SKIRT_BACK_HEM = 0.072;
 
 function pantsParts(gender: Gender): Clothing[] {
   const f = FIGURES[gender];
@@ -466,27 +481,46 @@ function pantsParts(gender: Gender): Clothing[] {
     // Yoke 0.86 -> 0.92: BERHENTI di sendi panggul (tulang upperLeg rest y = 0.92). Yoke kaku yang
     // menjulur di bawah sendi ini tidak punya tulang yang mengangkatnya saat duduk, jadi ia turun
     // bersama panggul dan menembus dudukan bangku.
-    ketiga.frustum({ radiusBottom: f.hipX + 0.05, radiusTop: f.hipX + 0.022, height: 0.06, segments: 8, capTop: false }, {
-      at: [0, 0.86, 0],
+    // Yoke sengaja dibuat turun sampai 0.845, LEBIH RENDAH dari ujung atas panel (0.87): saat paha
+    // berayun, ujung atas panel ikut miring dan bisa membuka celah horizontal tipis ke arah paha.
+    // Tumpang tindih 2.5 cm ini menutup celah itu. Tidak bisa diturunkan jauh lagi karena yoke
+    // kaku di tulang hips, jadi ia ikut turun ke dudukan bangku saat duduk.
+    ketiga.frustum({ radiusBottom: f.hipX + 0.05, radiusTop: f.hipX + 0.022, height: 0.075, segments: 8, capTop: false }, {
+      at: [0, 0.845, 0],
       color: shade(1),
       bone: hipBone,
     });
+    // Panel rok segi-8: makin banyak sisi, makin kecil selisih antara radius dan sisi datar, jadi
+    // paha tidak menyembul di sudut. Faktor ini mengubah radius jadi jarak sisi datar.
+    const SEG = 8;
+    const flat = Math.cos(Math.PI / SEG);
+    const rTop = 0.118;
+    const rBottom = 0.148;
+    const H = 0.27;
+    // Sisi BELAKANG rok mengikuti lancipnya paha: SKIRT_BACK di pangkal, SKIRT_BACK_HEM di hem.
+    // Kerucut simetris biasa juga mengembang ke belakang, dan karena sisi belakang menjadi sisi
+    // bawah saat duduk, hem yang mengembang itulah yang menembus bangku. Jadi panel DIMIRINGKAN
+    // (rotasi X sebesar tilt) supaya kembangnya hanya ke depan dan samping.
+    // Selisih z belakang atas-bawah setelah rotasi: H*sin(t) - (rBottom - rTop)*flat*cos(t) = d.
+    const a = H;
+    const b = (rBottom - rTop) * flat;
+    const d = SKIRT_BACK - SKIRT_BACK_HEM;
+    const tilt = Math.asin(d / Math.hypot(a, b)) + Math.atan2(b, a);
+    // Geser sumbu supaya sisi belakang hem tepat SKIRT_BACK_HEM dari sumbu paha (+Z = belakang).
+    const zShift = SKIRT_BACK_HEM - rBottom * flat * Math.cos(tilt);
     for (const side of ['L', 'R'] as const) {
       const sx = side === 'R' ? 1 : -1;
-      // Panel paha 0.60 -> 0.87: naik sampai menyentuh yoke supaya tidak ada celah di pangkal.
-      // Saat duduk paha berputar ~90 derajat ke depan, jadi sisi BELAKANG paha (+Z di rest)
-      // menjadi sisi BAWAH yang menempel di bangku. Karena itu sumbu panel digeser ke depan
-      // (SKIRT_FORWARD): sisi belakangnya hanya ~0.08 m dari sumbu paha (setara celana pendek),
-      // sementara kembang rok tetap ada di depan dan samping. Panel yang simetris dengan radius
-      // 0.14 m menggantung 0.08 m di bawah dudukan.
-      ketiga.frustum({ radiusBottom: 0.128, radiusTop: 0.112, height: 0.27, segments: 6 }, {
-        at: [sx * 0.098, 0.6, -SKIRT_FORWARD],
+      // Panel paha 0.60 -> ~0.87: naik sampai menyentuh yoke supaya tidak ada celah di pangkal.
+      ketiga.frustum({ radiusBottom: rBottom, radiusTop: rTop, height: H, segments: SEG }, {
+        at: [sx * 0.088, 0.6, zShift],
+        rot: [tilt, 0, 0],
         color: shade(1),
         bone: boneIndex(`upperLeg_${side}`),
       });
       // Pelipit bawah: pita tipis lebih gelap, menegaskan hem rok.
-      ketiga.frustum({ radiusBottom: 0.131, radiusTop: 0.124, height: 0.03, segments: 6, capTop: false, capBottom: false }, {
-        at: [sx * 0.098, 0.6, -SKIRT_FORWARD],
+      ketiga.frustum({ radiusBottom: rBottom + 0.003, radiusTop: rBottom - 0.004, height: 0.03, segments: SEG, capTop: false, capBottom: false }, {
+        at: [sx * 0.088, 0.6, zShift],
+        rot: [tilt, 0, 0],
         color: shade(0.86),
         bone: boneIndex(`upperLeg_${side}`),
       });
