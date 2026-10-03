@@ -1,0 +1,41 @@
+services:
+  mp-server:
+    build:
+      context: .
+    image: mp-server:latest
+    restart: unless-stopped
+    environment:
+      PORT: 8787
+      MAX_ROOMS: 100
+      MAX_PLAYERS: 50
+      ROOM_EMPTY_TTL_MS: 60000
+      # Caddy adalah satu-satunya yang menyentuh server, jadi header X-Forwarded-For dipercaya.
+      TRUST_PROXY: "1"
+      # Uji beban 50 bot berasal dari satu IP, jadi batas per IP dinaikkan.
+      MAX_CONNECTIONS_PER_IP: 200
+    ports:
+      # Diekspos langsung hanya untuk uji beban/health lokal. Di VPS cukup lewat Caddy (443).
+      - "8787:8787"
+    healthcheck:
+      test: ["CMD", "wget", "--quiet", "--tries=1", "--spider", "http://127.0.0.1:8787/health"]
+      interval: 15s
+      timeout: 3s
+      retries: 3
+      start_period: 5s
+
+  caddy:
+    image: caddy:2.10-alpine
+    restart: unless-stopped
+    depends_on:
+      - mp-server
+    ports:
+      - "8080:80"
+      - "8443:443"
+    volumes:
+      - ./Caddyfile:/etc/caddy/Caddyfile:ro
+      - caddy-data:/data
+      - caddy-config:/config
+
+volumes:
+  caddy-data:
+  caddy-config:
