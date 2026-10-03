@@ -205,21 +205,24 @@ export const FIGURES: Record<Gender, Figure> = {
     armX: 0.22,
   },
   f: {
-    shoulder: 0.15,
-    chestDepth: 0.102,
-    waistX: 0.112,
-    waistZ: 0.075,
-    hipX: 0.152,
-    hipZ: 0.085,
-    neck: 0.044,
-    armUpper: 0.046,
-    armLower: 0.038,
-    legUpper: 0.066,
+    // Bahu sengaja lebih sempit dari panggul DENGAN selisih yang cukup besar: baju menambah pad
+    // 0.015-0.032 m di dada tapi panggul dipakai apa adanya, jadi kalau selisihnya tipis bahu
+    // berbaju justru jadi bagian terlebar dan siluetnya kembali terbaca maskulin.
+    shoulder: 0.134,
+    chestDepth: 0.107,
+    waistX: 0.095,
+    waistZ: 0.067,
+    hipX: 0.173,
+    hipZ: 0.094,
+    neck: 0.042,
+    armUpper: 0.043,
+    armLower: 0.035,
+    legUpper: 0.068,
     legLower: 0.05,
-    bust: 0.058,
+    bust: 0.07,
     headStretch: [0.91, 1.07, 0.97],
     shoe: [0.098, 0.062, 0.215],
-    armX: 0.19,
+    armX: 0.168,
   },
 };
 
@@ -326,12 +329,24 @@ function torso(b: MeshBuilder, f: Figure, hemY: number, pad: number): void {
   const midX = (waistX + shoulder) / 2;
   const midZ = (waistZ + depth) / 2;
   b.box([midX * 2, 0.1, midZ * 2], { at: [0, 1.19, 0], color: shade(1), bone: spine });
-  // Dada/bahu.
-  b.box([shoulder * 2, 0.26, depth * 2], { at: [0, 1.33, 0], color: shade(1), bone: chest });
-  b.box([shoulder * 1.3, 0.05, depth * 1.75], { at: [0, 1.47, 0.02], color: shade(0.8), bone: chest });
   if (f.bust > 0) {
-    for (const x of [0.062, -0.062]) {
-      b.blob({ radius: f.bust, stretch: [1, 0.82, 0.95] }, { at: [x, 1.335, -depth * 0.8], color: shade(1), bone: chest });
+    // Wanita: dada dipecah jadi pita dada (lebar penuh) + bahu yang menyempit ke leher. Satu kotak
+    // selebar bahu sampai ke garis bahu membuat tubuh terbaca seperti papan persegi (maskulin).
+    b.box([shoulder * 2, 0.15, depth * 2], { at: [0, 1.275, 0], color: shade(1), bone: chest });
+    b.box([shoulder * 1.72, 0.11, depth * 1.8], { at: [0, 1.405, 0.005], color: shade(1), bone: chest });
+    b.box([shoulder * 1.15, 0.05, depth * 1.5], { at: [0, 1.47, 0.02], color: shade(0.8), bone: chest });
+  } else {
+    // Pria: dada/bahu persegi.
+    b.box([shoulder * 2, 0.26, depth * 2], { at: [0, 1.33, 0], color: shade(1), bone: chest });
+    b.box([shoulder * 1.3, 0.05, depth * 1.75], { at: [0, 1.47, 0.02], color: shade(0.8), bone: chest });
+  }
+  if (f.bust > 0) {
+    // Sejajar pita dada (1.2-1.35), bukan di garis bahu, supaya dada menonjol di depan dan
+    // dari samping ada lengkung — profil lama rata seperti papan.
+    // Pusat blob ditaruh TEPAT di permukaan depan kotak dada (z = -depth): kalau lebih ke dalam,
+    // separuh blob terbenam di dalam kotak dan sisi-sisinya berebut kedalaman (z-fighting zigzag).
+    for (const x of [0.058, -0.058]) {
+      b.blob({ radius: f.bust, stretch: [1, 0.78, 0.92] }, { at: [x, 1.3, -depth], color: shade(1), bone: chest });
     }
   }
 }
@@ -400,8 +415,34 @@ function shirtParts(gender: Gender): Clothing[] {
 }
 
 function hips(b: MeshBuilder, f: Figure): void {
-  b.box([f.hipX * 2, 0.17, f.hipZ * 2], { at: [0, 0.94, 0], color: shade(1), bone: boneIndex('hips') });
+  const hipBone = boneIndex('hips');
+  if (f.bust > 0) {
+    // Panggul wanita melebar ke bawah (pinggang kecil -> panggul penuh), bukan satu kotak lurus:
+    // ini yang memberi siluet jam pasir dari kamera game.
+    b.box([f.hipX * 1.62, 0.07, f.hipZ * 1.78], { at: [0, 1.0, 0], color: shade(1), bone: hipBone });
+    b.box([f.hipX * 2, 0.12, f.hipZ * 2], { at: [0, 0.915, 0], color: shade(1), bone: hipBone });
+    return;
+  }
+  b.box([f.hipX * 2, 0.17, f.hipZ * 2], { at: [0, 0.94, 0], color: shade(1), bone: hipBone });
 }
+
+/**
+ * Jarak sisi BELAKANG panel rok dari sumbu paha (m), di pangkal dan di hem. Dua kebutuhan yang
+ * saling tarik, jadi jangan diubah tanpa mengukur keduanya:
+ *
+ *   - Harus lebih besar dari radius paha (FIGURES.f.legUpper 0.068 di pangkal, melancip ke ~0.05
+ *     di tinggi hem). Kurang dari itu, paha menyembul di belakang rok, apalagi saat jalan ketika
+ *     paha berayun. Itu bug versi sebelumnya: sumbu panel digeser ke depan tanpa memperhitungkan
+ *     sisi belakang, jadi paha terlihat dari belakang.
+ *   - Saat duduk paha berputar ~90 derajat, jadi sisi belakang rok menjadi sisi BAWAH. Makin besar
+ *     angkanya, makin dalam rok turun ke dudukan bangku.
+ *
+ * Terukur (pose diam + dua fase jalan, dan anim_Sit): paha tertutup dengan margin terkecil 6 mm,
+ * dan saat duduk rok hanya 4 cm di bawah paha telanjang (kira-kira tebal kain), bukan menggantung
+ * lurus 26 cm menembus bangku seperti rok kaku di tulang hips.
+ */
+const SKIRT_BACK = 0.09;
+const SKIRT_BACK_HEM = 0.072;
 
 function pantsParts(gender: Gender): Clothing[] {
   const f = FIGURES[gender];
@@ -427,17 +468,63 @@ function pantsParts(gender: Gender): Clothing[] {
     }
   }
   if (gender === 'f') {
-    // Rok A-line: kerucut terbalik dari panggul ke atas lutut, dipasang di tulang hips.
-    ketiga.frustum({ radiusBottom: 0.235, radiusTop: f.hipX + 0.02, height: 0.3, segments: 8, capTop: false }, {
-      at: [0, 0.6, 0],
+    // Rok A-line selutut, DUA bagian (pola yang sama dipakai warga wanita di defs/creatures.ts):
+    //
+    //   1. Yoke kaku di tulang hips: bagian pinggang yang memang tidak boleh ikut kaki.
+    //   2. Dua panel bawah yang di-skin ke tulang upperLeg_L/R.
+    //
+    // Versi lama memasang SELURUH rok di tulang hips, jadi saat klip anim_Sit menekuk paha 88
+    // derajat ke depan, rok tetap menggantung lurus ke bawah mengikuti panggul dan menembus
+    // dudukan bangku. Dengan panel bawah menempel di paha, rok ikut mendatar di atas paha saat
+    // duduk dan tetap mengayun wajar saat jalan.
+    const hipBone = boneIndex('hips');
+    // Yoke 0.86 -> 0.92: BERHENTI di sendi panggul (tulang upperLeg rest y = 0.92). Yoke kaku yang
+    // menjulur di bawah sendi ini tidak punya tulang yang mengangkatnya saat duduk, jadi ia turun
+    // bersama panggul dan menembus dudukan bangku.
+    // Yoke sengaja dibuat turun sampai 0.845, LEBIH RENDAH dari ujung atas panel (0.87): saat paha
+    // berayun, ujung atas panel ikut miring dan bisa membuka celah horizontal tipis ke arah paha.
+    // Tumpang tindih 2.5 cm ini menutup celah itu. Tidak bisa diturunkan jauh lagi karena yoke
+    // kaku di tulang hips, jadi ia ikut turun ke dudukan bangku saat duduk.
+    ketiga.frustum({ radiusBottom: f.hipX + 0.05, radiusTop: f.hipX + 0.022, height: 0.075, segments: 8, capTop: false }, {
+      at: [0, 0.845, 0],
       color: shade(1),
-      bone: boneIndex('hips'),
+      bone: hipBone,
     });
-    ketiga.frustum({ radiusBottom: 0.238, radiusTop: 0.228, height: 0.035, segments: 8, capTop: false, capBottom: false }, {
-      at: [0, 0.6, 0],
-      color: shade(0.86),
-      bone: boneIndex('hips'),
-    });
+    // Panel rok segi-8: makin banyak sisi, makin kecil selisih antara radius dan sisi datar, jadi
+    // paha tidak menyembul di sudut. Faktor ini mengubah radius jadi jarak sisi datar.
+    const SEG = 8;
+    const flat = Math.cos(Math.PI / SEG);
+    const rTop = 0.118;
+    const rBottom = 0.148;
+    const H = 0.27;
+    // Sisi BELAKANG rok mengikuti lancipnya paha: SKIRT_BACK di pangkal, SKIRT_BACK_HEM di hem.
+    // Kerucut simetris biasa juga mengembang ke belakang, dan karena sisi belakang menjadi sisi
+    // bawah saat duduk, hem yang mengembang itulah yang menembus bangku. Jadi panel DIMIRINGKAN
+    // (rotasi X sebesar tilt) supaya kembangnya hanya ke depan dan samping.
+    // Selisih z belakang atas-bawah setelah rotasi: H*sin(t) - (rBottom - rTop)*flat*cos(t) = d.
+    const a = H;
+    const b = (rBottom - rTop) * flat;
+    const d = SKIRT_BACK - SKIRT_BACK_HEM;
+    const tilt = Math.asin(d / Math.hypot(a, b)) + Math.atan2(b, a);
+    // Geser sumbu supaya sisi belakang hem tepat SKIRT_BACK_HEM dari sumbu paha (+Z = belakang).
+    const zShift = SKIRT_BACK_HEM - rBottom * flat * Math.cos(tilt);
+    for (const side of ['L', 'R'] as const) {
+      const sx = side === 'R' ? 1 : -1;
+      // Panel paha 0.60 -> ~0.87: naik sampai menyentuh yoke supaya tidak ada celah di pangkal.
+      ketiga.frustum({ radiusBottom: rBottom, radiusTop: rTop, height: H, segments: SEG }, {
+        at: [sx * 0.088, 0.6, zShift],
+        rot: [tilt, 0, 0],
+        color: shade(1),
+        bone: boneIndex(`upperLeg_${side}`),
+      });
+      // Pelipit bawah: pita tipis lebih gelap, menegaskan hem rok.
+      ketiga.frustum({ radiusBottom: rBottom + 0.003, radiusTop: rBottom - 0.004, height: 0.03, segments: SEG, capTop: false, capBottom: false }, {
+        at: [sx * 0.088, 0.6, zShift],
+        rot: [tilt, 0, 0],
+        color: shade(0.86),
+        bone: boneIndex(`upperLeg_${side}`),
+      });
+    }
   }
 
   return [
