@@ -1,0 +1,103 @@
+# CI untuk bagian web + Android dari game (folder web/). Proyek Godot di root belum punya tes,
+# jadi belum ikut di sini.
+#
+# Dua job sengaja dipisah: `web` cepat (sekitar 2-3 menit) dan jadi gerbang utama, sementara
+# `android` lambat (Gradle + SDK) dan hanya perlu membuktikan APK masih bisa dibangun.
+name: CI
+
+on:
+  push:
+    branches: [main]
+  pull_request:
+  workflow_dispatch:
+
+# PR yang di-push berkali-kali: batalkan run lama, hemat kuota runner.
+concurrency:
+  group: ci-${{ github.ref }}
+  cancel-in-progress: true
+
+defaults:
+  run:
+    working-directory: web
+
+jobs:
+  web:
+    name: Typecheck, test, build
+    runs-on: ubuntu-latest
+    timeout-minutes: 20
+    steps:
+      - uses: actions/checkout@v4
+
+      - uses: actions/setup-node@v4
+        with:
+          node-version: '24'
+          cache: npm
+          cache-dependency-path: web/package-lock.json
+
+      # `npm ci` (bukan install) supaya versi persis mengikuti package-lock.json.
+      - run: npm ci
+
+      # tsc untuk src DAN tools (tools punya tsconfig sendiri).
+      - name: Typecheck
+        run: npm run typecheck
+
+      - name: Unit test
+        run: npm test
+
+      - name: Build web
+        run: npm run build
+
+      # Aset GLB di-commit ke repo, tapi dihasilkan dari tools/assets/defs/*.ts. Kalau ada yang
+      # mengubah def tanpa menjalankan `npm run assets`, aset di repo jadi basi dan APK memuat model
+      # lama. Build-nya deterministik, jadi hasil regenerate harus identik byte-per-byte.
+      - name: Aset hasil regenerate harus sama dengan yang di-commit
+        run: npm run assets
+      - name: Cek aset basi
+        run: |
+          if ! git diff --exit-code --stat -- public/assets asset-previews; then
+            echo "::error::Aset di repo tidak cocok dengan tools/assets/defs. Jalankan 'npm run assets' lalu commit hasilnya."
+            exit 1
+          fi
+
+  android:
+    name: Build APK debug
+    runs-on: ubuntu-latest
+    timeout-minutes: 30
+    # Tidak perlu membuang waktu Gradle kalau typecheck/test saja sudah gagal.
+    needs: web
+    steps:
+      - uses: actions/checkout@v4
+
+      - uses: actions/setup-node@v4
+        with:
+          node-version: '24'
+          cache: npm
+          cache-dependency-path: web/package-lock.json
+
+      - uses: actions/setup-java@v4
+        with:
+          distribution: temurin
+          java-version: '21'
+
+      - uses: gradle/actions/setup-gradle@v4
+        with:
+          build-root-directory: web/android
+
+      - run: npm ci
+
+      - name: Build web + sync Capacitor
+        run: |
+          npm run build
+          npx cap sync android
+
+      # gradlew di repo tidak punya bit executable, jadi dipanggil lewat `bash` (bukan ./gradlew).
+      - name: Assemble debug
+        run: bash ./gradlew assembleDebug --no-daemon
+        working-directory: web/android
+
+      - uses: actions/upload-artifact@v4
+        with:
+          name: openworld-debug-apk-${{ github.sha }}
+          path: web/android/app/build/outputs/apk/debug/app-debug.apk
+          if-no-files-found: error
+          retention-days: 14
