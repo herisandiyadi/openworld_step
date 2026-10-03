@@ -19,6 +19,7 @@ import {
   SIT_DROP,
   splitPedsByMesh,
   STRIDE,
+  pedFacing,
 } from './pedAnim';
 import { generateResidents } from './residents';
 
@@ -188,5 +189,21 @@ describe('pemetaan gender warga ke mesh', () => {
     for (const { gender, asset } of PED_MESHES) {
       expect(manifest.assets.find((a) => a.id === asset)?.meta?.variants).toEqual(PED_VARIANTS[gender]);
     }
+  });
+});
+
+describe('arah hadap warga', () => {
+  it('menghadap arah jalannya, bukan mundur 180 derajat', () => {
+    // Rig menghadap -Z: pada yaw 0 badan menghadap (0,-1). Arah hadap = (-sin yaw, -cos yaw).
+    for (const [dirX, dirZ] of [[0, -1], [0, 1], [1, 0], [-1, 0], [Math.SQRT1_2, Math.SQRT1_2]] as const) {
+      const yaw = pedFacing(dirX, dirZ);
+      expect(-Math.sin(yaw)).toBeCloseTo(dirX, 6);
+      expect(-Math.cos(yaw)).toBeCloseTo(dirZ, 6);
+    }
+  });
+
+  it('berjalan ke utara (-Z) berarti yaw 0, bukan PI', () => {
+    expect(pedFacing(0, -1)).toBeCloseTo(0, 6);
+    expect(Math.abs(pedFacing(0, -1))).toBeLessThan(Math.PI / 2);
   });
 });

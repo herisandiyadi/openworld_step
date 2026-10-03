@@ -26,6 +26,7 @@ import {
   pedVariantIndex,
   splitPedsByMesh,
   STRIDE,
+  pedFacing,
 } from './pedAnim';
 import {
   buildWalkGraph,
@@ -206,7 +207,8 @@ export function PedestrianLayer() {
         const dz = playerState.z - pose.z;
         const distance = Math.hypot(dx, dz);
         // Saat chat, warga menghadap pemain; kalau tidak, menghadap arah jalannya.
-        const want = talking ? Math.atan2(-dx, -dz) + Math.PI : Math.atan2(-pose.dirX, -pose.dirZ) + Math.PI;
+        // Tanpa offset PI: rig menghadap -Z, jadi pedFacing sudah menghasilkan arah hadap yang benar.
+        const want = talking ? pedFacing(dx, dz) : pedFacing(pose.dirX, pose.dirZ);
         const current = yaw.current.get(ped.id) ?? want;
         // Langsung menghadap saat chat dimulai: game loop dijeda selama panel terbuka, jadi tidak ada frame untuk berputar halus.
         const next = talking ? want : current + Math.atan2(Math.sin(want - current), Math.cos(want - current)) * (1 - Math.exp(-TURN_SMOOTHING * dt));

@@ -1,5 +1,5 @@
 import { useRef } from 'react';
-import { CATEGORIES, CATEGORY_IDS, type Category } from '../game/HeroAppearance';
+import { CATEGORIES, CATEGORY_IDS, type Category, optionLabel } from '../game/HeroAppearance';
 import type { Appearance } from '../state/profile';
 
 /**
@@ -54,7 +54,7 @@ export function AppearancePicker({ value, onChange }: { value: Appearance; onCha
                   onClick={() => set(category, index)}
                 >
                   <span className="appearance-swatch" style={{ background: option.swatch }} aria-hidden="true" />
-                  {option.label}
+                  {optionLabel(category, index, value.gender)}
                 </button>
               ))}
             </div>
@@ -66,12 +66,18 @@ export function AppearancePicker({ value, onChange }: { value: Appearance; onCha
 }
 
 /** Pilihan acak untuk tombol "Acak". */
-export const randomAppearance = (): Appearance => ({
-  gender: Math.random() < 0.5 ? 'm' : 'f',
-  hairColor: Math.floor(Math.random() * 3),
-  expression: Math.floor(Math.random() * 3),
-  shirtColor: Math.floor(Math.random() * 3),
-  shirtStyle: Math.floor(Math.random() * 3),
-  pantsColor: Math.floor(Math.random() * 3),
-  pantsStyle: Math.floor(Math.random() * 3),
-});
+export const randomAppearance = (): Appearance => {
+  const pick = () => Math.floor(Math.random() * 3);
+  return {
+    gender: Math.random() < 0.5 ? 'm' : 'f',
+    skinTone: pick(),
+    hairStyle: pick(),
+    hairColor: pick(),
+    expression: pick(),
+    shirtColor: pick(),
+    shirtStyle: pick(),
+    pantsColor: pick(),
+    pantsStyle: pick(),
+    accessory: pick(),
+  };
+};

@@ -865,13 +865,16 @@ button:focus-visible {
 
 .appearance-options {
   display: flex;
+  flex-wrap: wrap;
   gap: 8px;
 }
 
 .appearance-option {
   display: flex;
-  flex: 1;
+  /* Label panjang ("Belah samping", "Sawo matang") turun ke baris baru, bukan terpotong di HP. */
+  flex: 1 1 88px;
   min-height: 48px;
+  text-align: center;
   align-items: center;
   justify-content: center;
   gap: 6px;

@@ -55,6 +55,10 @@ export const PALETTE = {
   lightYellow: hex('#e8b02a'),
   lightGreen: hex('#3fb360'),
   concrete: hex('#b8b4ac'),
+  // Detail karakter kustom (hero m/f): bibir, logam aksesori, lensa kacamata.
+  lip: hex('#b5564f'),
+  gold: hex('#d8ab3c'),
+  lens: hex('#cfe3ef'),
   furGrey: hex('#9a948c'),
   furDark: hex('#4a4440'),
   beak: hex('#d79a3a'),

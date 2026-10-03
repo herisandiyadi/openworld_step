@@ -24,28 +24,72 @@ export interface Option {
 
 const STYLE_SWATCH = '#8b93a4';
 
+/**
+ * Label gaya sering berbeda per gender (rambut, bawahan): `byGender` menimpa `label` saat dipakai.
+ * Indeks opsi tetap sama untuk kedua gender, jadi profil lama tidak berubah arti kalau gender diganti.
+ */
+export interface StyleOption extends Option {
+  byGender?: { m: string; f: string };
+}
+
 export const CATEGORIES = {
   gender: { label: 'Gender', options: [{ label: 'Laki-laki', swatch: STYLE_SWATCH }, { label: 'Perempuan', swatch: STYLE_SWATCH }] },
+  skinTone: { label: 'Warna kulit', options: [{ label: 'Terang', swatch: '#e9b48f' }, { label: 'Sawo matang', swatch: '#b97e56' }, { label: 'Gelap', swatch: '#8a5a3b' }] },
+  hairStyle: {
+    label: 'Gaya rambut',
+    options: [
+      { label: 'Pendek', swatch: STYLE_SWATCH, byGender: { m: 'Cepak', f: 'Bob' } },
+      { label: 'Belah', swatch: STYLE_SWATCH, byGender: { m: 'Belah samping', f: 'Ekor kuda' } },
+      { label: 'Panjang', swatch: STYLE_SWATCH, byGender: { m: 'Jambul', f: 'Panjang' } },
+    ],
+  },
   hairColor: { label: 'Warna rambut', options: [{ label: 'Hitam', swatch: '#2b211c' }, { label: 'Cokelat', swatch: '#6b4423' }, { label: 'Pirang', swatch: '#c9a227' }] },
   expression: { label: 'Ekspresi wajah', options: [{ label: 'Senyum', swatch: STYLE_SWATCH }, { label: 'Datar', swatch: STYLE_SWATCH }, { label: 'Ceria', swatch: STYLE_SWATCH }] },
   shirtColor: { label: 'Warna baju', options: [{ label: 'Biru', swatch: '#2f6fdb' }, { label: 'Merah', swatch: '#c43b32' }, { label: 'Hijau', swatch: '#3b8f54' }] },
-  shirtStyle: { label: 'Gaya baju', options: [{ label: 'Kaos', swatch: STYLE_SWATCH }, { label: 'Hoodie', swatch: STYLE_SWATCH }, { label: 'Kemeja', swatch: STYLE_SWATCH }] },
+  shirtStyle: {
+    label: 'Gaya baju',
+    options: [
+      { label: 'Kaos', swatch: STYLE_SWATCH },
+      { label: 'Hoodie', swatch: STYLE_SWATCH, byGender: { m: 'Hoodie', f: 'Kardigan' } },
+      { label: 'Kemeja', swatch: STYLE_SWATCH, byGender: { m: 'Kemeja', f: 'Blus' } },
+    ],
+  },
   pantsColor: { label: 'Warna celana', options: [{ label: 'Denim biru', swatch: '#34405a' }, { label: 'Hitam', swatch: '#2a2a2e' }, { label: 'Krem', swatch: '#c9b48c' }] },
-  pantsStyle: { label: 'Gaya celana', options: [{ label: 'Jeans panjang', swatch: STYLE_SWATCH }, { label: 'Celana pendek', swatch: STYLE_SWATCH }, { label: 'Jogger', swatch: STYLE_SWATCH }] },
-} as const satisfies Record<string, { label: string; options: readonly Option[] }>;
+  pantsStyle: {
+    label: 'Gaya bawahan',
+    options: [
+      { label: 'Jeans panjang', swatch: STYLE_SWATCH },
+      { label: 'Celana pendek', swatch: STYLE_SWATCH },
+      { label: 'Jogger', swatch: STYLE_SWATCH, byGender: { m: 'Jogger', f: 'Rok' } },
+    ],
+  },
+  accessory: { label: 'Aksesori', options: [{ label: 'Tanpa', swatch: STYLE_SWATCH }, { label: 'Kacamata', swatch: '#cfe3ef' }, { label: 'Topi', swatch: '#f3f1ea' }] },
+} as const satisfies Record<string, { label: string; options: readonly StyleOption[] }>;
 
 export type Category = keyof typeof CATEGORIES;
 export const CATEGORY_IDS = Object.keys(CATEGORIES) as Category[];
+
+/** Label opsi sesuai gender (mis. pantsStyle 2 = "Jogger" untuk pria, "Rok" untuk wanita). */
+export function optionLabel(category: Category, index: number, gender: Appearance['gender']): string {
+  const option = CATEGORIES[category].options[index] as StyleOption | undefined;
+  if (!option) return '';
+  return option.byGender?.[gender] ?? option.label;
+}
 
 export const heroAssetId = (appearance: Appearance): AssetId => (appearance.gender === 'f' ? 'char_hero_f' : 'char_hero_m');
 
 /** Ringkasan untuk system prompt AI, mis. "hoodie merah dan jeans panjang denim biru". */
 export const appearanceSummary = (a: Appearance): string =>
-  `${CATEGORIES.shirtStyle.options[a.shirtStyle]?.label.toLowerCase()} ${CATEGORIES.shirtColor.options[a.shirtColor]?.label.toLowerCase()}` +
-  ` dan ${CATEGORIES.pantsStyle.options[a.pantsStyle]?.label.toLowerCase()} ${CATEGORIES.pantsColor.options[a.pantsColor]?.label.toLowerCase()}`;
+  `${optionLabel('shirtStyle', a.shirtStyle, a.gender).toLowerCase()} ${CATEGORIES.shirtColor.options[a.shirtColor]?.label.toLowerCase()}` +
+  ` dan ${optionLabel('pantsStyle', a.pantsStyle, a.gender).toLowerCase()} ${CATEGORIES.pantsColor.options[a.pantsColor]?.label.toLowerCase()}`;
 
-const SLOT_OF: Record<string, 'hairColor' | 'shirtColor' | 'pantsColor'> = { hair: 'hairColor', shirt: 'shirtColor', pants: 'pantsColor' };
-const VARIANT = /^(hair|shirt_\d|pants_\d|face_\d)$/;
+const SLOT_OF: Record<string, 'skinTone' | 'hairColor' | 'shirtColor' | 'pantsColor'> = {
+  skin: 'skinTone',
+  hair: 'hairColor',
+  shirt: 'shirtColor',
+  pants: 'pantsColor',
+};
+const VARIANT = /^(skin|hair_\d|shirt_\d|pants_\d|face_\d|acc_\d)$/;
 const MERGED = 'hero_merged';
 
 /** Atribut terkuantisasi (meshopt) jadi Float32 supaya bisa digabung. */
@@ -64,7 +108,15 @@ function toFloat(attribute: BufferAttribute | InterleavedBufferAttribute): Buffe
  * node berbagi bind matrix yang sama.
  */
 export function applyAppearance(root: Object3D, appearance: Appearance): void {
-  const wanted = new Set(['hair', `shirt_${appearance.shirtStyle}`, `pants_${appearance.pantsStyle}`, `face_${appearance.expression}`]);
+  // acc_0 tidak ada di GLB (= tanpa aksesori), jadi tidak menyalakan apa pun.
+  const wanted = new Set([
+    'skin',
+    `hair_${appearance.hairStyle}`,
+    `shirt_${appearance.shirtStyle}`,
+    `pants_${appearance.pantsStyle}`,
+    `face_${appearance.expression}`,
+    `acc_${appearance.accessory}`,
+  ]);
   const parts: SkinnedMesh[] = [];
   let body: SkinnedMesh | undefined;
   root.traverse((object) => {
@@ -113,5 +165,5 @@ export function applyAppearance(root: Object3D, appearance: Appearance): void {
   });
 }
 
-// ponytail: kulit, sepatu, dan aksesori masih tetap. Tambah slot material baru di humanoid.ts
-// kalau nanti perlu warna kulit atau barang kosmetik dari toko.
+// ponytail: warna sepatu dan aksesori masih tetap (palet). Tambah slot material baru di humanoid.ts
+// kalau nanti perlu barang kosmetik dari toko.

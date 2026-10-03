@@ -318,3 +318,13 @@ export function bakeBindPose(mesh: SkinnedMesh): BufferGeometry {
   geometry.computeBoundingSphere();
   return geometry;
 }
+
+/**
+ * Yaw supaya warga menghadap arah jalannya. Rig humanoid menghadap -Z (lihat defs/humanoid.ts dan
+ * mata/alis warga yang dimodelkan di z negatif), sama seperti `playerState.heading`, jadi arah
+ * (dirX, dirZ) langsung jadi atan2(-dirX, -dirZ) TANPA tambahan PI.
+ *
+ * Dulu ada `+ Math.PI` di PedestrianLayer yang membuat semua warga berjalan mundur: badan menghadap
+ * 180 derajat dari arah langkahnya. Helper ini dipakai bersama supaya konvensinya hanya ada di satu tempat.
+ */
+export const pedFacing = (dirX: number, dirZ: number): number => Math.atan2(-dirX, -dirZ);
