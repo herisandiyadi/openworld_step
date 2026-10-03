@@ -205,21 +205,24 @@ export const FIGURES: Record<Gender, Figure> = {
     armX: 0.22,
   },
   f: {
-    shoulder: 0.15,
-    chestDepth: 0.102,
-    waistX: 0.112,
-    waistZ: 0.075,
-    hipX: 0.152,
-    hipZ: 0.085,
-    neck: 0.044,
-    armUpper: 0.046,
-    armLower: 0.038,
-    legUpper: 0.066,
+    // Bahu sengaja lebih sempit dari panggul DENGAN selisih yang cukup besar: baju menambah pad
+    // 0.015-0.032 m di dada tapi panggul dipakai apa adanya, jadi kalau selisihnya tipis bahu
+    // berbaju justru jadi bagian terlebar dan siluetnya kembali terbaca maskulin.
+    shoulder: 0.134,
+    chestDepth: 0.107,
+    waistX: 0.095,
+    waistZ: 0.067,
+    hipX: 0.173,
+    hipZ: 0.094,
+    neck: 0.042,
+    armUpper: 0.043,
+    armLower: 0.035,
+    legUpper: 0.068,
     legLower: 0.05,
-    bust: 0.058,
+    bust: 0.07,
     headStretch: [0.91, 1.07, 0.97],
     shoe: [0.098, 0.062, 0.215],
-    armX: 0.19,
+    armX: 0.168,
   },
 };
 
@@ -326,12 +329,24 @@ function torso(b: MeshBuilder, f: Figure, hemY: number, pad: number): void {
   const midX = (waistX + shoulder) / 2;
   const midZ = (waistZ + depth) / 2;
   b.box([midX * 2, 0.1, midZ * 2], { at: [0, 1.19, 0], color: shade(1), bone: spine });
-  // Dada/bahu.
-  b.box([shoulder * 2, 0.26, depth * 2], { at: [0, 1.33, 0], color: shade(1), bone: chest });
-  b.box([shoulder * 1.3, 0.05, depth * 1.75], { at: [0, 1.47, 0.02], color: shade(0.8), bone: chest });
   if (f.bust > 0) {
-    for (const x of [0.062, -0.062]) {
-      b.blob({ radius: f.bust, stretch: [1, 0.82, 0.95] }, { at: [x, 1.335, -depth * 0.8], color: shade(1), bone: chest });
+    // Wanita: dada dipecah jadi pita dada (lebar penuh) + bahu yang menyempit ke leher. Satu kotak
+    // selebar bahu sampai ke garis bahu membuat tubuh terbaca seperti papan persegi (maskulin).
+    b.box([shoulder * 2, 0.15, depth * 2], { at: [0, 1.275, 0], color: shade(1), bone: chest });
+    b.box([shoulder * 1.72, 0.11, depth * 1.8], { at: [0, 1.405, 0.005], color: shade(1), bone: chest });
+    b.box([shoulder * 1.15, 0.05, depth * 1.5], { at: [0, 1.47, 0.02], color: shade(0.8), bone: chest });
+  } else {
+    // Pria: dada/bahu persegi.
+    b.box([shoulder * 2, 0.26, depth * 2], { at: [0, 1.33, 0], color: shade(1), bone: chest });
+    b.box([shoulder * 1.3, 0.05, depth * 1.75], { at: [0, 1.47, 0.02], color: shade(0.8), bone: chest });
+  }
+  if (f.bust > 0) {
+    // Sejajar pita dada (1.2-1.35), bukan di garis bahu, supaya dada menonjol di depan dan
+    // dari samping ada lengkung — profil lama rata seperti papan.
+    // Pusat blob ditaruh TEPAT di permukaan depan kotak dada (z = -depth): kalau lebih ke dalam,
+    // separuh blob terbenam di dalam kotak dan sisi-sisinya berebut kedalaman (z-fighting zigzag).
+    for (const x of [0.058, -0.058]) {
+      b.blob({ radius: f.bust, stretch: [1, 0.78, 0.92] }, { at: [x, 1.3, -depth], color: shade(1), bone: chest });
     }
   }
 }
@@ -400,7 +415,15 @@ function shirtParts(gender: Gender): Clothing[] {
 }
 
 function hips(b: MeshBuilder, f: Figure): void {
-  b.box([f.hipX * 2, 0.17, f.hipZ * 2], { at: [0, 0.94, 0], color: shade(1), bone: boneIndex('hips') });
+  const hipBone = boneIndex('hips');
+  if (f.bust > 0) {
+    // Panggul wanita melebar ke bawah (pinggang kecil -> panggul penuh), bukan satu kotak lurus:
+    // ini yang memberi siluet jam pasir dari kamera game.
+    b.box([f.hipX * 1.62, 0.07, f.hipZ * 1.78], { at: [0, 1.0, 0], color: shade(1), bone: hipBone });
+    b.box([f.hipX * 2, 0.12, f.hipZ * 2], { at: [0, 0.915, 0], color: shade(1), bone: hipBone });
+    return;
+  }
+  b.box([f.hipX * 2, 0.17, f.hipZ * 2], { at: [0, 0.94, 0], color: shade(1), bone: hipBone });
 }
 
 function pantsParts(gender: Gender): Clothing[] {

@@ -365,10 +365,10 @@
         "player",
         "custom"
       ],
-      "triangles": 2158,
+      "triangles": 2230,
       "drawCalls": 16,
       "materials": 5,
-      "bytes": 106916,
+      "bytes": 108500,
       "bones": 13,
       "animations": [
         {
@@ -420,12 +420,12 @@
       ],
       "bounds": {
         "min": [
-          -0.273,
+          -0.248,
           0,
           -0.238
         ],
         "max": [
-          0.273,
+          0.248,
           1.795,
           0.238
         ]
