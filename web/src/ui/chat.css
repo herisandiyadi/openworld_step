@@ -1,0 +1,154 @@
+/* Chat antar pemain (MULTIPLAYER.md 5.1). Dipisah dari styles.css supaya chat NPC tidak terganggu. */
+
+/* Tombol chat di HUD, di atas tombol aksi supaya tidak menutupi joystick. */
+.chat-hud-button {
+  position: relative;
+}
+
+.chat-unread-badge {
+  position: absolute;
+  top: -4px;
+  right: -4px;
+  min-width: 18px;
+  padding: 0 4px;
+  border-radius: 9px;
+  background: #e5484d;
+  color: #fff;
+  font-size: 11px;
+  font-weight: 700;
+  line-height: 18px;
+  text-align: center;
+}
+
+/* Panel chat pemain: tidak menutup seluruh layar, karena game tetap jalan. */
+.player-chat {
+  position: absolute;
+  right: 8px;
+  bottom: 8px;
+  display: flex;
+  flex-direction: column;
+  gap: 8px;
+  width: min(380px, calc(100vw - 16px));
+  height: min(300px, calc(100vh - 16px - var(--safe-top) - var(--safe-bottom)));
+  padding: 12px;
+  border-radius: 14px;
+  background: rgba(18, 24, 32, 0.92);
+  pointer-events: auto;
+}
+
+.player-chat-header {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 8px;
+}
+
+.player-chat-header h2 {
+  margin: 0;
+  color: var(--accent);
+  font-size: 15px;
+}
+
+.player-chat-tabs {
+  display: flex;
+  gap: 6px;
+}
+
+.player-chat-tab {
+  position: relative;
+  padding: 5px 12px;
+  border: 1px solid rgba(255, 255, 255, 0.2);
+  border-radius: 999px;
+  background: transparent;
+  color: inherit;
+  font: inherit;
+  font-size: 13px;
+}
+
+.player-chat-tab[aria-selected='true'] {
+  border-color: var(--accent);
+  background: rgba(255, 210, 63, 0.22);
+}
+
+.player-chat-log {
+  flex: 1;
+  display: flex;
+  flex-direction: column;
+  gap: 6px;
+  overflow-y: auto;
+  -webkit-user-select: text;
+  user-select: text;
+}
+
+.player-chat-row {
+  display: flex;
+  align-items: baseline;
+  gap: 6px;
+  margin: 0;
+  font-size: 13px;
+  line-height: 1.4;
+}
+
+.player-chat-name {
+  flex-shrink: 0;
+  color: var(--accent);
+  font-weight: 600;
+}
+
+.player-chat-name.self {
+  color: #9fd2ff;
+}
+
+.player-chat-text {
+  overflow-wrap: anywhere;
+  white-space: pre-wrap;
+}
+
+.player-chat-mute {
+  flex-shrink: 0;
+  margin-left: auto;
+  padding: 0 6px;
+  border: 0;
+  border-radius: 6px;
+  background: transparent;
+  color: #ff9b8f;
+  font: inherit;
+  font-size: 11px;
+}
+
+.player-chat-empty {
+  margin: auto 0;
+  text-align: center;
+  font-size: 13px;
+  opacity: 0.7;
+}
+
+.player-chat-notice {
+  margin: 0;
+  color: #ff9b8f;
+  font-size: 12px;
+}
+
+.player-chat-form {
+  display: flex;
+  gap: 6px;
+}
+
+.player-chat-form input {
+  flex: 1;
+  min-width: 0;
+}
+
+/* Gelembung "dekat" di atas kepala pengirim. */
+.chat-bubble-near {
+  max-width: 180px;
+  padding: 5px 9px;
+  border-radius: 10px;
+  background: rgba(18, 24, 32, 0.88);
+  color: #fff;
+  font-size: 12px;
+  line-height: 1.3;
+  text-align: center;
+  overflow-wrap: anywhere;
+  white-space: pre-wrap;
+}
