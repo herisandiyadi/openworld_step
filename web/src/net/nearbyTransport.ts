@@ -35,6 +35,9 @@ export interface NearbyTransportOptions {
   plugin?: NearbyPluginPart;
 }
 
+/** Batas antrean klien sebelum host tersambung (hello + beberapa state). */
+const MAX_PENDING = 32;
+
 const errorReason = (error: unknown): string => (error instanceof Error ? error.message : String(error));
 
 export class NearbyTransport implements HostTransport {
@@ -46,6 +49,12 @@ export class NearbyTransport implements HostTransport {
   private readonly peerHandlers = new Set<PeerHandler>();
   /** Endpoint yang tersambung. Di klien isinya paling banyak satu: host. */
   private readonly connected = new Set<string>();
+  /**
+   * Klien: pesan yang dikirim sebelum host tersambung (mis. `hello` dari ClientSession.join,
+   * yang dipanggil sebelum handshake Nearby selesai). Dikirim berurutan saat host tersambung.
+   * Dibatasi supaya tidak tumbuh tanpa batas kalau sambungan tidak pernah jadi.
+   */
+  private readonly pending: { data: Uint8Array; reliable: boolean }[] = [];
   private handles: PluginListenerHandle[] = [];
   private closed = false;
 
@@ -64,8 +73,12 @@ export class NearbyTransport implements HostTransport {
       return;
     }
     const host = this.hostEndpoint();
-    // Belum tersambung ke host: pesan dibuang (session baru mengirim hello setelah `open`).
-    if (host === null) return;
+    if (host === null) {
+      // Belum tersambung ke host: antrekan, dikirim di handleConnected. Saat penuh, pesan
+      // BARU yang dibuang supaya `hello` (pesan pertama) tetap terkirim.
+      if (this.pending.length < MAX_PENDING) this.pending.push({ data, reliable });
+      return;
+    }
     this.dispatch(host, data, reliable);
   }
 
@@ -99,6 +112,7 @@ export class NearbyTransport implements HostTransport {
     if (this.closed) return;
     this.closed = true;
     this.connected.clear();
+    this.pending.length = 0;
     this.messageHandlers.clear();
     this.peerHandlers.clear();
     this.removeHandles();
@@ -129,6 +143,10 @@ export class NearbyTransport implements HostTransport {
     // P2P_STAR: klien hanya tersambung ke satu host; sambungan kedua diabaikan.
     if (this.role === 'client' && this.connected.size > 0) return;
     this.connected.add(endpointId);
+    if (this.role === 'client') {
+      const queued = this.pending.splice(0, this.pending.length);
+      for (const item of queued) this.dispatch(endpointId, item.data, item.reliable);
+    }
     this.emitPeer({ kind: 'open', peer: this.peerFor(endpointId) });
   }
 

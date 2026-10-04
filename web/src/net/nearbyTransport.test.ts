@@ -175,7 +175,8 @@ describe('NearbyTransport (klien)', () => {
     transport.onPeer((event) => events.push(event));
     transport.onMessage((message) => received.push(message));
 
-    transport.send(bytes(5), true);
+    // Belum tersambung: belum ada yang dikirim, tapi pesan diantrekan (bukan dibuang).
+    transport.send(bytes(9), true);
     expect(plugin.sent).toEqual([]);
 
     plugin.emit('connected', { endpointId: 'HOST1', name: 'HP Host' });
@@ -187,6 +188,8 @@ describe('NearbyTransport (klien)', () => {
 
     expect(transport.peers()).toEqual([HOST_PEER]);
     expect(plugin.sent).toEqual([
+      // Antrean pra-koneksi dikirim lebih dulu, berurutan.
+      { endpointId: 'HOST1', data: bytesToBase64(bytes(9)), reliable: true },
       { endpointId: 'HOST1', data: bytesToBase64(bytes(5)), reliable: false },
       { endpointId: 'HOST1', data: bytesToBase64(bytes(6)), reliable: true },
     ]);
@@ -197,5 +200,43 @@ describe('NearbyTransport (klien)', () => {
     plugin.emit('disconnected', { endpointId: 'HOST1' });
     expect(events.at(-1)).toEqual({ kind: 'close', peer: HOST_PEER });
     expect(transport.peers()).toEqual([]);
+  });
+
+  it('mengantrekan hello yang dikirim sebelum host tersambung lalu mengirimnya saat open', async () => {
+    const plugin = new FakeNearby();
+    const transport = createNearbyClientTransport(plugin);
+    await transport.ready;
+
+    // ClientSession.join() mengirim hello sebelum handshake Nearby selesai.
+    transport.send(bytes(1, 2, 3), true);
+    expect(plugin.sent).toEqual([]);
+
+    plugin.emit('connected', { endpointId: 'HOST1', name: 'HP Host' });
+    expect(plugin.sent).toEqual([{ endpointId: 'HOST1', data: bytesToBase64(bytes(1, 2, 3)), reliable: true }]);
+  });
+
+  it('antrean pra-koneksi dibatasi dan dibuang saat close()', async () => {
+    const plugin = new FakeNearby();
+    const transport = createNearbyClientTransport(plugin);
+    await transport.ready;
+
+    for (let i = 0; i < 40; i += 1) transport.send(bytes(i), true);
+    transport.close();
+    plugin.emit('connected', { endpointId: 'HOST1', name: 'HP Host' });
+    expect(plugin.sent).toEqual([]);
+  });
+
+  it('saat antrean penuh, 32 pesan pertama (termasuk hello) yang disimpan', async () => {
+    const plugin = new FakeNearby();
+    const transport = createNearbyClientTransport(plugin);
+    await transport.ready;
+
+    for (let i = 0; i < 40; i += 1) transport.send(bytes(i), true);
+    plugin.emit('connected', { endpointId: 'HOST1', name: 'HP Host' });
+
+    expect(plugin.sent).toHaveLength(32);
+    // Pesan pertama (hello) tetap ada; kelebihan 32..39 yang dibuang.
+    expect(plugin.sent[0]).toEqual({ endpointId: 'HOST1', data: bytesToBase64(bytes(0)), reliable: true });
+    expect(plugin.sent.at(-1)).toEqual({ endpointId: 'HOST1', data: bytesToBase64(bytes(31)), reliable: true });
   });
 });

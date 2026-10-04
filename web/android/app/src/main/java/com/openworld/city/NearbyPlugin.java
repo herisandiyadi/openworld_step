@@ -52,6 +52,9 @@ import java.util.concurrent.ConcurrentHashMap;
         @Permission(strings = { Manifest.permission.BLUETOOTH_CONNECT }, alias = NearbyPlugin.ALIAS_BLUETOOTH_CONNECT),
         // Android 13+ (API 33) untuk jalur Wi-Fi Direct.
         @Permission(strings = { Manifest.permission.NEARBY_WIFI_DEVICES }, alias = NearbyPlugin.ALIAS_NEARBY_WIFI),
+        // Semua versi: Nearby Connections P2P_STAR tetap meminta lokasi kasar, juga di
+        // Android 13+ (tanpa ini startDiscovery gagal 8034 MISSING_PERMISSION_ACCESS_COARSE_LOCATION).
+        @Permission(strings = { Manifest.permission.ACCESS_COARSE_LOCATION }, alias = NearbyPlugin.ALIAS_LOCATION_COARSE),
         // Android 12 ke bawah: Nearby butuh lokasi presisi untuk scan Bluetooth/Wi-Fi.
         @Permission(strings = { Manifest.permission.ACCESS_FINE_LOCATION }, alias = NearbyPlugin.ALIAS_LOCATION)
     }
@@ -62,6 +65,7 @@ public class NearbyPlugin extends Plugin {
     static final String ALIAS_BLUETOOTH_CONNECT = "bluetoothConnect";
     static final String ALIAS_NEARBY_WIFI = "nearbyWifiDevices";
     static final String ALIAS_LOCATION = "location";
+    static final String ALIAS_LOCATION_COARSE = "locationCoarse";
 
     /** Harus sama di semua HP; dipakai Nearby untuk memfilter aplikasi lain. */
     private static final String SERVICE_ID = "com.openworld.city.session";
@@ -127,6 +131,9 @@ public class NearbyPlugin extends Plugin {
             // Android 12 ke bawah: lokasi presisi wajib untuk scan.
             aliases.add(ALIAS_LOCATION);
         }
+        // Lokasi kasar wajib di SEMUA versi: Nearby memeriksanya sendiri, termasuk di
+        // Android 13+ yang jalur Wi-Fi-nya sudah pakai NEARBY_WIFI_DEVICES.
+        aliases.add(ALIAS_LOCATION_COARSE);
         return aliases.toArray(new String[0]);
     }
 
