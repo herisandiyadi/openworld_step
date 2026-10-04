@@ -8,7 +8,7 @@ import {
   validateSettings,
 } from '../state/aiSettings';
 import { useGameStore } from '../state/gameStore';
-import { DENSITY_LABELS, DENSITY_PRESETS, useGraphicsSettings } from '../state/graphicsSettings';
+import { BRIGHTNESS_RANGE, DENSITY_LABELS, DENSITY_PRESETS, QUALITY_LABELS, QUALITY_PRESETS, useGraphicsSettings } from '../state/graphicsSettings';
 import { AudioControls } from './AudioControls';
 
 /** AI endpoint settings (base URL, API key, model), saved on the device with Capacitor Preferences. */
@@ -17,6 +17,9 @@ export function SettingsScreen() {
   const controls = useGameStore((state) => state.controls);
   const setControls = useGameStore((state) => state.setControls);
   const density = useGraphicsSettings((state) => state.settings.density);
+  const quality = useGraphicsSettings((state) => state.settings.quality);
+  const brightness = useGraphicsSettings((state) => state.settings.brightness);
+  const reducedMotion = useGraphicsSettings((state) => state.settings.reducedMotion);
   const setGraphics = useGraphicsSettings((state) => state.update);
   const stored = useAiSettings((state) => state.settings);
   const save = useAiSettings((state) => state.save);
@@ -25,7 +28,7 @@ export function SettingsScreen() {
   const [error, setError] = useState<string | null>(null);
   const [status, setStatus] = useState<ConnectionResult | null>(null);
   const [busy, setBusy] = useState(false);
-  const ids = { url: useId(), key: useId(), model: useId(), status: useId() };
+  const ids = { url: useId(), key: useId(), model: useId(), status: useId(), brightness: useId() };
 
   useEffect(() => setForm(stored), [stored]);
 
@@ -145,6 +148,36 @@ export function SettingsScreen() {
               checked={controls.minimapRotate}
               onChange={(event) => setControls({ minimapRotate: event.target.checked })}
             />
+          </label>
+        </fieldset>
+
+        <fieldset className="audio-fieldset visual-options">
+          <legend>Tampilan</legend>
+          <div className="appearance-options">
+            {QUALITY_PRESETS.map((preset) => (
+              <label key={preset} className={`appearance-option${quality === preset ? ' selected' : ''}`}>
+                <input type="radio" name="quality" value={preset} checked={quality === preset} onChange={() => setGraphics({ quality: preset })} />
+                <span>{QUALITY_LABELS[preset]}</span>
+              </label>
+            ))}
+          </div>
+          <label className="range-field" htmlFor={ids.brightness}>
+            <span>Kecerahan</span>
+            <input
+              id={ids.brightness}
+              type="range"
+              min={BRIGHTNESS_RANGE.min}
+              max={BRIGHTNESS_RANGE.max}
+              step="0.05"
+              value={brightness}
+              aria-valuetext={`${Math.round(brightness * 100)}%`}
+              onChange={(event) => setGraphics({ brightness: Number(event.target.value) })}
+            />
+            <output htmlFor={ids.brightness}>{Math.round(brightness * 100)}%</output>
+          </label>
+          <label className="audio-row">
+            <span>Kurangi gerakan kamera dan efek</span>
+            <input type="checkbox" checked={reducedMotion} onChange={(event) => setGraphics({ reducedMotion: event.target.checked })} />
           </label>
         </fieldset>
 

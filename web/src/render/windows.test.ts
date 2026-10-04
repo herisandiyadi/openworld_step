@@ -1,0 +1,16 @@
+import { describe, expect, it } from 'vitest';
+import { WINDOW_LIT_RATIO, windowCellLit } from './windows';
+
+describe('windowCellLit', () => {
+  it('is deterministic per cell', () => {
+    expect(windowCellLit(3, 7)).toBe(windowCellLit(3, 7));
+  });
+  it('lights a varied fraction of windows close to the target ratio', () => {
+    let lit = 0;
+    let total = 0;
+    for (let x = -40; x < 40; x++) for (let y = 0; y < 20; y++, total++) if (windowCellLit(x, y)) lit++;
+    expect(Math.abs(lit / total - WINDOW_LIT_RATIO)).toBeLessThan(0.06);
+    expect(lit).toBeGreaterThan(0);
+    expect(lit).toBeLessThan(total);
+  });
+});

@@ -2,7 +2,7 @@ import { describe, expect, it } from 'vitest';
 import { bakeLanes } from '../../tools/world/lanes';
 import { mulberry32 } from '../world/worldGen';
 import { buildLaneGraph, edgePoint } from './laneGraph';
-import { type CameraView, DESPAWN, inView, SPAWN_MAX, SPAWN_MIN, updateSpawns, VEHICLE_POOL } from './spawner';
+import { type CameraView, DESPAWN, inView, SPAWN_MAX, SPAWN_MIN, updateSpawns, VEHICLE_POOL, vehiclePoolFor } from './spawner';
 import { createTraffic, createVehicle } from './trafficSim';
 
 const graph = buildLaneGraph(bakeLanes());
@@ -43,7 +43,7 @@ describe('spawner', () => {
       updateSpawns(graph, state, view, preset, random, () => id++);
       expect(state.vehicles.length).toBe(VEHICLE_POOL[preset]);
     }
-    expect(VEHICLE_POOL).toEqual({ low: 8, medium: 14, high: 20 });
+    expect(VEHICLE_POOL).toEqual({ low: 8, medium: 16, high: 24 });
 
     const state = createTraffic();
     const far = graph.data.edges.findIndex((edge, index) => {
@@ -54,5 +54,22 @@ describe('spawner', () => {
     const { despawned } = updateSpawns(graph, state, view, 'low', random, () => id++);
     expect(despawned).toBe(1);
     expect(state.vehicles.some((vehicle) => vehicle.id === 999)).toBe(false);
+  });
+
+  it('pool kendaraan dibatasi quality tier render supaya budget HP low-end aman', () => {
+    expect(vehiclePoolFor('high', 'high')).toBe(VEHICLE_POOL.high);
+    expect(vehiclePoolFor('high', 'medium')).toBe(VEHICLE_POOL.medium);
+    expect(vehiclePoolFor('high', 'low')).toBe(VEHICLE_POOL.low);
+    expect(vehiclePoolFor('low', 'high')).toBe(VEHICLE_POOL.low);
+    for (const quality of ['low', 'medium', 'high'] as const) expect(vehiclePoolFor('high', quality)).toBeLessThanOrEqual(VEHICLE_POOL.high);
+  });
+
+  it('updateSpawns menghormati batas quality tier', () => {
+    const random = mulberry32(7);
+    let id = 0;
+    const view: CameraView = { x: 0, z: 0, dirX: 0, dirZ: -1, halfFov: 35 * DEG };
+    const state = createTraffic();
+    updateSpawns(graph, state, view, 'high', random, () => id++, 11, 'low');
+    expect(state.vehicles.length).toBe(VEHICLE_POOL.low);
   });
 });

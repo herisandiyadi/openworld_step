@@ -14,7 +14,13 @@ const SPAWN_CLEAR = 12;
 const VIEW_MARGIN = 10 * (Math.PI / 180);
 
 export type GraphicsPreset = 'low' | 'medium' | 'high';
-export const VEHICLE_POOL: Record<GraphicsPreset, number> = { low: 8, medium: 14, high: 20 };
+export const VEHICLE_POOL: Record<GraphicsPreset, number> = { low: 8, medium: 16, high: 24 };
+
+/** Resolve ambient vehicle capacity from both city density and render quality. */
+export function vehiclePoolFor(density: GraphicsPreset, quality: GraphicsPreset): number {
+  const qualityIndex = { low: 0, medium: 1, high: 2 } as const;
+  return VEHICLE_POOL[qualityIndex[quality] < qualityIndex[density] ? quality : density];
+}
 
 export interface CameraView {
   x: number;
@@ -94,10 +100,12 @@ export function updateSpawns(
   random: () => number,
   nextId: () => number,
   maxSpeed = 11,
+  quality: GraphicsPreset = preset,
 ): { spawned: Vehicle[]; despawned: number } {
   const despawned = despawnFar(graph, state, view);
   const spawned: Vehicle[] = [];
-  while (state.vehicles.length < VEHICLE_POOL[preset]) {
+  const pool = vehiclePoolFor(preset, quality);
+  while (state.vehicles.length < pool) {
     const spot = findSpawnSpot(graph, view, random, state.vehicles);
     if (!spot) break;
     const vehicle = createVehicle(graph, nextId(), spot.edge, spot.s, maxSpeed, random);

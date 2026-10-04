@@ -1,0 +1,5 @@
+{
+  "version": 1,
+  "orm": { "R": "occlusion", "G": "roughness", "B": "metallic" },
+  "textureCompression": { "preferred": "KTX2/Basis", "fallback": "PNG/JPEG" }
+}

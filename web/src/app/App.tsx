@@ -22,6 +22,8 @@ import { ProfileScreen } from '../ui/ProfileScreen';
 import { usePlayerProfile } from '../state/profile';
 import { useAiSettings } from '../state/aiSettings';
 import { QUALITY_PRESETS, type Quality, useGameStore } from '../state/gameStore';
+import { RenderFoundation } from '../render/RenderFoundation';
+import { VisualEffects } from '../render/VisualEffects';
 
 const SKY_COLOR = '#bcd3e6';
 preloadAssets();
@@ -76,7 +78,9 @@ function Game() {
       >
         <color attach="background" args={[SKY_COLOR]} />
         <fog attach="fog" args={[SKY_COLOR, 50, 125]} />
+        <RenderFoundation tier={quality} />
         <DayNight />
+        <VisualEffects />
         <PerformanceMonitor flipflops={3} onDecline={() => setQuality(DOWNGRADE[useGameStore.getState().quality])} />
         <Suspense fallback={null}>
           <World />

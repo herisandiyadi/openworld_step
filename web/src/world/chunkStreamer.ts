@@ -15,6 +15,7 @@ import type { BuiltChunk, ChunkLoadRequest, ChunkWorkerResponse } from './chunkP
 import type { PropId } from './propSpec';
 import { type ChunkCoord, chunkDistance, planStreaming, withinRadius } from './streaming';
 import { chunkCoord, chunkKey, inWorld, LOAD_RADIUS, UNLOAD_RADIUS } from './worldSpec';
+import { streamingPolicyFor } from '../optimization/streamingPolicy';
 import { rebuildCollision, worldState } from './worldState';
 
 export interface PropPart {
@@ -49,7 +50,6 @@ interface ChunkView {
 
 /** Props are drawn only near the player (cheap distance LOD); terrain + buildings out to LOAD_RADIUS. */
 const PROP_RADIUS = 1;
-const MAX_IN_FLIGHT = 2;
 
 /**
  * Streams chunk JSON through a worker, applies at most one built chunk per frame, and disposes
@@ -67,6 +67,7 @@ export class ChunkStreamer {
   private readonly ready: BuiltChunk[] = [];
   private center: ChunkCoord = { cx: Number.NaN, cz: Number.NaN };
   private readyFired = false;
+  private readonly streamingPolicy = streamingPolicyFor('medium');
   private readonly terrainMaterial = new MeshLambertMaterial({ vertexColors: true });
   private readonly buildingMaterial = new MeshLambertMaterial();
   private readonly unitBox = new BoxGeometry(1, 1, 1);
@@ -99,14 +100,14 @@ export class ChunkStreamer {
     let changed = false;
     if (cx !== this.center.cx || cz !== this.center.cz) {
       this.center = { cx, cz };
-      const plan = planStreaming(this.center, this.views.keys(), this.pending);
+      const plan = planStreaming(this.center, this.views.keys(), this.pending, this.streamingPolicy);
       for (const key of plan.unload) this.unload(key);
       this.queue = plan.load;
       changed = true;
       for (const view of this.views.values()) view.props.visible = chunkDistance(view.coord, this.center) <= PROP_RADIUS;
     }
 
-    while (this.pending.size < MAX_IN_FLIGHT && this.queue.length > 0) {
+    while (this.pending.size < this.streamingPolicy.maxInFlight && this.queue.length > 0) {
       const next = this.queue.shift();
       if (!next || this.views.has(next.key) || this.pending.has(next.key)) continue;
       this.pending.add(next.key);

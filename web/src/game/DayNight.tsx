@@ -3,6 +3,7 @@ import { useFrame, useThree } from '@react-three/fiber';
 import { Color, Fog, type HemisphereLight, type InstancedMesh, type Material, type Mesh, MeshLambertMaterial, MeshStandardMaterial } from 'three';
 import { ambientAudio } from '../audio/ambientAudio';
 import { DAY_SECONDS, clockLabel, daylightAt } from './dayCycle';
+import { lightingAt } from './lighting';
 import { dayClock, lighting } from './runtime';
 import { useGameStore } from '../state/gameStore';
 
@@ -60,8 +61,9 @@ export function DayNight() {
 
   useFrame((_, delta) => {
     dayClock.t = (dayClock.t + Math.min(delta, 0.05) / DAY_SECONDS) % 1;
-    const { daylight, dusk } = daylightAt(dayClock.t);
+    const { daylight } = lightingAt(dayClock.t);
     const night = 1 - daylight;
+    const dusk = daylightAt(dayClock.t).dusk;
     const store = useGameStore.getState();
     ambientAudio.update(store.district, dayClock.t, Math.min(delta, 0.05), !store.mapOpen);
 

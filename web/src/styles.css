@@ -34,6 +34,10 @@ body,
   touch-action: none;
 }
 
+.game-canvas {
+  filter: brightness(var(--game-brightness, 1));
+}
+
 .hud {
   position: fixed;
   inset: 0;
@@ -138,8 +142,11 @@ button:focus-visible {
 }
 
 .hud-button {
-  width: 44px;
-  height: 44px;
+  /* Touch target >= 48dp (polish/mobileLayout MIN_TOUCH_TARGET_DP). */
+  min-width: 48px;
+  min-height: 48px;
+  width: 48px;
+  height: 48px;
   border: none;
   border-radius: 10px;
   background: var(--panel);
@@ -960,4 +967,80 @@ button:focus-visible {
 .bus-ride-exit:focus-visible {
   outline: 2px solid #ffd23f;
   outline-offset: 2px;
+}
+
+
+/* --- VISUAL_UPGRADE §8: display options, reduced motion, readability --- */
+.range-field {
+  display: grid;
+  grid-template-columns: minmax(96px, auto) 1fr 3.5em;
+  align-items: center;
+  gap: 10px;
+  min-height: 48px;
+}
+
+.range-field input[type='range'] {
+  width: 100%;
+  min-height: 48px;
+  accent-color: var(--accent);
+}
+
+.range-field output {
+  text-align: right;
+  font-variant-numeric: tabular-nums;
+}
+
+.audio-row input[type='checkbox'] {
+  width: 28px;
+  height: 28px;
+  accent-color: var(--accent);
+}
+
+/* User-selected reduced motion mirrors the OS media query. */
+.reduced-motion *,
+.reduced-motion *::before,
+.reduced-motion *::after {
+  animation-duration: 0.01ms !important;
+  animation-iteration-count: 1 !important;
+  transition-duration: 0.01ms !important;
+  scroll-behavior: auto !important;
+}
+
+/* HUD text readable over bright day and dark night scenes. */
+.quest-line,
+.stats {
+  text-shadow: 0 1px 2px rgba(0, 0, 0, 0.8);
+}
+
+/* Portrait: keep the top HUD inside the notch-safe width and stack panels. */
+@media (orientation: portrait) {
+  .hud-top-left {
+    right: calc(72px + var(--safe-right));
+    flex-wrap: wrap;
+  }
+
+  .status-panel {
+    min-width: 0;
+    max-width: 100%;
+  }
+}
+
+/* Short landscape phones: shrink decorative HUD, never touch targets below 48px. */
+@media (orientation: landscape) and (max-height: 420px) {
+  .minimap {
+    width: 104px;
+    height: 104px;
+  }
+
+  .status-panel {
+    padding: 6px 8px;
+    gap: 4px;
+  }
+
+  .joystick {
+    left: calc(20px + var(--safe-left));
+    bottom: calc(16px + var(--safe-bottom));
+    width: 120px;
+    height: 120px;
+  }
 }

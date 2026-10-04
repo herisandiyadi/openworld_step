@@ -11,6 +11,13 @@ import { type MoveMode, type Quality, useGameStore } from '../state/gameStore';
 import { useResidentChats } from '../state/saveGame';
 import { DISTRICT_NAMES } from '../world/worldSpec';
 import { worldState } from '../world/worldState';
+import { useGraphicsSettings } from '../state/graphicsSettings';
+import { isDebugOverlayVisible } from '../polish/debugOverlay';
+import { useDisplayPreferences } from './useDisplayPreferences';
+
+/** Renderer stats are for developers only; production needs ?debug-overlay. */
+const SHOW_DEBUG_OVERLAY =
+  typeof window !== 'undefined' && isDebugOverlayVisible({ dev: import.meta.env.DEV, search: window.location.search });
 
 const MODE_LABELS: Record<MoveMode, string> = {
   walk: 'Jalan kaki',
@@ -74,6 +81,8 @@ function BusRidePanel() {
 }
 
 export function Hud() {
+  useDisplayPreferences();
+  const setGraphics = useGraphicsSettings((state) => state.update);
   const mode = useGameStore((state) => state.mode);
   const chatNpcId = useGameStore((state) => state.chatNpcId);
   const busMenuOpen = useGameStore((state) => state.busMenuOpen);
@@ -87,7 +96,6 @@ export function Hud() {
   const setPaused = useGameStore((state) => state.setPaused);
   const mapOpen = useGameStore((state) => state.mapOpen);
   const quality = useGameStore((state) => state.quality);
-  const setQuality = useGameStore((state) => state.setQuality);
   const stats = useGameStore((state) => state.stats);
   const stream = useGameStore((state) => state.stream);
   const district = useGameStore((state) => state.district);
@@ -119,9 +127,11 @@ export function Hud() {
       </div>
 
       <div className="hud-top-right">
-        <div className="stats" aria-live="off">
-          {stats.fps} FPS · {stats.calls} dc · {(stats.triangles / 1000).toFixed(1)}k tri · {stream.chunks} ch
-        </div>
+        {SHOW_DEBUG_OVERLAY && (
+          <div className="stats" aria-live="off">
+            {stats.fps} FPS · {stats.calls} dc · {(stats.triangles / 1000).toFixed(1)}k tri · {stream.chunks} ch
+          </div>
+        )}
         <button type="button" className="hud-button" aria-label="Jeda" onClick={() => setPaused(true)}>
           II
         </button>
@@ -160,7 +170,7 @@ export function Hud() {
                   type="button"
                   className={`mode-button${quality === item.id ? ' active' : ''}`}
                   aria-pressed={quality === item.id}
-                  onClick={() => setQuality(item.id)}
+                  onClick={() => setGraphics({ quality: item.id })}
                 >
                   {item.label}
                 </button>

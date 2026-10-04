@@ -8,6 +8,27 @@ import { animState, playerMotion } from './runtime';
 import { CarModel, MotoModel } from './vehicleModels';
 import { BIKE } from './vehicleSpec';
 import { useGameStore } from '../state/gameStore';
+import { headlightRig, VEHICLE_LIGHTS } from '../render/vehicleLights';
+
+function VehicleLightRig({ kind }: { kind: 'car' | 'moto' }) {
+  const spec = VEHICLE_LIGHTS[kind];
+  const rig = headlightRig(spec);
+  return <>
+    <mesh position={[-0.58, 0.58, spec.halfLength] as [number, number, number]}>
+      <boxGeometry args={[0.18, 0.12, 0.03]} />
+      <meshStandardMaterial color="#ff3030" emissive="#ff2020" emissiveIntensity={1.8} />
+    </mesh>
+    <mesh position={[0.58, 0.58, spec.halfLength] as [number, number, number]}>
+      <boxGeometry args={[0.18, 0.12, 0.03]} />
+      <meshStandardMaterial color="#ff3030" emissive="#ff2020" emissiveIntensity={1.8} />
+    </mesh>
+    <spotLight position={rig.position} target-position={rig.target} color="#fff0cf" intensity={5} distance={rig.distance} angle={rig.angle} penumbra={0.8} castShadow={false} />
+    <mesh position={[0, spec.frontY, -spec.halfLength - 0.04]}>
+      <boxGeometry args={[spec.halfWidth * 1.6, 0.12, 0.03]} />
+      <meshStandardMaterial color="#fff5dd" emissive="#fff0c0" emissiveIntensity={2.2} />
+    </mesh>
+  </>;
+}
 
 function Skateboard() {
   const gltf = useGLTF(assetUrl('veh_skateboard'));
@@ -42,6 +63,6 @@ export function PlayerVehicle() {
   if (!riding) return null;
   if (riding.kind === 'bike') return <Bicycle />;
   if (riding.kind === 'skate') return <Skateboard />;
-  if (riding.kind === 'moto') return <MotoModel color={riding.color} />;
-  return <CarModel color={riding.color} />;
+  if (riding.kind === 'moto') return <><MotoModel color={riding.color} /><VehicleLightRig kind="moto" /></>;
+  return <><CarModel color={riding.color} /><VehicleLightRig kind="car" /></>;
 }
