@@ -1,0 +1,48 @@
+{
+  "bots": 50,
+  "durationSec": 1800,
+  "room": "58ABRS",
+  "latencyMs": {
+    "samples": 89900,
+    "p50": 6.78,
+    "p95": 18.39,
+    "p99": 25.48,
+    "max": 178.49
+  },
+  "serverCpu": {
+    "processAvgPctOfOneCore": 26.61,
+    "dockerAvgPct": 27.03,
+    "dockerMaxPct": 35.42,
+    "dockerSamples": 585
+  },
+  "serverMemory": {
+    "rssStartMB": 69.7,
+    "rssEndMB": 96.8,
+    "rssMaxMB": 96.9,
+    "dockerMaxMB": 56.4
+  },
+  "bandwidth": {
+    "serverToClientsPayloadKBps": 103.2,
+    "clientsToServerPayloadKBps": 14.7,
+    "perBotDownKBps": 2.06,
+    "perBotUpKBps": 0.29,
+    "dockerRxKBps": 101.1,
+    "dockerTxKBps": 183,
+    "serverUploadMbps": 1.46
+  },
+  "messages": {
+    "sentByBots": 1444734,
+    "receivedByBots": 1580460,
+    "stateMessagesReceived": 1329068,
+    "chatMessagesReceived": 152492
+  },
+  "rejected": {
+    "total": 0,
+    "byReason": {}
+  },
+  "disconnectedBots": 0,
+  "gate": {
+    "p95Under150ms": true,
+    "cpuUnder60pct": true
+  }
+}

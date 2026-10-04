@@ -15,7 +15,7 @@ Gelombang 5 (deploy VPS, TLS Let's Encrypt, systemd) **ditunda** atas permintaan
 | 1 | M1 fondasi jaringan + native Nearby (M2 bagian Android) | Selesai |
 | 2 | Server Node + `ws` di Docker, `wsTransport`, `nearbyTransport`, bot uji beban | Selesai |
 | 3 | `RemotePlayers`, menu Main bersama, chat, minimap, kendaraan bersama | Selesai |
-| 4 | Integrasi, uji beban 50 bot, APK debug, polish M4 | Berjalan (uji beban 30 menit + APK) |
+| 4 | Integrasi, uji beban 50 bot, APK debug, polish M4 | Selesai di host (polish M4 dan uji HP fisik masih terbuka) |
 | 5 | Deploy VPS + TLS | Ditunda (menunggu VPS) |
 
 ## Gelombang 1 — Selesai
@@ -124,6 +124,32 @@ Verifikasi: `npx vitest run src/net/wsTransport.test.ts src/net/nearbyTransport.
 
 Verifikasi: `npx vitest run` 348/348 lulus (45 file); `npm run typecheck` exit 0; `npm run build` sukses.
 
+## Gelombang 4 — Selesai di host
+
+- Integrasi ke game masuk di gelombang 3 (`985d6b9`).
+- APK debug: `npx cap sync android` + `bash ./gradlew assembleDebug` BUILD SUCCESSFUL, APK 8,1 MB dari
+  commit `985d6b9`.
+
+Uji beban gerbang M3: 50 bot, **30 menit** (1800 s), server di Docker pada host yang sama (RTT internet
+belum termasuk):
+
+| Metrik | Hasil |
+| --- | --- |
+| Bot tersambung / terputus | 50 / 0 |
+| Ping RTT (89.900 sampel) | p50 6,78 ms, p95 18,39 ms, p99 25,48 ms, maks 178,49 ms |
+| CPU server | rata-rata proses 26,61% dari 1 core, `docker stats` rata-rata 27,03% / maks 35,42% |
+| RAM server | RSS 69,7 → 96,8 MB (maks 96,9 MB), `docker stats` maks 56,4 MB |
+| Bandwidth | server→bot 103,2 kB/s (2,06 kB/s per bot), container tx 183 kB/s (≈1,46 Mbit/s) |
+| Pesan | 1.444.734 dikirim bot, 1.580.460 diterima, 0 ditolak server |
+
+Gerbang M3 bagian server: p95 < 150 ms **lulus**, CPU < 60% **lulus**, tanpa bot terputus selama 30 menit.
+RSS naik 27 MB dalam 30 menit; perlu dipantau di uji lebih lama untuk memastikan bukan kebocoran.
+
+Masih terbuka:
+
+- Polish M4 (jaringan lambat/putus-sambung, baterai) dan uji di HP fisik (lihat bagian di bawah).
+- Server baru jalan di host ini; HP perlu URL publik (tunnel atau VPS gelombang 5) untuk mode online.
+
 ## Penyimpangan dari `MULTIPLAYER.md`
 
 Dicatat di sini supaya dokumen rencana tetap utuh.
@@ -171,3 +197,8 @@ Gerbang berikut tidak bisa dibuktikan di host ini dan perlu uji perangkat:
 ### Gelombang 3
 
 - `feat(net): UI multiplayer + integrasi ke game (M3 klien)` (`985d6b9`)
+- `docs(net): catat gelombang 3 selesai + daftar commit per gelombang` (`9297e6c`)
+
+### Gelombang 4
+
+- `docs(net): hasil uji beban 30 menit gerbang M3 + APK debug`
