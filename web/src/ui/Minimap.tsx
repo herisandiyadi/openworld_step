@@ -1,7 +1,9 @@
 import { useEffect, useRef } from 'react';
 import { playerState } from '../game/runtime';
 import { useGameStore } from '../state/gameStore';
-import { drawFog, drawNpcDot, drawNpcEdgeMarker, drawPlayerArrow, loadMapImage } from './mapRender';
+import { drawFog, drawNpcDot, drawNpcEdgeMarker, drawPlayerArrow, drawRemoteDot, loadMapImage } from './mapRender';
+import { useNetStore } from '../net/netStore';
+import { currentMode } from '../net/netRuntime';
 import { HALF_WORLD } from '../world/worldSpec';
 import { cameraState } from '../camera/followCamera';
 
@@ -64,6 +66,19 @@ export function Minimap() {
             } else {
               const angle = Math.atan2(offsetY, offsetX);
               drawNpcEdgeMarker(context, size / 2 + Math.cos(angle) * rim, size / 2 + Math.sin(angle) * rim, angle, 6 * dpr);
+            }
+          }
+          // Pemain lain: titik biru, hanya yang masuk lingkaran minimap. for...in tanpa alokasi per titik.
+          if (currentMode() !== null) {
+            const remotes = useNetStore.getState().remotes;
+            for (const id in remotes) {
+              const position = remotes[id]?.position;
+              if (!position) continue;
+              const offsetX = (position.x - playerState.x) * scale;
+              const offsetY = (position.z - playerState.z) * scale;
+              if (offsetX * offsetX + offsetY * offsetY <= rim * rim) {
+                drawRemoteDot(context, size / 2 + offsetX, size / 2 + offsetY, 4 * dpr);
+              }
             }
           }
           drawPlayerArrow(context, size / 2, size / 2, playerState.heading, 7 * dpr);

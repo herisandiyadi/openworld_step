@@ -1,0 +1,32 @@
+# Reverse proxy wss:// untuk server multiplayer.
+#
+# PAKAI LOKAL (blok ini): sertifikat SELF-SIGNED dari Caddy (`tls internal`).
+# Klien harus mengizinkan sertifikat tidak dipercaya, atau CA lokal Caddy dipasang di perangkat:
+#   docker compose cp caddy:/data/caddy/pki/authorities/local/root.crt ./caddy-root.crt
+# Endpoint: wss://localhost:8443/ws?room=KODE&token=TOKEN
+#
+# PINDAH KE VPS: ganti seluruh blok di bawah dengan domain nyata; Let's Encrypt otomatis.
+#   mp.contoh.com {
+#     reverse_proxy mp-server:8787
+#   }
+# (port 80 dan 443 harus terbuka, dan domain mengarah ke IP VPS)
+
+{
+	# Tanpa email ACME untuk mode lokal; isi saat memakai domain nyata.
+	admin off
+}
+
+localhost, 127.0.0.1 {
+	tls internal
+
+	# WebSocket dan HTTP (health, /rooms) memakai satu upstream.
+	reverse_proxy mp-server:8787 {
+		header_up X-Forwarded-For {remote_host}
+	}
+
+	log {
+		output stdout
+		format console
+		# Isi chat tidak pernah lewat HTTP, jadi log akses aman (MULTIPLAYER.md 6).
+	}
+}

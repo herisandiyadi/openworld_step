@@ -7,6 +7,9 @@ import { BUS_DISTANCE, MODE_RADIUS, TALK_DISTANCE, USE_DISTANCE, jumpState, play
 import { findNearestFreeSeat } from './seating';
 import { useGameStore } from '../state/gameStore';
 import { chunkAt, worldState } from '../world/worldState';
+import { currentMode } from '../net/netRuntime';
+import { useNetStore } from '../net/netStore';
+import { isClaimable, useSharedVehicles, vehicleOwner } from './sharedVehicles';
 
 const INTERVAL = 0.15;
 
@@ -28,7 +31,12 @@ export function Proximity() {
     let vehicleId: string | null = null;
     if (onFoot) {
       let best = Infinity;
+      const inSession = currentMode() !== null;
+      const owners = useSharedVehicles.getState().owners;
+      const localId = useNetStore.getState().playerId;
       for (const vehicle of state.vehicles) {
+        // Dipakai pemain lain: tombol Naik tidak muncul; kendaraan ditandai merah + label "Dipakai ...".
+        if (!isClaimable(vehicleOwner(owners, vehicle.id), localId, inSession)) continue;
         const distance = Math.hypot(vehicle.x - playerState.x, vehicle.z - playerState.z);
         if (distance < MODE_RADIUS[vehicle.kind] + USE_DISTANCE && distance < best) {
           best = distance;
