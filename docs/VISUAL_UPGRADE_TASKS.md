@@ -45,7 +45,7 @@
 - [x] Buat konfigurasi exposure per quality tier.
 - [x] Pastikan albedo/color texture memakai sRGB.
 - [x] Pastikan normal, roughness, metalness, dan AO map tetap linear.
-- [ ] Buat satu konfigurasi lighting yang bisa dipakai siang dan malam.
+- [x] Buat satu konfigurasi lighting yang bisa dipakai siang dan malam.
 - [x] Tambahkan renderer capability detection untuk WebGL2, MSAA, half-float render target, dan texture compression.
 
 ### P0 — Anti-aliasing
