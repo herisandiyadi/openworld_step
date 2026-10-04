@@ -13,15 +13,15 @@
   - [ ] Android low-end
   - [ ] Android mid-range
   - [ ] Desktop/browser modern
-- [ ] Tambahkan overlay/debug metrics untuk:
-  - [ ] FPS dan frame time CPU/GPU
-  - [ ] draw calls
-  - [ ] triangles
-  - [ ] texture count dan memory
-  - [ ] shadow map memory
-  - [ ] post-processing passes
-  - [ ] WebGL warnings dan shader compile time
-- [ ] Tetapkan quality tiers: `Low`, `Medium`, `High`.
+- [x] Tambahkan overlay/debug metrics untuk:
+  - [x] FPS dan frame time CPU/GPU
+  - [x] draw calls
+  - [x] triangles
+  - [x] texture count dan memory
+  - [x] shadow map memory
+  - [x] post-processing passes
+  - [x] WebGL warnings dan shader compile time
+- [x] Tetapkan quality tiers: `Low`, `Medium`, `High`.
 
 ### Target awal mobile
 
@@ -40,19 +40,19 @@
 
 ### P0 — Renderer dan color pipeline
 
-- [ ] Pastikan `WebGLRenderer` memakai `SRGBColorSpace` untuk output.
-- [ ] Terapkan ACES/AgX tone mapping secara konsisten di semua scene.
-- [ ] Buat konfigurasi exposure per quality tier.
-- [ ] Pastikan albedo/color texture memakai sRGB.
-- [ ] Pastikan normal, roughness, metalness, dan AO map tetap linear.
+- [x] Pastikan `WebGLRenderer` memakai `SRGBColorSpace` untuk output.
+- [x] Terapkan ACES/AgX tone mapping secara konsisten di semua scene.
+- [x] Buat konfigurasi exposure per quality tier.
+- [x] Pastikan albedo/color texture memakai sRGB.
+- [x] Pastikan normal, roughness, metalness, dan AO map tetap linear.
 - [ ] Buat satu konfigurasi lighting yang bisa dipakai siang dan malam.
-- [ ] Tambahkan renderer capability detection untuk WebGL2, MSAA, half-float render target, dan texture compression.
+- [x] Tambahkan renderer capability detection untuk WebGL2, MSAA, half-float render target, dan texture compression.
 
 ### P0 — Anti-aliasing
 
-- [ ] Aktifkan MSAA saat WebGL2 dan device mampu.
-- [ ] Sediakan FXAA fallback untuk device yang tidak mendukung MSAA.
-- [ ] Jangan menjalankan MSAA dan FXAA penuh secara bersamaan jika cost terlalu tinggi.
+- [x] Aktifkan MSAA saat WebGL2 dan device mampu.
+- [x] Sediakan FXAA fallback untuk device yang tidak mendukung MSAA.
+- [x] Jangan menjalankan MSAA dan FXAA penuh secara bersamaan jika cost terlalu tinggi.
 - [ ] Uji aliasing pada: tiang lampu, roofline, marka jalan, foliage, dan edge bangunan.
 
 **Acceptance criteria:** diagonal edge tidak terlihat patah parah pada viewport mobile, tanpa frame-time spike yang mengganggu.
