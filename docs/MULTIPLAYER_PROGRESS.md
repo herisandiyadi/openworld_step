@@ -14,8 +14,8 @@ Gelombang 5 (deploy VPS, TLS Let's Encrypt, systemd) **ditunda** atas permintaan
 | --- | --- | --- |
 | 1 | M1 fondasi jaringan + native Nearby (M2 bagian Android) | Selesai |
 | 2 | Server Node + `ws` di Docker, `wsTransport`, `nearbyTransport`, bot uji beban | Selesai |
-| 3 | `RemotePlayers`, menu Main bersama, chat, minimap, kendaraan bersama | Belum |
-| 4 | Integrasi, uji beban 50 bot, APK debug, polish M4 | Belum |
+| 3 | `RemotePlayers`, menu Main bersama, chat, minimap, kendaraan bersama | Selesai |
+| 4 | Integrasi, uji beban 50 bot, APK debug, polish M4 | Berjalan (uji beban 30 menit + APK) |
 | 5 | Deploy VPS + TLS | Ditunda (menunggu VPS) |
 
 ## Gelombang 1 — Selesai
@@ -104,6 +104,26 @@ jaringan seluler masuk gelombang 4 dan uji perangkat.
 Verifikasi: `npx vitest run src/net/wsTransport.test.ts src/net/nearbyTransport.test.ts src/state/netSettings.test.ts`
 23/23 lulus.
 
+## Gelombang 3 — Selesai
+
+- `web/src/net/netRuntime.ts` + test — manajer koneksi: host lokal, klien lokal, online (buat/gabung room
+  lewat HTTP lalu WebSocket). Event sesi diteruskan ke `netStore`; error koneksi berbahasa Indonesia.
+- `web/src/game/RemotePlayers.tsx` + `remotePlayers.ts` + test — pemain lain digambar dengan penampilan
+  masing-masing, interpolasi snapshot, label nama sprite kanvas, maks pemain terlihat + culling jarak.
+- `web/src/ui/MultiplayerMenu.tsx` + test — menu "Main bersama": buat/gabung sesi Nearby dengan kode
+  konfirmasi 4 digit, main online dengan kode room 6 karakter, notifikasi pemain masuk/keluar, ping.
+- `web/src/ui/ChatPanel.tsx`, `ChatBubbles.tsx`, `chatLogic.ts` + test — kanal Sesi dan Dekat, batas
+  200 karakter, bisukan per pemain, lencana pesan baru, gelembung di atas kepala 5 detik dalam 30 m.
+- `web/src/game/sharedVehicles.ts` + test — kepemilikan kendaraan mengikuti host/server; kendaraan milik
+  pemain lain diberi cincin merah + label "Dipakai ..." dan tidak bisa dinaiki.
+- `Minimap.tsx` / `BigMap.tsx` / `mapRender.ts` — titik pemain lain di peta.
+- `web/src/game/NetDriver.tsx` + `netDriver.ts` + test — kirim state pemain lokal 15 Hz (pakai interval,
+  bukan `useFrame`, supaya host tetap melayani saat game dijeda) dan tick `HostSession`.
+- Integrasi: layar `multiplayer` di `App.tsx`, tombol "Main bersama" di `TitleScreen`, tombol chat di HUD
+  hanya saat dalam sesi. Single-player tidak berubah perilakunya.
+
+Verifikasi: `npx vitest run` 348/348 lulus (45 file); `npm run typecheck` exit 0; `npm run build` sukses.
+
 ## Penyimpangan dari `MULTIPLAYER.md`
 
 Dicatat di sini supaya dokumen rencana tetap utuh.
@@ -142,4 +162,12 @@ Gerbang berikut tidak bisa dibuktikan di host ini dan perlu uji perangkat:
 
 ### Gelombang 1
 
-- `feat(net): fondasi protokol multiplayer M1 + plugin Nearby Android`
+- `feat(net): fondasi protokol multiplayer M1 + plugin Nearby Android` (`d747686`)
+
+### Gelombang 2
+
+- `feat(server): server multiplayer internet M3 + transport WebSocket dan Nearby` (`f3ff32a`)
+
+### Gelombang 3
+
+- `feat(net): UI multiplayer + integrasi ke game (M3 klien)` (`985d6b9`)
