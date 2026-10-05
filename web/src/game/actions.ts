@@ -7,6 +7,9 @@ import { worldState } from '../world/worldState';
 import { playerSeat, releaseSeat, reserveSeat, sitPose, standPosition } from './seating';
 import { BUS_EXIT, busLocalToWorld } from '../ambient/busRide';
 import { busTrip, resetBusTrip } from './busTrip';
+import { claimVehicle, currentMode } from '../net/netRuntime';
+import { useNetStore } from '../net/netStore';
+import { isClaimable, useSharedVehicles, vehicleOwner } from './sharedVehicles';
 
 const PLAYER_ID = 'player';
 
@@ -39,6 +42,8 @@ export function toggleVehicle(): void {
     const { riding } = state;
     const heading = playerState.heading;
     state.dismount({ ...riding, x: playerState.x, z: playerState.z, yaw: heading });
+    // Multiplayer: lepas klaim di host/server dengan pose parkir baru.
+    if (currentMode() !== null) claimVehicle(riding.id, 'release', { x: playerState.x, z: playerState.z, yaw: heading });
     audio.dismount();
     // Step out to the side; collision resolves any overlap on the next frame.
     const side = MODE_RADIUS[riding.kind] + MODE_RADIUS.walk + 0.3;
@@ -49,12 +54,18 @@ export function toggleVehicle(): void {
 
   const vehicle = state.vehicles.find((item) => item.id === state.nearby.vehicleId);
   if (!vehicle) return;
+  // Kendaraan bersama: yang sedang dipakai pemain lain tidak bisa dinaiki (ditandai merah di ParkedVehicles).
+  const inSession = currentMode() !== null;
+  const ownerId = vehicleOwner(useSharedVehicles.getState().owners, vehicle.id);
+  if (!isClaimable(ownerId, useNetStore.getState().playerId, inSession)) return;
   jumpState.y = 0;
   jumpState.vy = 0;
   playerState.x = vehicle.x;
   playerState.z = vehicle.z;
   playerState.heading = vehicle.yaw;
   state.mount(vehicle);
+  // Host/server yang memutuskan; kalau ditolak, vehicleState balasan menurunkan pemain (ParkedVehicles).
+  if (inSession) claimVehicle(vehicle.id, 'mount', { x: vehicle.x, z: vehicle.z, yaw: vehicle.yaw });
   audio.mount(vehicle.kind);
 }
 

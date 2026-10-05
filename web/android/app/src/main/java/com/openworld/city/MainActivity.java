@@ -8,6 +8,7 @@ public class MainActivity extends BridgeActivity {
     public void onCreate(Bundle savedInstanceState) {
         registerPlugin(AiStreamPlugin.class);
         registerPlugin(PlayerDbPlugin.class);
+        registerPlugin(NearbyPlugin.class);
         super.onCreate(savedInstanceState);
     }
 }

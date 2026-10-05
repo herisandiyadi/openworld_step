@@ -40,6 +40,17 @@ export function drawNpcDot(context: CanvasRenderingContext2D, x: number, y: numb
   context.stroke();
 }
 
+/** Titik biru pemain lain di minimap dan peta besar (MULTIPLAYER.md 5). */
+export function drawRemoteDot(context: CanvasRenderingContext2D, x: number, y: number, radius: number): void {
+  context.beginPath();
+  context.arc(x, y, radius, 0, Math.PI * 2);
+  context.fillStyle = '#3fa9f5';
+  context.strokeStyle = '#0b2b44';
+  context.lineWidth = Math.max(1, radius * 0.35);
+  context.fill();
+  context.stroke();
+}
+
 /** Blue square bus-stop marker on the big map. */
 export function drawBusStop(context: CanvasRenderingContext2D, x: number, y: number, size: number): void {
   context.fillStyle = '#3fa9f5';

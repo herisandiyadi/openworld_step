@@ -50,6 +50,9 @@ export function TitleScreen() {
               Main baru
             </button>
           )}
+          <button type="button" className="overlay-button secondary menu-button" onClick={() => setScreen('multiplayer')}>
+            Main bersama
+          </button>
           <button type="button" className="overlay-button secondary menu-button" onClick={() => setScreen('settings')}>
             Pengaturan
           </button>

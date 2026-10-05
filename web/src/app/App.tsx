@@ -19,6 +19,10 @@ import { Hud } from '../ui/Hud';
 import { TitleScreen } from '../ui/TitleScreen';
 import { SettingsScreen } from '../ui/SettingsScreen';
 import { ProfileScreen } from '../ui/ProfileScreen';
+import { MultiplayerMenu } from '../ui/MultiplayerMenu';
+import { RemotePlayers } from '../game/RemotePlayers';
+import { ChatBubbles } from '../ui/ChatBubbles';
+import { NetDriver } from '../game/NetDriver';
 import { usePlayerProfile } from '../state/profile';
 import { useAiSettings } from '../state/aiSettings';
 import { QUALITY_PRESETS, type Quality, useGameStore } from '../state/gameStore';
@@ -54,7 +58,20 @@ export function App() {
   if (screen === 'profile') return <ProfileScreen />;
   if (screen === 'title') return <TitleScreen />;
   if (screen === 'settings') return <SettingsScreen />;
+  if (screen === 'multiplayer') return <MultiplayerScreen />;
   return <Game />;
+}
+
+/** Menu "Main bersama"; Mulai main melanjutkan dunia yang sedang dimuat tanpa menghapus save. */
+function MultiplayerScreen() {
+  const setScreen = useGameStore((state) => state.setScreen);
+  return (
+    <MultiplayerMenu
+      onBack={() => setScreen('title')}
+      onStart={() => setScreen('game')}
+      onOpenSettings={() => setScreen('settings')}
+    />
+  );
 }
 
 /** The 3D world + HUD, mounted only after the player presses Mulai. */
@@ -88,7 +105,9 @@ function Game() {
           <World />
           <PlayerController shadows={preset.shadows} />
           <ParkedVehicles />
+          <RemotePlayers />
         </Suspense>
+        <ChatBubbles />
         <TapToMove />
         <Proximity />
         <AudioFrame />
@@ -98,6 +117,7 @@ function Game() {
       <Hud />
       <LoadingScreen />
       <AudioDirector />
+      <NetDriver />
       {!soakActive && <AutoSave />}
     </div>
   );

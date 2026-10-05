@@ -1,4 +1,8 @@
+import { useState } from 'react';
 import { BigMap } from './BigMap';
+import { ChatPanel } from './ChatPanel';
+import { currentMode } from '../net/netRuntime';
+import { useNetStore } from '../net/netStore';
 import { Joystick } from './Joystick';
 import { Minimap } from './Minimap';
 import { ActionButtons } from './ActionButtons';
@@ -84,6 +88,10 @@ export function Hud() {
   useDisplayPreferences();
   const setGraphics = useGraphicsSettings((state) => state.update);
   const mode = useGameStore((state) => state.mode);
+  const [chatOpen, setChatOpen] = useState(false);
+  // Lencana hanya menghitung kanal yang belum dibuka pemain.
+  const unread = useNetStore((state) => state.unread.session + state.unread.nearby);
+  const inSession = currentMode() !== null;
   const chatNpcId = useGameStore((state) => state.chatNpcId);
   const busMenuOpen = useGameStore((state) => state.busMenuOpen);
   const busRide = useGameStore((state) => state.busRide !== null);
@@ -132,6 +140,18 @@ export function Hud() {
             {stats.fps} FPS · {stats.calls} dc · {(stats.triangles / 1000).toFixed(1)}k tri · {stream.chunks} ch
           </div>
         )}
+        {/* Tombol chat hanya muncul dalam sesi multiplayer; single-player tidak berubah. */}
+        {inSession && (
+          <button
+            type="button"
+            className="hud-button chat-hud-button"
+            aria-label={unread > 0 ? `Chat, ${unread} pesan baru` : 'Chat'}
+            onClick={() => setChatOpen((open) => !open)}
+          >
+            💬
+            {unread > 0 && !chatOpen && <span className="chat-unread-badge">{unread > 9 ? '9+' : unread}</span>}
+          </button>
+        )}
         <button type="button" className="hud-button" aria-label="Jeda" onClick={() => setPaused(true)}>
           II
         </button>
@@ -145,6 +165,7 @@ export function Hud() {
       {mapOpen && <BigMap />}
       {chatNpcId && <NpcChat key={chatNpcId} />}
       {busMenuOpen && <BusMenu />}
+      {chatOpen && inSession && <ChatPanel onClose={() => setChatOpen(false)} />}
       <BusRidePanel />
 
       {soakResult && (
