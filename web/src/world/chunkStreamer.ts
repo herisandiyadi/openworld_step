@@ -8,13 +8,16 @@ import {
   type Material,
   Matrix4,
   Mesh,
-  MeshLambertMaterial,
+  MeshStandardMaterial,
   type Object3D,
 } from 'three';
+import { installWindowShader } from '../render/windowShader';
+import { replaceChunkStreetLamps, removeChunkStreetLamps } from '../render/streetLampRegistry';
 import type { BuiltChunk, ChunkLoadRequest, ChunkWorkerResponse } from './chunkProtocol';
 import type { PropId } from './propSpec';
 import { type ChunkCoord, chunkDistance, planStreaming, withinRadius } from './streaming';
 import { chunkCoord, chunkKey, inWorld, LOAD_RADIUS, UNLOAD_RADIUS } from './worldSpec';
+import { streamingPolicyFor } from '../optimization/streamingPolicy';
 import { rebuildCollision, worldState } from './worldState';
 
 export interface PropPart {
@@ -49,7 +52,6 @@ interface ChunkView {
 
 /** Props are drawn only near the player (cheap distance LOD); terrain + buildings out to LOAD_RADIUS. */
 const PROP_RADIUS = 1;
-const MAX_IN_FLIGHT = 2;
 
 /**
  * Streams chunk JSON through a worker, applies at most one built chunk per frame, and disposes
@@ -67,8 +69,9 @@ export class ChunkStreamer {
   private readonly ready: BuiltChunk[] = [];
   private center: ChunkCoord = { cx: Number.NaN, cz: Number.NaN };
   private readyFired = false;
-  private readonly terrainMaterial = new MeshLambertMaterial({ vertexColors: true });
-  private readonly buildingMaterial = new MeshLambertMaterial();
+  private readonly streamingPolicy = streamingPolicyFor('medium');
+  private readonly terrainMaterial = new MeshStandardMaterial({ vertexColors: true, roughness: 0.92, metalness: 0 });
+  private readonly buildingMaterial = new MeshStandardMaterial({ color: '#ffffff', roughness: 0.78, metalness: 0.04 });
   private readonly unitBox = new BoxGeometry(1, 1, 1);
   private readonly scratch = new Matrix4();
   private readonly placement = new Matrix4();
@@ -80,6 +83,7 @@ export class ChunkStreamer {
     private readonly onError: (message: string) => void,
   ) {
     this.root.name = 'world_chunks';
+    installWindowShader(this.buildingMaterial);
     this.worker = new Worker(new URL('./chunkWorker.ts', import.meta.url), { type: 'module' });
     this.worker.onmessage = (event: MessageEvent<ChunkWorkerResponse>) => {
       const message = event.data;
@@ -99,14 +103,14 @@ export class ChunkStreamer {
     let changed = false;
     if (cx !== this.center.cx || cz !== this.center.cz) {
       this.center = { cx, cz };
-      const plan = planStreaming(this.center, this.views.keys(), this.pending);
+      const plan = planStreaming(this.center, this.views.keys(), this.pending, this.streamingPolicy);
       for (const key of plan.unload) this.unload(key);
       this.queue = plan.load;
       changed = true;
       for (const view of this.views.values()) view.props.visible = chunkDistance(view.coord, this.center) <= PROP_RADIUS;
     }
 
-    while (this.pending.size < MAX_IN_FLIGHT && this.queue.length > 0) {
+    while (this.pending.size < this.streamingPolicy.maxInFlight && this.queue.length > 0) {
       const next = this.queue.shift();
       if (!next || this.views.has(next.key) || this.pending.has(next.key)) continue;
       this.pending.add(next.key);
@@ -169,6 +173,8 @@ export class ChunkStreamer {
   }
 
   private apply(chunk: BuiltChunk): void {
+    const lampEntry = chunk.props.find((entry) => entry.id === 'prop_streetlamp_01');
+    replaceChunkStreetLamps(chunk.key, lampEntry?.matrices ?? []);
     const group = new Group();
     group.name = `chunk_${chunk.key}`;
     const props = new Group();
@@ -255,6 +261,7 @@ export class ChunkStreamer {
     if (!view) return;
     this.root.remove(view.group);
     view.dispose();
+    removeChunkStreetLamps(key);
     this.views.delete(key);
     worldState.chunks.delete(key);
     this.stats.unloads += 1;

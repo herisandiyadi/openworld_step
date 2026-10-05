@@ -1,8 +1,9 @@
 import { useEffect, useRef } from 'react';
 import { useFrame, useThree } from '@react-three/fiber';
-import { Color, Fog, type HemisphereLight, type InstancedMesh, type Material, type Mesh, MeshLambertMaterial, MeshStandardMaterial } from 'three';
+import { Color, Fog, type InstancedMesh, type Material, type Mesh, MeshLambertMaterial, MeshStandardMaterial } from 'three';
 import { ambientAudio } from '../audio/ambientAudio';
 import { DAY_SECONDS, clockLabel, daylightAt } from './dayCycle';
+import { lightingAt } from './lighting';
 import { dayClock, lighting } from './runtime';
 import { useGameStore } from '../state/gameStore';
 
@@ -32,7 +33,6 @@ const isLit = (material: Material): material is LitMaterial =>
  */
 export function DayNight() {
   const scene = useThree((state) => state.scene);
-  const hemiRef = useRef<HemisphereLight>(null);
   const sky = useRef(new Color());
   // Material bohlam yang ditemukan di scene, dengan intensitas aslinya (siang).
   const lamps = useRef(new Map<LitMaterial, number>());
@@ -60,8 +60,9 @@ export function DayNight() {
 
   useFrame((_, delta) => {
     dayClock.t = (dayClock.t + Math.min(delta, 0.05) / DAY_SECONDS) % 1;
-    const { daylight, dusk } = daylightAt(dayClock.t);
+    const { daylight } = lightingAt(dayClock.t);
     const night = 1 - daylight;
+    const dusk = daylightAt(dayClock.t).dusk;
     const store = useGameStore.getState();
     ambientAudio.update(store.district, dayClock.t, Math.min(delta, 0.05), !store.mapOpen);
 
@@ -89,10 +90,9 @@ export function DayNight() {
     if (scene.background instanceof Color) scene.background.copy(color);
     if (scene.fog instanceof Fog) scene.fog.color.copy(color);
     lighting.sun = 0.08 + 0.92 * daylight;
-    if (hemiRef.current) hemiRef.current.intensity = 0.35 + 0.75 * daylight;
     const label = clockLabel(dayClock.t);
     if (label !== store.clock) store.setClock(label);
   });
 
-  return <hemisphereLight ref={hemiRef} args={['#eaf4ff', '#7d8f6a', 1.1]} />;
+  return null;
 }

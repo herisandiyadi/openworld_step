@@ -1,0 +1,5 @@
+export interface VehicleLightSpec { halfLength:number; roofY:number; frontY:number; halfWidth:number; tail:readonly (readonly [number,number,number])[]; }
+export const VEHICLE_LIGHTS={car:{halfLength:2.08,roofY:1.34,frontY:.62,halfWidth:.75,tail:[[ -.58,.58,2.06],[.58,.58,2.06]] as const},moto:{halfLength:.95,roofY:1.05,frontY:.82,halfWidth:.08,tail:[[0,.75,.95]] as const}} as const;
+export interface HeadlightRig { position:[number,number,number]; target:[number,number,number]; angle:number; distance:number; }
+export function headlightRig(spec:VehicleLightSpec):HeadlightRig{return {position:[0,spec.frontY,-spec.halfLength-.05],target:[0,.05,-spec.halfLength-10],angle:.32,distance:14};}
+export function pointInCone(point:[number,number,number],rig:HeadlightRig):boolean { const dx=point[0]-rig.position[0],dy=point[1]-rig.position[1],dz=point[2]-rig.position[2]; const len=Math.hypot(dx,dy,dz); if(len>rig.distance)return false; const tx=rig.target[0]-rig.position[0],ty=rig.target[1]-rig.position[1],tz=rig.target[2]-rig.position[2]; const tl=Math.hypot(tx,ty,tz); return (dx*tx+dy*ty+dz*tz)/(len*tl)>Math.cos(rig.angle); }

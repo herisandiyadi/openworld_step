@@ -1,0 +1,3 @@
+export interface OrmManifest { asset: string; source: { occlusion: string; roughness: string; metallic: string }; packed: string; channels: { R: 'occlusion' | 'roughness' | 'metallic'; G: 'occlusion' | 'roughness' | 'metallic'; B: 'occlusion' | 'roughness' | 'metallic' }; }
+export interface TextureFallback { compressed: string; fallback: string; mime: 'image/ktx2'; }
+export function validateOrmManifest(manifest: OrmManifest): string[] { const errors: string[] = []; if (manifest.channels.R !== 'occlusion') errors.push('occlusion must be in R'); if (manifest.channels.G !== 'roughness') errors.push('roughness must be in G'); if (manifest.channels.B !== 'metallic') errors.push('metallic must be in B'); return errors; }

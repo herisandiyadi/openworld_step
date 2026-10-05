@@ -1,0 +1,12 @@
+{
+  "format": "glb",
+  "unit_meters": 1,
+  "apply_transform": true,
+  "export_yup": true,
+  "export_normals": true,
+  "export_tangents": true,
+  "export_animations": true,
+  "meshopt": true,
+  "static_lightmap_uv": "TEXCOORD_1",
+  "bake_policy": "static-only"
+}

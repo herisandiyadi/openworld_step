@@ -9,6 +9,7 @@ import { Hero } from './Hero';
 import { audio } from '../audio/audioEngine';
 import { PlayerVehicle } from './PlayerVehicle';
 import { MODE_RADIUS, MODE_SPEED, joystickInput, jumpState, keyboardInput, lighting, playerMotion, playerState } from './runtime';
+import { fitShadowCamera, keyLightIntensity } from './lighting';
 import { DRIVE, stepDrive } from './vehicleSpec';
 import { cameraState, rotateCameraInput } from '../camera/followCamera';
 import { CameraRig } from '../camera/CameraRig';
@@ -137,10 +138,11 @@ export function PlayerController({ shadows }: { shadows: boolean }) {
 
     const light = lightRef.current;
     if (light) {
-      light.intensity = SUN_INTENSITY * lighting.sun;
+      light.intensity = keyLightIntensity(lighting.sun);
       const focusX = playerState.x - Math.sin(cameraState.yaw) * SHADOW_LEAD;
       const focusZ = playerState.z - Math.cos(cameraState.yaw) * SHADOW_LEAD;
-      light.position.set(focusX + LIGHT_OFFSET.x, groundY + LIGHT_OFFSET.y, focusZ + LIGHT_OFFSET.z);
+  const shadow = fitShadowCamera({ radius: 18, mapSize: shadows ? 1024 : 1, focusX, focusZ });
+      light.position.set(shadow.focusX + LIGHT_OFFSET.x, groundY + LIGHT_OFFSET.y, shadow.focusZ + LIGHT_OFFSET.z);
       lightTarget.position.set(focusX, groundY, focusZ);
       lightTarget.updateMatrixWorld();
     }
@@ -153,7 +155,7 @@ export function PlayerController({ shadows }: { shadows: boolean }) {
       <directionalLight
         ref={lightRef}
         target={lightTarget}
-        intensity={SUN_INTENSITY}
+        intensity={shadows ? SUN_INTENSITY * lighting.sun : 0}
         castShadow={shadows}
         shadow-mapSize={[1024, 1024]}
         shadow-camera-left={-20}
