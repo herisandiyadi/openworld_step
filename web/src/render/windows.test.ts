@@ -1,5 +1,5 @@
 import { describe, expect, it } from 'vitest';
-import { WINDOW_LIT_RATIO, windowCellLit } from './windows';
+import { WINDOW_LIT_RATIO, windowCellLit, windowEmissionAt } from './windows';
 
 describe('windowCellLit', () => {
   it('is deterministic per cell', () => {
@@ -12,5 +12,13 @@ describe('windowCellLit', () => {
     expect(Math.abs(lit / total - WINDOW_LIT_RATIO)).toBeLessThan(0.06);
     expect(lit).toBeGreaterThan(0);
     expect(lit).toBeLessThan(total);
+  });
+  it('turns emissive off at noon and on gradually at night', () => {
+    expect(windowEmissionAt(1)).toBe(0);
+    expect(windowEmissionAt(0.5)).toBeCloseTo(0.425, 8);
+    expect(windowEmissionAt(0)).toBe(0.85);
+    expect(windowEmissionAt(-1)).toBe(0.85);
+    expect(windowEmissionAt(2)).toBe(0);
+    expect(windowEmissionAt(Number.NaN)).toBe(0);
   });
 });

@@ -59,10 +59,9 @@ const PROFILES: Readonly<Record<LightingState, LightingProfile>> = {
     shadowCasters: 1,
   },
   night: {
-    // Moon key light: cukup untuk bentuk, tidak untuk menerangi jalan.
-    sunIntensity: 0.14,
-    // Blue-hour fill supaya scene tidak pitch black.
-    hemisphereIntensity: 0.3,
+    // Moon/key fill keeps the player and road readable at midnight without flattening daylight contrast.
+    sunIntensity: 0.55,
+    hemisphereIntensity: 1.05,
     skyColor: '#2a3a63',
     groundColor: '#12161f',
     sunColor: '#9fb6e8',
@@ -77,6 +76,12 @@ export function lightingFor(state: LightingState): LightingProfile {
 }
 
 const mix = (a: number, b: number, t: number) => a + (b - a) * t;
+
+/** Minimum readable key-light intensity used for player/road visibility at night. */
+export function keyLightIntensity(daylight: number): number {
+  const normalized = Number.isFinite(daylight) ? Math.min(1, Math.max(0, daylight)) : 0;
+  return mix(PROFILES.night.sunIntensity, PROFILES.day.sunIntensity, normalized);
+}
 
 /** Nilai lighting yang sudah diblend — dipakai per frame supaya transisi tidak pop. */
 export interface LightingSample {

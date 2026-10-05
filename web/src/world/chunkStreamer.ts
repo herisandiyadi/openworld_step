@@ -8,9 +8,11 @@ import {
   type Material,
   Matrix4,
   Mesh,
-  MeshLambertMaterial,
+  MeshStandardMaterial,
   type Object3D,
 } from 'three';
+import { installWindowShader } from '../render/windowShader';
+import { replaceChunkStreetLamps, removeChunkStreetLamps } from '../render/streetLampRegistry';
 import type { BuiltChunk, ChunkLoadRequest, ChunkWorkerResponse } from './chunkProtocol';
 import type { PropId } from './propSpec';
 import { type ChunkCoord, chunkDistance, planStreaming, withinRadius } from './streaming';
@@ -68,8 +70,8 @@ export class ChunkStreamer {
   private center: ChunkCoord = { cx: Number.NaN, cz: Number.NaN };
   private readyFired = false;
   private readonly streamingPolicy = streamingPolicyFor('medium');
-  private readonly terrainMaterial = new MeshLambertMaterial({ vertexColors: true });
-  private readonly buildingMaterial = new MeshLambertMaterial();
+  private readonly terrainMaterial = new MeshStandardMaterial({ vertexColors: true, roughness: 0.92, metalness: 0 });
+  private readonly buildingMaterial = new MeshStandardMaterial({ color: '#ffffff', roughness: 0.78, metalness: 0.04 });
   private readonly unitBox = new BoxGeometry(1, 1, 1);
   private readonly scratch = new Matrix4();
   private readonly placement = new Matrix4();
@@ -81,6 +83,7 @@ export class ChunkStreamer {
     private readonly onError: (message: string) => void,
   ) {
     this.root.name = 'world_chunks';
+    installWindowShader(this.buildingMaterial);
     this.worker = new Worker(new URL('./chunkWorker.ts', import.meta.url), { type: 'module' });
     this.worker.onmessage = (event: MessageEvent<ChunkWorkerResponse>) => {
       const message = event.data;
@@ -170,6 +173,8 @@ export class ChunkStreamer {
   }
 
   private apply(chunk: BuiltChunk): void {
+    const lampEntry = chunk.props.find((entry) => entry.id === 'prop_streetlamp_01');
+    replaceChunkStreetLamps(chunk.key, lampEntry?.matrices ?? []);
     const group = new Group();
     group.name = `chunk_${chunk.key}`;
     const props = new Group();
@@ -256,6 +261,7 @@ export class ChunkStreamer {
     if (!view) return;
     this.root.remove(view.group);
     view.dispose();
+    removeChunkStreetLamps(key);
     this.views.delete(key);
     worldState.chunks.delete(key);
     this.stats.unloads += 1;

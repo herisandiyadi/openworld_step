@@ -1,5 +1,5 @@
 import { describe, expect, it } from 'vitest';
-import { fitShadowCamera, lightingAt, lightingFor, timeState, type LightingState } from './lighting';
+import { fitShadowCamera, keyLightIntensity, lightingAt, lightingFor, timeState, type LightingState } from './lighting';
 
 describe('lighting helpers', () => {
   it('classifies day, dusk, and night continuously', () => {
@@ -7,10 +7,16 @@ describe('lighting helpers', () => {
     expect(timeState(0.25)).toBe('dusk');
     expect(timeState(0)).toBe('night');
   });
+  it('keeps the player key light alive in every time phase, including full night', () => {
+    expect(keyLightIntensity(0)).toBeGreaterThanOrEqual(0.5);
+    expect(keyLightIntensity(0.25)).toBeGreaterThan(keyLightIntensity(0));
+    expect(keyLightIntensity(1)).toBeCloseTo(2.2, 5);
+    expect(keyLightIntensity(Number.NaN)).toBeGreaterThanOrEqual(0.5);
+  });
   it('keeps night readable with cool fill and warm practicals', () => {
     const night = lightingFor('night');
-    expect(night.sunIntensity).toBeLessThan(0.2);
-    expect(night.hemisphereIntensity).toBeGreaterThan(0.2);
+    expect(night.hemisphereIntensity).toBeGreaterThanOrEqual(1);
+    expect(night.sunIntensity).toBeGreaterThanOrEqual(0.5);
     expect(night.streetLightIntensity).toBeGreaterThan(night.sunIntensity);
     expect(night.streetLightColor).toBe('#ffb45c');
   });
