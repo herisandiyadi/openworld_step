@@ -3,6 +3,9 @@
  * Wires updates.ts into the live app with browser/Capacitor-compatible adapters.
  */
 
+import { Capacitor } from '@capacitor/core';
+import { Directory, Filesystem } from '@capacitor/filesystem';
+import { Network } from '@capacitor/network';
 import { Preferences } from '@capacitor/preferences';
 import {
   ContentUpdateManager,
@@ -12,6 +15,12 @@ import {
   type ContentConnectionType,
   type ContentUpdateOptions,
 } from '../content/updates';
+import {
+  CapacitorFilesystemContentStorage,
+  CapacitorNetworkConnectivity,
+  type FilesystemLike,
+  type NetworkPluginLike,
+} from '../content/capacitorAdapters';
 import type { ManifestDef } from '../content/schema';
 import type { ContentPublicKeyProvider } from '../content/security';
 
@@ -119,18 +128,50 @@ function requireManager(): ContentUpdateManager {
   return contentUpdatesRuntime.manager;
 }
 
-export function createDefaultContentUpdateDependencies(): Pick<InitContentUpdateManagerOptions, 'storage' | 'network' | 'connectivity' | 'preferences' | 'publicKeys'> {
-  const connection = (): ContentConnectionType => {
-    if (typeof navigator === 'undefined') return 'unknown';
-    if (!navigator.onLine) return 'none';
-    const effectiveType = (navigator as Navigator & { connection?: { type?: string; effectiveType?: string } }).connection;
-    if (effectiveType?.type === 'cellular' || effectiveType?.effectiveType === '2g' || effectiveType?.effectiveType === '3g' || effectiveType?.effectiveType === '4g') return 'cellular';
-    return effectiveType?.type === 'wifi' ? 'wifi' : 'unknown';
-  };
+export interface ContentAdapterEnvironment {
+  /** Defaults to Capacitor.isNativePlatform(). */
+  isNativePlatform?: () => boolean;
+  /** Defaults to the real @capacitor/filesystem plugin. */
+  filesystem?: FilesystemLike;
+  /** Defaults to the real @capacitor/network plugin. */
+  networkPlugin?: NetworkPluginLike;
+  /** Defaults to window.localStorage. */
+  browserStorage?: Storage;
+  /** Defaults to the navigator.connection heuristic. */
+  browserConnectionType?: () => ContentConnectionType;
+}
+
+/** Real browser connectivity heuristic used when running outside Capacitor. */
+export function browserConnectionType(): ContentConnectionType {
+  if (typeof navigator === 'undefined') return 'unknown';
+  if (!navigator.onLine) return 'none';
+  const connection = (navigator as Navigator & { connection?: { type?: string; effectiveType?: string } }).connection;
+  if (
+    connection?.type === 'cellular' ||
+    connection?.effectiveType === '2g' ||
+    connection?.effectiveType === '3g' ||
+    connection?.effectiveType === '4g'
+  ) {
+    return 'cellular';
+  }
+  return connection?.type === 'wifi' ? 'wifi' : 'unknown';
+}
+
+export function createDefaultContentUpdateDependencies(
+  environment: ContentAdapterEnvironment = {},
+): Pick<InitContentUpdateManagerOptions, 'storage' | 'network' | 'connectivity' | 'preferences' | 'publicKeys'> {
+  const native = (environment.isNativePlatform ?? (() => Capacitor.isNativePlatform()))();
+  const storage: ContentUpdateOptions['storage'] = native
+    ? new CapacitorFilesystemContentStorage(environment.filesystem ?? Filesystem, Directory.Data)
+    : new LocalStorageContentStorage(environment.browserStorage ?? (typeof window !== 'undefined' ? window.localStorage : undefined));
+  const connectivity: ContentUpdateOptions['connectivity'] = native
+    ? new CapacitorNetworkConnectivity(environment.networkPlugin ?? Network)
+    : { getConnectionType: async () => (environment.browserConnectionType ?? browserConnectionType)() };
+
   return {
-    storage: new LocalStorageContentStorage(window.localStorage),
+    storage,
     network: new FetchContentNetwork(),
-    connectivity: { getConnectionType: async () => connection() },
+    connectivity,
     preferences: {
       allowCellularDownloads: async () => {
         const { value } = await Preferences.get({ key: CELLULAR_KEY });

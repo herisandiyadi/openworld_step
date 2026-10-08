@@ -56,6 +56,47 @@ describe('U4 expanded world', () => {
       expect(world.index.busStops.some((stop) => stop.district === district)).toBe(true);
     }
   });
+
+  it('uses validated runtime index dimensions for coordinate and bounds helpers', async () => {
+    const spec = await import('./worldSpec');
+    spec.configureWorldDimensions({ chunkSize: 32, worldChunks: 10 });
+    expect(spec.getWorldDimensions()).toEqual({ chunkSize: 32, worldChunks: 10 });
+    expect(spec.chunkCoord(-160)).toBe(0);
+    expect(spec.chunkCoord(0)).toBe(5);
+    expect(spec.chunkOrigin(9)).toBe(128);
+    expect(spec.inWorld(9, 9)).toBe(true);
+    expect(spec.inWorld(10, 9)).toBe(false);
+    expect(spec.WORLD_BOUNDS).toEqual({ minX: -160, maxX: 160, minZ: -160, maxZ: 160 });
+    spec.configureWorldDimensions({ chunkSize: 64, worldChunks: 16 });
+  });
+
+  it('rejects inconsistent public index metadata before changing runtime dimensions', async () => {
+    const spec = await import('./worldSpec');
+    spec.configureWorldDimensions({ chunkSize: 64, worldChunks: 16 });
+    const before = spec.getWorldDimensions();
+    const chunks = Array.from({ length: 100 }, (_, index) => ({ cx: index % 10, cz: Math.floor(index / 10) }));
+    expect(() => spec.configureWorldDimensionsFromIndex({
+      chunkSize: 32,
+      worldChunks: 10,
+      worldSize: 319,
+      bounds: { minX: -160, maxX: 160, minZ: -160, maxZ: 160 },
+      chunks,
+    })).toThrow('invalid world index dimensions');
+    expect(spec.getWorldDimensions()).toEqual(before);
+  });
+
+  it('rejects unsafe runtime index dimensions without changing the active world', async () => {
+    const spec = await import('./worldSpec');
+    const before = spec.getWorldDimensions();
+    for (const dimensions of [
+      { chunkSize: 0, worldChunks: 16 },
+      { chunkSize: Number.NaN, worldChunks: 16 },
+      { chunkSize: 64, worldChunks: 0 },
+      { chunkSize: 64, worldChunks: 16.5 },
+      { chunkSize: 64, worldChunks: 10_000 },
+    ]) expect(() => spec.configureWorldDimensions(dimensions)).toThrow('invalid world dimensions');
+    expect(spec.getWorldDimensions()).toEqual(before);
+  });
 });
 
 describe('F1/F5 baked world data', () => {

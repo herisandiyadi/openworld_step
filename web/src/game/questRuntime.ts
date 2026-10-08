@@ -116,3 +116,25 @@ export function questCandidatesFor(npcId: string): { questId: string; status: 'l
       return { questId: def.id, status: status as 'locked' | 'available' | 'active' | 'completed' };
     });
 }
+
+/**
+ * Marker shown above an NPC, derived purely from the live quest defs + state:
+ *   • 'turn-in'  – the current incomplete step of an active quest is a talk to
+ *                  this NPC and earlier steps already advanced (step > 0),
+ *   • 'available' – this NPC's active quest opens with a talk to them (step 0),
+ *   • null       – nothing to give or hand in here.
+ * Turn-in wins when both apply, so the player is never sent away.
+ */
+export function questNpcMarkerState(npcId: string): 'available' | 'turn-in' | null {
+  const states = useContentProgress.getState().quests;
+  let available = false;
+  for (const state of states) {
+    if (state.status !== 'active') continue;
+    const def = questDefs.find((d) => d.id === state.questId);
+    const step = def?.steps[state.step];
+    if (step?.type !== 'talk' || step.npc !== npcId) continue;
+    if (state.step > 0) return 'turn-in';
+    available = true;
+  }
+  return available ? 'available' : null;
+}

@@ -16,6 +16,7 @@ import {
   ShopSchema,
 } from '../../src/content/schema';
 import { z } from 'zod';
+import { runFishingBalanceSimulation } from './simulate';
 
 // ---------------------------------------------------------------------------
 // Public types
@@ -153,7 +154,15 @@ export function validatePack(raw: RawPack | Record<string, unknown>): Validation
   }
   if (raw.fishing !== undefined) {
     const fish = FishingSchema.safeParse(raw.fishing);
-    if (!fish.success) violations.push(...fish.error.issues.map(i => `fishing: ${i.path.join('.') || '<root>'}: ${i.message}`));
+    if (!fish.success) {
+      violations.push(...fish.error.issues.map(i => `fishing: ${i.path.join('.') || '<root>'}: ${i.message}`));
+    } else if (raw.economy !== undefined) {
+      const eco = EconomySchema.safeParse(raw.economy);
+      if (eco.success) {
+        const report = runFishingBalanceSimulation(fish.data, eco.data);
+        violations.push(...report.violations);
+      }
+    }
   }
 
   // 4. Cross-reference checks (only when arrays parsed OK)

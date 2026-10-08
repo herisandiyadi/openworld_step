@@ -9,6 +9,7 @@ import {
 } from '../fishing/FishingController';
 import type { FishingLoot } from '../fishing/lootTable';
 import { fishSpecies, type FishingLootConfig } from '../fishing/lootTable';
+import { createFishingVibrator } from '../fishing/fishingHaptics';
 import {
   createSpotReservations,
   releaseSpot,
@@ -16,6 +17,7 @@ import {
   type FishingSpotReservations,
 } from '../fishing/fishingSpots';
 import { useContentProgress } from '../state/contentProgress';
+import { useFishingAccessibility } from '../state/fishingAccessibility';
 import { useGameStore } from '../state/gameStore';
 import { worldState } from '../world/worldState';
 import { dayClock } from './runtime';
@@ -23,6 +25,7 @@ import { routeQuestEvent } from './questRuntime';
 
 const DEFAULT_NOW = (): number => Date.now();
 const DEFAULT_RNG = (): number => Math.random();
+const DEFAULT_VIBRATE = createFishingVibrator();
 
 let spotReservations: FishingSpotReservations = createSpotReservations();
 const activeReservedSpots = new Set<string>();
@@ -74,7 +77,7 @@ function callbacks(overrides: Partial<FishingCallbacks> = {}): FishingCallbacks 
   return {
     now: overrides.now ?? DEFAULT_NOW,
     rng: overrides.rng ?? DEFAULT_RNG,
-    vibrate: overrides.vibrate ?? (() => undefined),
+    vibrate: overrides.vibrate ?? DEFAULT_VIBRATE,
     playSound: overrides.playSound ?? (() => undefined),
   };
 }
@@ -110,6 +113,8 @@ export function startFishing(overrides: Partial<FishingCallbacks> = {}): boolean
   const session = createFishingSession({
     spotId,
     hour,
+    // F3 accessibility preference (Settings → Kontrol) drives the minigame difficulty.
+    easyMode: useFishingAccessibility.getState().settings.easyMode,
     carbonRod: content.inventory.equipped.tool === 'fishing_rod_carbon',
     bait: content.inventory.equipped.tool?.startsWith('bait_') ?? false,
     ...(fishingConfig ? { fishingConfig } : {}),

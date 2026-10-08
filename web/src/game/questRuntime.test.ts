@@ -1,6 +1,6 @@
 import { describe, it, expect, beforeEach } from 'vitest';
 import { useContentProgress } from '../state/contentProgress';
-import { initQuests, routeQuestEvent, activeQuestSummaries, resetQuestRuntime } from './questRuntime';
+import { initQuests, questNpcMarkerState, routeQuestEvent, activeQuestSummaries, resetQuestRuntime } from './questRuntime';
 import type { ContentRegistry } from '../content/registry';
 import { loadContentPack } from '../content/loader';
 import baseManifest from '../../content/base/manifest.json';
@@ -59,5 +59,25 @@ describe('questRuntime', () => {
     const summaries = activeQuestSummaries();
     expect(summaries.some((s) => s.title.includes('Kenalan'))).toBe(true);
     expect(summaries.every((s) => s.status === 'active')).toBe(true);
+  });
+
+  it('computes live quest marker states for NPCs', () => {
+    initQuests(baseRegistry());
+    // A fresh active quest is offered by its giver; a later talk step is a turn-in.
+    expect(questNpcMarkerState('npc_budi')).toBe('available');
+    expect(questNpcMarkerState('npc_sari')).toBeNull();
+    routeQuestEvent({ type: 'talk', npc: 'npc_budi' });
+    expect(questNpcMarkerState('npc_sari')).toBe('turn-in');
+    expect(questNpcMarkerState('npc_budi')).toBeNull();
+
+    // Continue q_kenalan: the live current step moves the turn-in marker along
+    // the chain, while locked quests do not produce markers at their givers.
+    routeQuestEvent({ type: 'talk', npc: 'npc_sari' });
+    expect(questNpcMarkerState('npc_rina')).toBe('turn-in');
+    routeQuestEvent({ type: 'talk', npc: 'npc_rina' });
+    expect(questNpcMarkerState('npc_dewi')).toBe('turn-in');
+    routeQuestEvent({ type: 'talk', npc: 'npc_dewi' });
+    expect(questNpcMarkerState('npc_joko')).toBe('turn-in');
+    expect(questNpcMarkerState('npc_agus')).toBeNull();
   });
 });

@@ -20,6 +20,9 @@
   "dependencies": {
     "@capacitor/android": "7.6.9",
     "@capacitor/core": "7.6.9",
+    "@capacitor/filesystem": "7.1.9",
+    "@capacitor/haptics": "7.0.5",
+    "@capacitor/network": "7.0.4",
     "@capacitor/preferences": "7.0.4",
     "@react-three/drei": "10.7.9",
     "@react-three/fiber": "9.8.1",

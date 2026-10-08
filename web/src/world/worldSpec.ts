@@ -20,13 +20,39 @@ export interface WorldDimensions {
   worldChunks: number;
 }
 
+export interface WorldDimensionMetadata extends WorldDimensions {
+  worldSize: number;
+  bounds: Aabb;
+  chunks: readonly { cx: number; cz: number }[];
+}
+
+const MAX_WORLD_CHUNKS = 256;
 let runtimeDimensions: WorldDimensions = { chunkSize: CHUNK_SIZE, worldChunks: WORLD_CHUNKS };
 export const configureWorldDimensions = (dimensions: WorldDimensions): void => {
-  if (!Number.isInteger(dimensions.worldChunks) || dimensions.worldChunks <= 0 || dimensions.chunkSize <= 0) {
+  if (
+    !Number.isFinite(dimensions.chunkSize) || dimensions.chunkSize <= 0 ||
+    !Number.isInteger(dimensions.worldChunks) || dimensions.worldChunks <= 0 || dimensions.worldChunks > MAX_WORLD_CHUNKS
+  ) {
     throw new Error('invalid world dimensions');
   }
   runtimeDimensions = { ...dimensions };
+  const halfWorld = halfWorldFor(runtimeDimensions);
+  Object.assign(WORLD_BOUNDS, { minX: -halfWorld, maxX: halfWorld, minZ: -halfWorld, maxZ: halfWorld });
 };
+export function configureWorldDimensionsFromIndex(index: WorldDimensionMetadata): void {
+  const dimensions = { chunkSize: index.chunkSize, worldChunks: index.worldChunks };
+  const expectedWorldSize = worldSizeFor(dimensions);
+  const expectedHalf = expectedWorldSize / 2;
+  const boundsAreConsistent =
+    index.bounds.minX === -expectedHalf && index.bounds.maxX === expectedHalf &&
+    index.bounds.minZ === -expectedHalf && index.bounds.maxZ === expectedHalf;
+  const chunksAreConsistent = index.chunks.length === index.worldChunks * index.worldChunks &&
+    index.chunks.every(({ cx, cz }) => Number.isInteger(cx) && Number.isInteger(cz) && inWorldFor(cx, cz, dimensions));
+  if (index.worldSize !== expectedWorldSize || !boundsAreConsistent || !chunksAreConsistent) {
+    throw new Error('invalid world index dimensions');
+  }
+  configureWorldDimensions(dimensions);
+}
 export const getWorldDimensions = (): WorldDimensions => ({ ...runtimeDimensions });
 export const worldSizeFor = (dimensions = runtimeDimensions): number => dimensions.chunkSize * dimensions.worldChunks;
 export const halfWorldFor = (dimensions = runtimeDimensions): number => worldSizeFor(dimensions) / 2;
@@ -231,9 +257,9 @@ export interface WorldIndex {
 export const chunkKey = (cx: number, cz: number): string => `${cx}_${cz}`;
 /** Chunk index containing a world coordinate in the built-in world grid. */
 export const chunkCoord = (value: number): number =>
-  Math.min(WORLD_CHUNKS - 1, Math.max(0, Math.floor((value + HALF_WORLD) / CHUNK_SIZE)));
-export const chunkOrigin = (index: number): number => -HALF_WORLD + index * CHUNK_SIZE;
-export const inWorld = (cx: number, cz: number): boolean => cx >= 0 && cz >= 0 && cx < WORLD_CHUNKS && cz < WORLD_CHUNKS;
+  chunkCoordFor(value, runtimeDimensions);
+export const chunkOrigin = (index: number): number => chunkOriginFor(index, runtimeDimensions);
+export const inWorld = (cx: number, cz: number): boolean => inWorldFor(cx, cz, runtimeDimensions);
 /** Data-driven variants for callers that load a different index at runtime. */
 export const chunkCoordFor = (value: number, dimensions: WorldDimensions): number =>
   Math.min(dimensions.worldChunks - 1, Math.max(0, Math.floor((value + halfWorldFor(dimensions)) / dimensions.chunkSize)));

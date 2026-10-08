@@ -1,4 +1,6 @@
 import type { Vec2 } from '../game/movement';
+import type { NpcDef } from '../content/schema';
+import type { NpcSpawn } from '../world/worldSpec';
 
 export interface NpcScheduleEntry {
   from: number;
@@ -68,6 +70,43 @@ export function npcScheduleState(
 
 export function activeNpcsAt<T extends RuntimeNpc>(npcs: readonly T[], hour: number): T[] {
   return npcs.filter((npc) => npcScheduleState(npc, hour).active);
+}
+
+export interface NpcRosterSource {
+  allNpcs(): readonly NpcDef[];
+}
+
+/**
+ * U2/U3 seam: converts the content registry's NPC definitions into runtime
+ * NpcSpawn-like records (base position = the active schedule entry at `hour`,
+ * so a pure list is enough for renderers) and merges them with the baked world
+ * NPCs. Registry entries overwrite baked ids they redefine, so no id appears
+ * twice; NPCs whose schedule has no active entry at `hour` are omitted.
+ */
+export function mergeNpcRoster(
+  registry: NpcRosterSource,
+  baked: readonly NpcSpawn[],
+  hour: number,
+): NpcSpawn[] {
+  const roster = new Map<string, NpcSpawn>();
+  for (const spawn of baked) roster.set(spawn.id, spawn);
+  for (const def of registry.allNpcs()) {
+    // A registry definition owns its id even while retired/inactive; remove the
+    // baked fallback before deciding whether this NPC exists at the given hour.
+    roster.delete(def.id);
+    if (def.retired) continue;
+    const state = npcScheduleState(def, hour);
+    if (!state.active || !state.target) continue;
+    roster.set(def.id, {
+      id: def.id,
+      asset: 'npc_vendor',
+      name: def.name,
+      x: state.target.x,
+      z: state.target.z,
+      yaw: def.yaw,
+    });
+  }
+  return [...roster.values()];
 }
 
 export function npcNavTarget(

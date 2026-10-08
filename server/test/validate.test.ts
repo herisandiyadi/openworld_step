@@ -114,6 +114,17 @@ describe('validateIncoming', () => {
     expect(validateIncoming(new Uint8Array([9, 9, 9]))).toEqual({ ok: false, reason: 'version' });
   });
 
+  it('accepts exact fishing messages and rejects malformed or oversized fishing state', () => {
+    const payload = new Uint8Array([1, 2, 0, 4, 0, 100, 255, 156]);
+    const state = encodeMessage({ type: 'fishingState', playerId: 0, sequence: 1, payload });
+    expect(validateIncoming(state).ok).toBe(true);
+    expect(validateIncoming(encodeMessage({ type: 'fishingReserve', playerId: 0, spotId: 'lake-east' })).ok).toBe(true);
+    expect(validateIncoming(state.subarray(0, state.length - 1))).toEqual({ ok: false, reason: 'length' });
+    const oversized = new Uint8Array(state.length + 1);
+    oversized.set(state);
+    expect(validateIncoming(oversized)).toEqual({ ok: false, reason: 'length' });
+  });
+
   it('chat 200 karakter lolos, 201 ditolak', () => {
     const ok = encodeMessage({ type: 'chat', channel: 'session', fromId: 0, msgId: 0, timeMs: 0, text: 'a'.repeat(200) });
     expect(validateIncoming(ok).ok).toBe(true);

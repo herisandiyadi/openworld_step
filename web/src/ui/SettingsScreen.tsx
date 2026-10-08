@@ -8,6 +8,7 @@ import {
   validateSettings,
 } from '../state/aiSettings';
 import { useGameStore } from '../state/gameStore';
+import { useFishingAccessibility } from '../state/fishingAccessibility';
 import { BRIGHTNESS_RANGE, DENSITY_LABELS, DENSITY_PRESETS, QUALITY_LABELS, QUALITY_PRESETS, useGraphicsSettings } from '../state/graphicsSettings';
 import { ContentUpdatePanel } from './ContentUpdatePanel';
 import { AudioControls } from './AudioControls';
@@ -26,6 +27,8 @@ export function SettingsScreen() {
   const setScreen = useGameStore((state) => state.setScreen);
   const controls = useGameStore((state) => state.controls);
   const setControls = useGameStore((state) => state.setControls);
+  const easyMode = useFishingAccessibility((state) => state.settings.easyMode);
+  const setAccessibility = useFishingAccessibility((state) => state.update);
   const density = useGraphicsSettings((state) => state.settings.density);
   const quality = useGraphicsSettings((state) => state.settings.quality);
   const brightness = useGraphicsSettings((state) => state.settings.brightness);
@@ -167,6 +170,15 @@ export function SettingsScreen() {
               onChange={(event) => setControls({ minimapRotate: event.target.checked })}
             />
           </label>
+          <label className="audio-row">
+            <span>Memancing: mode mudah (aksesibilitas)</span>
+            <input
+              type="checkbox"
+              checked={easyMode}
+              onChange={(event) => setAccessibility({ easyMode: event.target.checked })}
+            />
+          </label>
+          <p className="appearance-label">Zona hijau 2× lebih lebar, ikan lebih pelan, senar tidak bisa putus.</p>
         </fieldset>
 
         <fieldset className="audio-fieldset visual-options">

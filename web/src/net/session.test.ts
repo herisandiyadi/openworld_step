@@ -1,4 +1,5 @@
 import { beforeEach, describe, expect, it } from 'vitest';
+import { decodeFishingSync, encodeFishingSync, type FishingSyncState } from '../fishing/fishingSync';
 import { DEFAULT_APPEARANCE, type Appearance } from '../state/profile';
 import { HALF_WORLD } from '../world/worldSpec';
 import { LoopbackNetwork } from './loopback';
@@ -71,6 +72,10 @@ interface Client {
   appearances: [number, Appearance][];
   pings: number[];
   send: (data: Uint8Array, reliable: boolean) => void;
+  /** fishingReserve/fishingRelease messages seen by this client. */
+  spotEvents: { type: 'fishingReserve' | 'fishingRelease'; spotId: string; fromId: number }[];
+  /** fishingState payloads seen by this client. */
+  fishingStates: { playerId: number; sequence: number; state: FishingSyncState | null }[];
 }
 
 function addClient(harness: Harness, username: string, appearance = DEFAULT_APPEARANCE): Client {
@@ -83,6 +88,8 @@ function addClient(harness: Harness, username: string, appearance = DEFAULT_APPE
     clocks: [],
     appearances: [],
     pings: [],
+    spotEvents: [],
+    fishingStates: [],
     send: (data, reliable) => transport.send(data, reliable),
     session: new ClientSession(
       transport,
@@ -94,6 +101,11 @@ function addClient(harness: Harness, username: string, appearance = DEFAULT_APPE
         onClock: (timeOfDay) => client.clocks.push(timeOfDay),
         onAppearance: (id, look) => client.appearances.push([id, look]),
         onPing: (rtt) => client.pings.push(rtt),
+        onFishingSpotEvent: (event) => client.spotEvents.push(event),
+        onFishingState: (playerId, sequence, payload) => {
+          const decoded = decodeFishingSync(payload);
+          client.fishingStates.push({ playerId, sequence, state: decoded.ok ? decoded.state : null });
+        },
       },
       clock,
     ),
@@ -409,6 +421,64 @@ describe('jam, penampilan, ping', () => {
     const a = addClient(harness, 'Budi');
     a.session.ping();
     expect(a.pings).toEqual([0]);
+  });
+});
+
+describe('memancing multiplayer (FISHING.md 8)', () => {
+  it('reservasi titik pancing: klaim pertama menang, kedua ditolak, lepas melepaskan', () => {
+    const harness = makeHost();
+    const a = addClient(harness, 'Budi');
+    const b = addClient(harness, 'Sari');
+    a.session.claimFishingSpot('lake-east', 'reserve');
+    expect(harness.host.fishingSpotOwner('lake-east')).toBe(1);
+    expect(b.spotEvents).toEqual([{ type: 'fishingReserve', spotId: 'lake-east', fromId: 1 }]);
+    b.session.claimFishingSpot('lake-east', 'reserve');
+    expect(harness.host.fishingSpotOwner('lake-east')).toBe(1);
+    expect(harness.rejects.at(-1)?.reason).toBe('spot-taken');
+    a.session.claimFishingSpot('lake-east', 'release');
+    expect(harness.host.fishingSpotOwner('lake-east')).toBeNull();
+    expect(b.spotEvents.at(-1)).toEqual({ type: 'fishingRelease', spotId: 'lake-east', fromId: 1 });
+  });
+
+  it('lepas oleh bukan pemilik ditolak dan reservasi hilang saat pemain keluar', () => {
+    const harness = makeHost();
+    const a = addClient(harness, 'Budi');
+    const b = addClient(harness, 'Sari');
+    a.session.claimFishingSpot('lake-east', 'reserve');
+    b.session.claimFishingSpot('lake-east', 'release');
+    expect(harness.rejects.at(-1)?.reason).toBe('not-owner');
+    expect(harness.host.fishingSpotOwner('lake-east')).toBe(1);
+    a.session.close();
+    expect(harness.host.fishingSpotOwner('lake-east')).toBeNull();
+  });
+
+  it('state pancing diteruskan dengan id pengirim dan payload tidak diubah host', () => {
+    const harness = makeHost();
+    const a = addClient(harness, 'Budi');
+    const b = addClient(harness, 'Sari');
+    const state: FishingSyncState = { phase: 'bite', spotIndex: 4, bobberX: -12.25, bobberZ: 31.5 };
+    a.session.sendFishingState(7, encodeFishingSync(state));
+    expect(b.fishingStates).toHaveLength(1);
+    expect(b.fishingStates[0]?.playerId).toBe(1); // host yang menentukan pengirim
+    expect(b.fishingStates[0]?.sequence).toBe(7);
+    expect(b.fishingStates[0]?.state).toEqual(state);
+    expect(a.fishingStates).toEqual([]); // tidak dikirim balik ke pengirim
+  });
+
+  it('payload state pancing yang rusak ditolak sebelum mencapai sesi', () => {
+    const harness = makeHost();
+    const a = addClient(harness, 'Budi');
+    const b = addClient(harness, 'Sari');
+    // Panjang tidak persis: 2 byte terpotong.
+    const good = encodeMessage({ type: 'fishingState', playerId: 0, sequence: 1, payload: encodeFishingSync({ phase: 'wait', spotIndex: 1, bobberX: 0, bobberZ: 0 }) });
+    a.send(good.subarray(0, good.length - 2), false);
+    expect(harness.rejects.at(-1)?.reason).toBe('length');
+    // Berlebih satu byte juga ditolak.
+    const longer = new Uint8Array(good.length + 1);
+    longer.set(good);
+    a.send(longer, false);
+    expect(harness.rejects.at(-1)?.reason).toBe('length');
+    expect(b.fishingStates).toEqual([]);
   });
 });
 

@@ -4,12 +4,13 @@ import { useGLTF } from '@react-three/drei';
 import type { Mesh } from 'three';
 import { assetUrl } from '../app/assets';
 import { AmbientLayer } from '../ambient/AmbientLayer';
-import { Npcs } from '../game/Npc';
+import { contentRuntime } from '../app/contentRuntime';
 import { playerState, sceneRefs } from '../game/runtime';
 import { useGameStore } from '../state/gameStore';
 import { ChunkStreamer, type PropParts } from './chunkStreamer';
 import { Impostors } from './Impostors';
 import { loadNavigation } from './navigation';
+import { NpcLayer } from './NpcLayer';
 import { PROP_IDS } from './propSpec';
 import { chunkAt, loadWorldIndex, worldUrl } from './worldState';
 import { legacyDistrict } from './worldSpec';
@@ -88,7 +89,7 @@ export function World() {
     <>
       {streamer && <primitive object={streamer.root} />}
       <Impostors />
-      <Npcs spawns={index.npcs} />
+      <NpcLayer baked={index.npcs} registry={contentRuntime.registry} />
       <AmbientLayer busStops={index.busStops} />
     </>
   );

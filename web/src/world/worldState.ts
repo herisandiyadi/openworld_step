@@ -3,7 +3,7 @@ import {
   chunkCoord,
   chunkGroundHeight,
   chunkKey,
-  configureWorldDimensions,
+  configureWorldDimensionsFromIndex,
   type FishingSpot,
   type FishStallPoint,
   type TrashBinPoint,
@@ -72,7 +72,7 @@ export function loadWorldIndex(): Promise<WorldIndex> {
       return response.json() as Promise<WorldIndex>;
     })
     .then((index) => {
-      configureWorldDimensions({ chunkSize: index.chunkSize, worldChunks: index.worldChunks });
+      configureWorldDimensionsFromIndex(index);
       worldState.index = index;
       return index;
     });

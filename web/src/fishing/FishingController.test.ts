@@ -103,6 +103,26 @@ describe('FishingController – cast/wait/bite/reel/result cycle', () => {
     expect(sReel.phase).toBe('reel');
   });
 
+  it('emits pull feedback when the fish crosses the green-zone boundary', () => {
+    const vibrate = vi.fn();
+    let t = 0;
+    const s0 = createFishingSession({
+      spotId: 'spot-1',
+      callbacks: { rng: () => 0.5, now: () => t, vibrate, playSound: vi.fn() },
+    });
+    const sCast = advanceFishingSession(s0, { now: s0.castWindowMs + 50 });
+    const sBite = advanceFishingSession(sCast, { now: sCast.phaseEnteredAt + s0.waitMs + 50 });
+    const sReel = advanceFishingSession(sBite, { now: sBite.phaseEnteredAt + 100, pull: true });
+    vibrate.mockClear();
+    const crossed = advanceFishingSession(sReel, {
+      now: sReel.lastStepAt + 100,
+      fishPositionOverride: 0.99,
+    });
+
+    expect(crossed.phase).toBe('reel');
+    expect(vibrate).toHaveBeenCalledWith(10);
+  });
+
   it('transitions to result/missed when the 1.2 s bite window expires without a pull', () => {
     let t = 0;
     const s0 = createFishingSession({

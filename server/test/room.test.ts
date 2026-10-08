@@ -211,6 +211,33 @@ describe('kendaraan', () => {
     expect(b!.conn.ofType('playerLeave')[0]?.playerId).toBe(a!.player.info.id);
   });
 
+  it('relays fishing reservations/state with authoritative ids and cleans reservations', () => {
+    const { room, players, clock } = setup(2);
+    const [a, b] = players as [typeof players[0], typeof players[0]];
+    for (const p of players) p.conn.clear();
+
+    room.handle(a!.player, { type: 'fishingReserve', playerId: 999, spotId: 'lake-east' });
+    expect(room.fishingSpotOwner('lake-east')).toBe(a!.player.info.id);
+    expect(b!.conn.ofType('fishingReserve')[0]).toMatchObject({ playerId: a!.player.info.id, spotId: 'lake-east' });
+    room.handle(b!.player, { type: 'fishingReserve', playerId: 0, spotId: 'lake-east' });
+    expect(room.stats.rejected['spot-taken']).toBe(1);
+
+    const payload = new Uint8Array([1, 2, 0, 4, 0, 100, 255, 156]);
+    room.handle(a!.player, { type: 'fishingState', playerId: 999, sequence: 7, payload });
+    expect(b!.conn.ofType('fishingState')[0]).toEqual({ type: 'fishingState', playerId: a!.player.info.id, sequence: 7, payload });
+    expect(a!.conn.ofType('fishingState')).toHaveLength(0);
+
+    clock.advance(5_000);
+    room.tick();
+    expect(room.fishingSpotOwner('lake-east')).toBeNull();
+    expect(b!.conn.ofType('fishingRelease').at(-1)).toMatchObject({ playerId: 0, spotId: 'lake-east' });
+
+    room.handle(a!.player, { type: 'fishingReserve', playerId: 0, spotId: 'lake-east' });
+    room.leave(a!.player);
+    expect(room.fishingSpotOwner('lake-east')).toBeNull();
+    expect(b!.conn.ofType('fishingRelease').at(-1)).toMatchObject({ playerId: a!.player.info.id, spotId: 'lake-east' });
+  });
+
   it('klaim dari jarak > 6 m ditolak', () => {
     const { room, players } = setup(1);
     const p = players[0]!.player;

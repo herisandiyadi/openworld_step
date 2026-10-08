@@ -1,6 +1,7 @@
 import { describe, it, expect, beforeEach, afterEach, vi } from 'vitest';
 import { useGameStore, NO_NEARBY } from '../state/gameStore';
 import { useContentProgress } from '../state/contentProgress';
+import { useFishingAccessibility } from '../state/fishingAccessibility';
 import {
   startFishing,
   cancelFishing,
@@ -66,6 +67,21 @@ describe('fishingActions', () => {
   it('pullFishing is a no-op when no session is active', () => {
     expect(() => pullFishing()).not.toThrow();
     expect(useGameStore.getState().fishing).toBeNull();
+  });
+
+  it('starts an easy-mode session when the accessibility preference is on', () => {
+    useFishingAccessibility.setState({ settings: { easyMode: true } });
+    startFishing();
+    const session = useGameStore.getState().fishing;
+    expect(session?.easyMode).toBe(true);
+    useFishingAccessibility.setState({ settings: { easyMode: false } });
+  });
+
+  it('starts a normal session when the accessibility preference is off (default)', () => {
+    useFishingAccessibility.setState({ settings: { easyMode: false } });
+    startFishing();
+    const session = useGameStore.getState().fishing;
+    expect(session?.easyMode).toBe(false);
   });
 });
 

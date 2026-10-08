@@ -14,6 +14,15 @@ export interface ContentNetwork {
 export interface ContentStorage {
   read(path: string): Promise<Uint8Array | null>;
   write(path: string, data: Uint8Array): Promise<void>;
+  /**
+   * Atomically publish a file (write to a temp path, then swap).
+   *
+   * Used for the active/pending pointers so a crash mid-write can never leave a
+   * partially written pointer selecting a half-copied pack. Optional: storages
+   * that write atomically by nature (localStorage setItem) may omit it, and
+   * callers fall back to `write`.
+   */
+  writeAtomic?(path: string, data: Uint8Array): Promise<void>;
   /** Removes a file or a directory prefix recursively. */
   remove(path: string): Promise<void>;
 }
@@ -284,7 +293,9 @@ function packRoot(manifest: ManifestDef): string {
 }
 
 async function writePointer(storage: ContentStorage, path: string, value: StoredPointer): Promise<void> {
-  await storage.write(path, textEncoder.encode(JSON.stringify(value)));
+  const bytes = textEncoder.encode(JSON.stringify(value));
+  if (storage.writeAtomic) await storage.writeAtomic(path, bytes);
+  else await storage.write(path, bytes);
 }
 
 async function readPointer(storage: ContentStorage, path: string): Promise<StoredPointer | null> {

@@ -107,6 +107,56 @@ describe('ContentUpdateManager lifecycle', () => {
     expect(td.decode(await nextLaunch.readFile('a.json'))).toBe('base-a');
   });
 
+  it('publishes the active pointer atomically and keeps the previous pack when activation write fails', async () => {
+    const { publicKeys, manifest } = await signer();
+    const base = await manifest('1.0.0', { 'a.json': 'base-a' });
+    const first = await manifest('1.1.0', { 'a.json': 'one-a' });
+    const second = await manifest('1.2.0', { 'a.json': 'two-a' });
+
+    class AtomicMemoryStorage extends MemoryStorage {
+      readonly atomicPaths: string[] = [];
+      failAtomic = false;
+      async writeAtomic(path: string, data: Uint8Array): Promise<void> {
+        this.atomicPaths.push(path);
+        if (this.failAtomic) throw new Error('atomic write failed');
+        await this.write(path, data);
+      }
+    }
+    const storage = new AtomicMemoryStorage();
+    const network = fakeNetwork({
+      'https://cdn.test/latest.json': { manifestUrl: 'manifest.json' },
+      'https://cdn.test/manifest.json': first,
+    }, { 'https://cdn.test/a.json': 'one-a' }, []);
+    const options = {
+      network, storage, publicKeys, latestUrl: 'https://cdn.test/latest.json',
+      appVersion: '1.0.0', supportedWorldVersions: [2],
+      bundled: { manifest: base, readFile: async () => te.encode('base-a') },
+      connectivity: { getConnectionType: async () => 'wifi' as const },
+      preferences: { allowCellularDownloads: async () => true },
+    };
+
+    await new ContentUpdateManager(options).checkAndStageLatest();
+    await expect(new ContentUpdateManager(options).activateStagedOnLaunch()).resolves.toBe(true);
+    expect(storage.atomicPaths).toContain('__content/active.json');
+    expect(storage.atomicPaths).toContain('__content/pending.json');
+    expect(storage.atomicPaths).not.toContain('__content/packs/main-1.1.0/a.json');
+
+    // Stage a broken second update and make the atomic pointer write fail during activation.
+    await new ContentUpdateManager({
+      ...options,
+      network: fakeNetwork({
+        'https://cdn.test/latest.json': { manifestUrl: 'manifest.json' },
+        'https://cdn.test/manifest.json': second,
+      }, { 'https://cdn.test/a.json': 'two-a' }, []),
+    }).checkAndStageLatest();
+    storage.failAtomic = true;
+
+    await expect(new ContentUpdateManager(options).activateStagedOnLaunch()).resolves.toBe(false);
+
+    // The previously activated pack is untouched; a half-written pointer never became active.
+    expect(td.decode(await new ContentUpdateManager(options).readFile('a.json'))).toBe('one-a');
+  });
+
   it('does not download pack files on cellular unless preference allows it', async () => {
     const { publicKeys, manifest } = await signer();
     const base = await manifest('1.0.0', { 'a.json': 'old' });

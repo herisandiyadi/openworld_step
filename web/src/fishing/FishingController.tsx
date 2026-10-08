@@ -118,6 +118,7 @@ function enterBite(session: FishingSession, now: number): FishingSession {
 }
 
 function enterReel(session: FishingSession, now: number): FishingSession {
+  session.callbacks.vibrate(10);
   const species = session.pendingLoot?.species ? fishSpecies(session.pendingLoot.species) : undefined;
   const difficulty = session.pendingLoot?.kind === 'trash' ? 1 : species?.difficulty ?? 1;
   return {
@@ -183,6 +184,14 @@ export function advanceFishingSession(
     random: session.callbacks.rng,
   });
   if (input.pull) session.callbacks.playSound('reel');
+  // FISHING.md 3.1: a short pulse whenever the fish enters or leaves the green zone.
+  const fishInside =
+    session.minigame !== undefined &&
+    Math.abs(nextMinigame.fish.position - nextMinigame.zone.position) <= nextMinigame.zone.size / 2;
+  const wasInside =
+    session.minigame !== undefined &&
+    Math.abs(session.minigame.fish.position - session.minigame.zone.position) <= session.minigame.zone.size / 2;
+  if (fishInside !== wasInside) session.callbacks.vibrate(10);
   if (nextMinigame.phase === 'won') {
     session.callbacks.vibrate(50);
     session.callbacks.playSound('catch');
