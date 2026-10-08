@@ -1,47 +1,26 @@
+import type { CSSProperties } from 'react';
 import type { FishingSession } from './FishingController';
 import type { FishingLoot } from './lootTable';
 import { fishSpecies } from './lootTable';
 
 interface FishingHudProps {
   session: FishingSession;
-  /** Called once to hook the bite and on keyboard/pointer activation during reel. */
+  /** One activation resolves the timing gauge. */
   onPull: () => void;
-  /** Optional hold-state callback for driving reel frames (true while held). */
+  /** Deprecated hold callback retained so existing parents need no migration. */
   onPullChange?: (pulling: boolean) => void;
-  /** Called when the player explicitly cancels. */
   onCancel: () => void;
-  /** Called when the player acknowledges or releases the result card. */
   onRelease?: (loot: FishingLoot | undefined) => void;
 }
 
 const PHASE_STATUS: Record<FishingSession['phase'], string> = {
   cast: 'Melempar senar…',
   wait: 'Menunggu ikan…',
-  bite: 'Umpan dimakan! Tarik!',
-  reel: 'Menarik…',
+  bite: 'Ketuk saat jarum berada di area sasaran!',
+  reel: 'Ketuk saat jarum berada di area sasaran!',
   result: '',
 };
 
-/** Converts reel progress and zone to screen-layout values (0..100). */
-function barLayout(position: number, size: number): { top: string; height: string } {
-  // Bar origin is at top; position=1 is top, position=0 is bottom.
-  const topFraction = 1 - position - size / 2;
-  return {
-    top: `${Math.round(topFraction * 100)}%`,
-    height: `${Math.round(size * 100)}%`,
-  };
-}
-
-/** Thin vertical bar with accessible label. */
-function VerticalBar({ percent, className, label }: { percent: number; className?: string; label: string }) {
-  return (
-    <div className="fishing-bar-track" role="progressbar" aria-valuenow={Math.round(percent * 100)} aria-valuemin={0} aria-valuemax={100} aria-label={label}>
-      <div className={`fishing-bar-fill ${className ?? ''}`} style={{ height: `${Math.round(percent * 100)}%` }} />
-    </div>
-  );
-}
-
-/** Accessible label for the result loot. */
 function lootLabel(loot: FishingLoot | undefined): string {
   if (!loot) return 'Tidak ada hasil';
   if (loot.kind === 'trash') {
@@ -49,82 +28,60 @@ function lootLabel(loot: FishingLoot | undefined): string {
     return labels[loot.id] ?? 'Sampah';
   }
   const species = fishSpecies(loot.id);
-  const kg = loot.weight?.toFixed(2) ?? '?';
-  return `${species?.name ?? loot.id} ${kg} kg`;
+  return `${species?.name ?? loot.id} ${loot.weight?.toFixed(2) ?? '?'} kg`;
 }
 
-/**
- * Overlay HUD for the fishing minigame.
- *
- * Positioned with CSS class "fishing-hud" (caller's stylesheet handles layout).
- * All interactive controls have ≥ 72 px touch targets, aria roles, and
- * keyboard equivalents — playable with one thumb.
- *
- * Does NOT read from gameStore. Session state and callbacks come through props.
- */
-export function FishingHud({ session, onPull, onPullChange, onCancel, onRelease }: FishingHudProps) {
+/** Accessible horizontal timing gauge; CSS hooks are intentionally explicit. */
+export function FishingHud({ session, onPull, onCancel, onRelease }: FishingHudProps) {
   const { phase, minigame, outcome, loot } = session;
-
-  const showBar = phase === 'reel' && minigame !== undefined;
-  const isBite = phase === 'bite';
+  const showGauge = (phase === 'bite' || phase === 'reel') && minigame !== undefined;
   const isResult = phase === 'result';
-
-  /** Tension level: 0 = none, 1 = yellow, 2 = red */
-  const tensionLevel =
-    showBar && minigame
-      ? minigame.tension > 0.9
-        ? 2
-        : minigame.tension > 0.5
-          ? 1
-          : 0
-      : 0;
+  const seconds = minigame ? Math.max(0, minigame.remainingMs / 1000) : 0;
+  const targetLeft = minigame ? (minigame.target.position - minigame.target.size / 2) * 100 : 0;
+  const gaugeVariables = minigame ? {
+    '--fishing-target-left': `${targetLeft}%`,
+    '--fishing-target-width': `${minigame.target.size * 100}%`,
+    '--fishing-needle-left': `${minigame.needle.position * 100}%`,
+  } as CSSProperties : undefined;
 
   return (
     <section className="fishing-hud" aria-label="Minigame memancing">
-      {/* Status label */}
       {!isResult && (
-        <p className="fishing-status" aria-live="polite" aria-atomic="true">
-          {PHASE_STATUS[phase]}
-        </p>
+        <p className="fishing-status" aria-live="polite" aria-atomic="true">{PHASE_STATUS[phase]}</p>
       )}
 
-      {/* Reel bar + fish indicator */}
-      {showBar && minigame && (
-        <div className="fishing-bar-container" aria-label="Bar pancing">
-          {/* Zone (green band) */}
+      {showGauge && minigame && (
+        <div className="fishing-gauge-panel">
           <div
-            className={`fishing-zone${tensionLevel === 2 ? ' fishing-zone-red' : tensionLevel === 1 ? ' fishing-zone-yellow' : ''}`}
-            style={barLayout(minigame.zone.position, minigame.zone.size)}
-            aria-hidden="true"
-          />
-          {/* Fish icon */}
-          <div
-            className="fishing-fish-icon"
-            style={{ bottom: `${Math.round(minigame.fish.position * 100)}%` }}
-            aria-hidden="true"
+            className="fishing-timing-gauge"
+            role="progressbar"
+            aria-label={`Posisi jarum: ${Math.round(minigame.needle.position * 100)}%. Sasaran: ${Math.round(targetLeft)} sampai ${Math.round((minigame.target.position + minigame.target.size / 2) * 100)}%.`}
+            aria-valuemin={0}
+            aria-valuemax={100}
+            aria-valuenow={Math.round(minigame.needle.position * 100)}
+            style={gaugeVariables}
           >
-            🐟
+            <span className="fishing-target-band" aria-hidden="true" />
+            <span className="fishing-needle" aria-hidden="true" />
           </div>
-          {/* Reel meter beside the bar */}
-          <VerticalBar
-            percent={minigame.reel}
-            className="fishing-reel"
-            label={`Gulungan: ${Math.round(minigame.reel * 100)}%`}
-          />
+          <p
+            className="fishing-countdown"
+            role="timer"
+            aria-live="polite"
+            aria-label={`Waktu tersisa: ${seconds.toFixed(1)} detik`}
+          >
+            {seconds.toFixed(1)} dtk
+          </p>
         </div>
       )}
 
-      {/* Result card */}
       {isResult && (
         <div className="fishing-result" role="status" aria-live="assertive" aria-label="Hasil pancingan">
           {outcome === 'caught' && (
-            <>
-              <span className="fishing-result-icon">🎣</span>
-              <span className="fishing-result-text">{lootLabel(loot)}</span>
-            </>
+            <><span className="fishing-result-icon">🎣</span><span className="fishing-result-text">{lootLabel(loot)}</span></>
           )}
-          {outcome === 'missed' && <span className="fishing-result-text">Ikan lepas!</span>}
-          {outcome === 'failed' && <span className="fishing-result-text">Senar putus!</span>}
+          {outcome === 'escaped' && <span className="fishing-result-text">Ikan lepas!</span>}
+          {outcome === 'line-broken' && <span className="fishing-result-text">Senar putus!</span>}
           {outcome === 'cancelled' && <span className="fishing-result-text">Memancing batal.</span>}
           <button
             type="button"
@@ -138,32 +95,19 @@ export function FishingHud({ session, onPull, onPullChange, onCancel, onRelease 
         </div>
       )}
 
-      {/* Pull button (bite window + reel) */}
-      {(isBite || showBar) && (
+      {showGauge && (
         <button
           type="button"
-          className={`fishing-btn fishing-btn-pull${isBite ? ' fishing-btn-pulse' : ''}`}
-          aria-label="Tarik senar"
-          onPointerDown={(e) => { e.preventDefault(); onPull(); onPullChange?.(true); }}
-          onPointerUp={() => onPullChange?.(false)}
-          onPointerLeave={() => onPullChange?.(false)}
-          onKeyDown={(e) => { if (e.key === 'Enter' || e.key === ' ') { onPull(); onPullChange?.(true); } }}
-          onKeyUp={(e) => { if (e.key === 'Enter' || e.key === ' ') onPullChange?.(false); }}
+          className="fishing-btn fishing-btn-pull fishing-btn-tap fishing-btn-pulse"
+          aria-label="Tap/Tarik sekarang"
+          onClick={onPull}
         >
-          🎣 Tarik
+          🎣 Tap / Tarik
         </button>
       )}
 
-      {/* Cancel button — always visible except result */}
       {!isResult && (
-        <button
-          type="button"
-          className="fishing-btn fishing-btn-cancel"
-          aria-label="Batal memancing"
-          onClick={onCancel}
-        >
-          ✕
-        </button>
+        <button type="button" className="fishing-btn fishing-btn-cancel" aria-label="Batal memancing" onClick={onCancel}>✕</button>
       )}
     </section>
   );

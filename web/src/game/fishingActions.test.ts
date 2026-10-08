@@ -1,7 +1,9 @@
-import { describe, it, expect, beforeEach, afterEach, vi } from 'vitest';
+import { beforeEach, describe, expect, it, afterEach, vi } from 'vitest';
 import { useGameStore, NO_NEARBY } from '../state/gameStore';
 import { useContentProgress } from '../state/contentProgress';
 import { useFishingAccessibility } from '../state/fishingAccessibility';
+import { worldState } from '../world/worldState';
+import { playerState } from './runtime';
 import {
   startFishing,
   cancelFishing,
@@ -17,10 +19,24 @@ import type { FishingDef } from '../content/loader';
 
 const spot = { id: 'spot_1', x: 10, z: 10, yaw: 0, water: 'lake' as const };
 
+function streamSpot(): void {
+  worldState.chunks.set('fishing-test', {
+    key: 'fishing-test', cx: 0, cz: 0, district: 'city_park', heights: [], surface: [], colliders: [],
+    fishingSpots: [spot], trashBins: [], fishStalls: [],
+  });
+}
+
 describe('fishingActions', () => {
   beforeEach(() => {
     vi.useFakeTimers();
     vi.setSystemTime(0);
+    worldState.chunks.clear();
+    streamSpot();
+    playerState.x = 2;
+    playerState.z = 3;
+    playerState.heading = 1;
+    playerState.target = { x: 99, z: 99 };
+    playerState.path = [{ x: 88, z: 88 }];
     useGameStore.setState({
       nearby: { ...NO_NEARBY, fishingSpotId: spot.id },
       fishing: null,
@@ -29,10 +45,40 @@ describe('fishingActions', () => {
     useContentProgress.setState({ bag: { capacity: 8, trashStackSize: 5, items: [] }, quests: [] });
   });
 
+  afterEach(() => {
+    setFishingMultiplayerBridge(null);
+    useFishingAccessibility.setState({ settings: { easyMode: false } });
+  });
+
   it('starts a session when a fishing spot is nearby and walking', () => {
     startFishing();
     expect(useGameStore.getState().fishing).not.toBeNull();
     expect(useGameStore.getState().fishing?.spotId).toBe(spot.id);
+  });
+
+  it('carries the streamed spot x/z/yaw in the session for the 3D visuals', () => {
+    startFishing();
+    expect(useGameStore.getState().fishing?.spot).toEqual(spot);
+  });
+
+  it('rotates toward the actual water cast target before locking movement', () => {
+    startFishing();
+    const targetX = spot.x - Math.sin(spot.yaw) * 3.2;
+    const targetZ = spot.z - Math.cos(spot.yaw) * 3.2;
+    const expected = Math.atan2(-(targetX - playerState.x), -(targetZ - playerState.z));
+    expect(playerState.heading).toBeCloseTo(expected);
+    expect(playerState.x).toBe(2);
+    expect(playerState.z).toBe(3);
+    expect(playerState.target).toBeNull();
+    expect(playerState.path).toEqual([]);
+  });
+
+  it('does not rotate or clear movement when spot reservation is rejected', () => {
+    setFishingMultiplayerBridge({ playerId: 'player-b', reserve: () => false, release: () => undefined });
+    expect(startFishing()).toBe(false);
+    expect(playerState.heading).toBe(1);
+    expect(playerState.target).toEqual({ x: 99, z: 99 });
+    expect(playerState.path).toEqual([{ x: 88, z: 88 }]);
   });
 
   it('does not start a session without a nearby spot', () => {
@@ -67,6 +113,19 @@ describe('fishingActions', () => {
   it('pullFishing is a no-op when no session is active', () => {
     expect(() => pullFishing()).not.toThrow();
     expect(useGameStore.getState().fishing).toBeNull();
+  });
+
+  it('publishes every automatic gauge step and tap result through the multiplayer bridge', () => {
+    const publish = vi.fn();
+    setFishingMultiplayerBridge({ playerId: 'player-a', reserve: () => true, release: () => undefined, publish });
+    startFishing({ rng: () => 0.5 });
+    updateFishing(800);
+    const bite = updateFishing(800 + 12_500);
+    expect(bite?.phase).toBe('bite');
+    const moving = updateFishing(800 + 12_600);
+    expect(moving?.minigame?.needle.position).toBeGreaterThan(bite?.minigame?.needle.position ?? 0);
+    pullFishing();
+    expect(publish).toHaveBeenLastCalledWith(expect.objectContaining({ phase: 'result' }));
   });
 
   it('starts an easy-mode session when the accessibility preference is on', () => {
@@ -104,6 +163,13 @@ describe('fishingActions with contentRuntime.fishing', () => {
   beforeEach(() => {
     vi.useFakeTimers();
     vi.setSystemTime(0);
+    worldState.chunks.clear();
+    streamSpot();
+    playerState.x = 2;
+    playerState.z = 3;
+    playerState.heading = 1;
+    playerState.target = { x: 99, z: 99 };
+    playerState.path = [{ x: 88, z: 88 }];
     useGameStore.setState({
       nearby: { ...NO_NEARBY, fishingSpotId: spot.id },
       fishing: null,
@@ -127,7 +193,7 @@ describe('fishingActions with contentRuntime.fishing', () => {
     expect(session?.phase).toBe('bite');
     // Pull at the start of the bite window: the fish weight roll r=0 gives the minimum weight.
     session = updateFishing(Date.now() + 800 + 12_500 + 1, true);
-    expect(session?.phase).toBe('reel');
+    expect(session?.phase).toBe('result');
     expect(session?.pendingLoot?.kind).toBe('fish');
     expect(session?.pendingLoot?.species).toBe('cumi');
     expect(session?.pendingLoot?.weight).toBe(0.2);

@@ -19,8 +19,8 @@ import {
 import { useContentProgress } from '../state/contentProgress';
 import { useFishingAccessibility } from '../state/fishingAccessibility';
 import { useGameStore } from '../state/gameStore';
-import { worldState } from '../world/worldState';
-import { dayClock } from './runtime';
+import { findStreamedFishingSpot } from '../world/worldState';
+import { dayClock, playerState } from './runtime';
 import { routeQuestEvent } from './questRuntime';
 
 const DEFAULT_NOW = (): number => Date.now();
@@ -67,10 +67,7 @@ function publishFishing(session: FishingSession | null): void {
 
 function currentSpot() {
   const id = useGameStore.getState().nearby.fishingSpotId;
-  if (!id) return null;
-  // Streamed world metadata may or may not carry fishing spots; tolerate its absence.
-  const spots = (worldState.index as { fishingSpots?: { id: string; x: number; z: number; yaw: number; water: 'lake' | 'sea' }[] } | null)?.fishingSpots;
-  return spots?.find((spot) => spot.id === id) ?? null;
+  return id ? findStreamedFishingSpot(id) ?? null : null;
 }
 
 function callbacks(overrides: Partial<FishingCallbacks> = {}): FishingCallbacks {
@@ -93,12 +90,21 @@ export function startFishing(overrides: Partial<FishingCallbacks> = {}): boolean
   const state = useGameStore.getState();
   const spot = currentSpot();
   const spotId = state.nearby.fishingSpotId;
-  if (!spotId) return false;
+  if (!spotId || !spot) return false;
   const sideEffects = callbacks(overrides);
   // Clear a stale local claim left by a previous terminal session; active sessions
   // remain protected by canStartFishing before this point.
   spotReservations = releaseSpot(spotReservations, spotId, LOCAL_PLAYER_ID);
   if (!reserveFishingSpot(spotId, sideEffects.now())) return false;
+  // Rotate toward the actual water cast target BEFORE session activates the movement lock,
+  // so the locked heading is correct for the cast animation. Convention: forward = (-sin h, -cos h).
+  const castTargetX = spot.x - Math.sin(spot.yaw) * 3.2;
+  const castTargetZ = spot.z - Math.cos(spot.yaw) * 3.2;
+  if (castTargetX !== playerState.x || castTargetZ !== playerState.z) {
+    playerState.heading = Math.atan2(-(castTargetX - playerState.x), -(castTargetZ - playerState.z));
+  }
+  playerState.target = null;
+  playerState.path = [];
   const content = useContentProgress.getState();
   const hour = dayClock.t * 24;
   const fishingConfig: FishingLootConfig | undefined = contentRuntime.fishing
@@ -112,6 +118,7 @@ export function startFishing(overrides: Partial<FishingCallbacks> = {}): boolean
     : undefined;
   const session = createFishingSession({
     spotId,
+    spot,
     hour,
     // F3 accessibility preference (Settings → Kontrol) drives the minigame difficulty.
     easyMode: useFishingAccessibility.getState().settings.easyMode,
@@ -125,8 +132,6 @@ export function startFishing(overrides: Partial<FishingCallbacks> = {}): boolean
     nearby: { ...state.nearby, vehicleId: null, seatId: null },
   });
   publishFishing(session);
-  // `spot` is read to make the metadata dependency explicit; no renderer reservation is attempted here.
-  void spot;
   return true;
 }
 

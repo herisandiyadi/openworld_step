@@ -21,9 +21,14 @@ const blocked = () => {
   return state.paused || state.mapOpen || state.chatNpcId !== null || state.busMenuOpen || state.soakActive || state.busRide !== null;
 };
 
+/** Shared blocked check for HUD buttons and keyboard shortcuts; fishing hard-locks all player actions. */
+export function isPlayerActionBlocked(): boolean {
+  return blocked() || useGameStore.getState().fishing !== null;
+}
+
 /** Shared by the HUD action buttons and the desktop keyboard shortcuts. */
 export function jump(): void {
-  if (blocked() || useGameStore.getState().mode === 'car') return;
+  if (isPlayerActionBlocked() || useGameStore.getState().mode === 'car') return;
   // Lompat saat duduk = berdiri.
   if (useGameStore.getState().seated) return standUp();
   if (jumpState.y > 0 || jumpState.vy !== 0) return;
@@ -33,7 +38,7 @@ export function jump(): void {
 
 /** Gets on the nearby parked vehicle, or parks the current one and continues on foot. */
 export function toggleVehicle(): void {
-  if (blocked() || useGameStore.getState().seated) return;
+  if (isPlayerActionBlocked() || useGameStore.getState().seated) return;
   const state = useGameStore.getState();
   playerState.target = null;
   playerState.path = [];
@@ -71,7 +76,7 @@ export function toggleVehicle(): void {
 
 /** Duduk di kursi terdekat (nearby.seatId); posisi diinterpolasi 0.4 detik oleh PlayerController. */
 export function sitDown(): void {
-  if (blocked()) return;
+  if (isPlayerActionBlocked()) return;
   const state = useGameStore.getState();
   if (state.seated || state.mode !== 'walk' || jumpState.y > 0 || jumpState.vy !== 0) return;
   const seat = worldState.index?.seats.find((item) => item.id === state.nearby.seatId);
@@ -101,6 +106,7 @@ export function standUp(): void {
 
 /** Tombol Duduk/Berdiri dan shortcut keyboard. */
 export function toggleSeat(): void {
+  if (isPlayerActionBlocked()) return;
   if (useGameStore.getState().seated) standUp();
   else sitDown();
 }

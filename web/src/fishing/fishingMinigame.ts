@@ -1,125 +1,119 @@
 export type FishingPhase = 'active' | 'won' | 'failed';
-export type FishingFailure = 'line-break' | 'reel-empty';
+export type FishingFailure = 'line-break' | 'escaped';
 
 export interface FishingMinigameState {
   readonly phase: FishingPhase;
   readonly failure?: FishingFailure;
-  /** Vertical bar: green zone, position = center in [0,1], size = height fraction. */
-  readonly zone: { readonly position: number; readonly size: number };
-  /** Fish icon in the same [0,1] bar. */
-  readonly fish: { readonly position: number; readonly velocity: number };
-  /** Reel meter in [0,1]; 1 wins, 0 (after some progress) lets the fish escape. */
-  readonly reel: number;
-  /** 0..1; above 0.9 is "red". */
+  readonly target: { readonly position: number; readonly size: number };
+  readonly needle: { readonly position: number; readonly direction: 1 | -1; readonly speed: number };
+  readonly remainingMs: number;
+  readonly durationMs: number;
+  readonly attempts: number;
+  /** Normalized miss tension; large misses on hard species break the line. */
   readonly tension: number;
-  /** Seconds spent at red tension; more than 1 breaks the line. */
-  readonly redTensionSeconds: number;
   readonly easyMode: boolean;
   readonly difficulty: number;
-  /** Base movement speed of the fish icon (halved in easy mode). */
+  /** Compatibility aliases retained for multiplayer/UI callers during migration. */
+  readonly zone: { readonly position: number; readonly size: number };
+  readonly fish: { readonly position: number; readonly velocity: number };
+  readonly reel: number;
+  readonly redTensionSeconds: number;
   readonly fishSpeed: number;
 }
 
 export interface FishingMinigameOptions {
   readonly random?: () => number;
-  /** 1 is calm and light (mujair), 5 is rare and heavy (patin). */
   readonly difficulty?: number;
   readonly easyMode?: boolean;
-  /** Carbon rod widens the green zone by 25%. */
   readonly carbonRod?: boolean;
 }
 
 export interface FishingMinigameInput {
   readonly deltaSeconds: number;
-  readonly pulling: boolean;
-  /** Overrides the simulated fish icon position (scripted patterns, tests). */
+  /** The tap is intentionally separate from movement so one frame cannot double-submit. */
+  readonly tap?: boolean;
+  /** Legacy input is accepted as a tap for callers that still pass pulling. */
+  readonly pulling?: boolean;
   readonly fishPosition?: number;
-  /** Random stream for autonomous fish movement when fishPosition is not given. */
   readonly random?: () => number;
 }
 
 const clamp = (value: number, min = 0, max = 1): number => Math.min(max, Math.max(min, value));
-const ZONE_TRAVEL = 0.35; // zone center units per second
-const REEL_RATE = 0.25; // reel gain per second while the fish is in the zone and pulling
-const DRAIN_RATE = 0.05; // slow reel loss while the fish is outside
-const RED_THRESHOLD = 0.9;
-const LINE_BREAK_SECONDS = 1;
+const BASE_DURATION_MS = 1200;
 
-/** FISHING.md 3.1: hold = zone rises and line reels; fish inside the green zone fills the meter. */
-export function createFishingMinigame(options: FishingMinigameOptions = {}): FishingMinigameState {
-  const difficulty = clamp(Math.round(options.difficulty ?? 1), 1, 5);
-  const easyMode = options.easyMode === true;
-  let size = 0.2;
-  if (options.carbonRod) size *= 1.25;
-  if (easyMode) size *= 2;
-  const random = options.random ?? Math.random;
+function withCompatibility(state: Omit<FishingMinigameState, 'zone' | 'fish' | 'reel' | 'redTensionSeconds' | 'fishSpeed'>): FishingMinigameState {
   return {
-    phase: 'active',
-    zone: { position: 0.5, size: Math.min(size, 1) },
-    fish: { position: clamp(random()), velocity: 0 },
-    reel: 0,
-    tension: 0,
-    redTensionSeconds: 0,
-    easyMode,
-    difficulty,
-    fishSpeed: 0.3 * (easyMode ? 0.5 : 1),
+    ...state,
+    zone: state.target,
+    fish: { position: state.needle.position, velocity: state.needle.direction * state.needle.speed },
+    reel: state.phase === 'won' ? 1 : 0,
+    redTensionSeconds: state.tension > 0.9 ? 1 : 0,
+    fishSpeed: state.needle.speed,
   };
 }
 
-/** Advances the bar-pulling minigame one frame. Pure: returns a new state, never mutates. */
-export function fishingMinigameStep(
-  state: FishingMinigameState,
-  input: FishingMinigameInput,
-): FishingMinigameState {
-  if (state.phase !== 'active' || input.deltaSeconds <= 0) return state;
-  const dt = input.deltaSeconds;
-  const random = input.random ?? Math.random;
+export function createFishingMinigame(options: FishingMinigameOptions = {}): FishingMinigameState {
+  const difficulty = clamp(Math.round(options.difficulty ?? 1), 1, 5);
+  const easyMode = options.easyMode === true;
+  const baseTarget = 0.28 - (difficulty - 1) * 0.035;
+  const targetSize = clamp(baseTarget * (options.carbonRod ? 1.25 : 1) * (easyMode ? 2 : 1), 0.12, 0.85);
+  const durationMs = BASE_DURATION_MS + (easyMode ? 900 : 0) - (difficulty - 1) * 100;
+  const speed = (0.9 + difficulty * 0.16) * (easyMode ? 0.55 : 1);
+  const targetPosition = 0.5;
+  return withCompatibility({
+    phase: 'active',
+    target: { position: targetPosition, size: targetSize },
+    needle: { position: 0, direction: 1, speed },
+    remainingMs: durationMs,
+    durationMs,
+    attempts: 0,
+    tension: 0,
+    easyMode,
+    difficulty,
+  });
+}
 
-  // Fish icon: calmer for light species, wilder for heavy ones; easy mode halves the speed.
-  const maxSpeed = state.fishSpeed * (1 + 0.25 * (state.difficulty - 1));
-  const targetVelocity = (clamp(random()) - 0.5) * 2 * maxSpeed;
-  const velocity = state.fish.velocity * 0.5 + targetVelocity * 0.5;
-  const simulatedPosition = clamp(state.fish.position + velocity * dt);
-  const fishPosition =
-    input.fishPosition === undefined ? simulatedPosition : clamp(input.fishPosition);
-
-  // Zone: hold to raise, release to sink.
-  const zonePosition = clamp(
-    state.zone.position + (input.pulling ? ZONE_TRAVEL : -ZONE_TRAVEL) * dt,
-    state.zone.size / 2,
-    1 - state.zone.size / 2,
-  );
-
-  // Reel: rises while the fish sits inside the (frame-start) zone and the player pulls.
-  const fishInside = Math.abs(fishPosition - state.zone.position) <= state.zone.size / 2;
-  const reelDelta = fishInside && input.pulling ? REEL_RATE : -DRAIN_RATE;
-  const reel = clamp(state.reel + reelDelta * dt);
-
-  // Tension: holding pull with the fish outside the zone heats the line; easy mode never can.
-  const tension =
-    !state.easyMode && input.pulling && !fishInside
-      ? clamp(state.tension + dt)
-      : clamp(state.tension - dt);
-  const redTensionSeconds =
-    !state.easyMode && tension > RED_THRESHOLD ? state.redTensionSeconds + dt : 0;
-
-  const progressed: FishingMinigameState = {
+function moveNeedle(state: FishingMinigameState, deltaSeconds: number): FishingMinigameState {
+  let position = state.needle.position + state.needle.direction * state.needle.speed * deltaSeconds;
+  let direction = state.needle.direction;
+  if (position >= 1) {
+    position = 1 - (position - 1);
+    direction = -1;
+  } else if (position <= 0) {
+    position = -position;
+    direction = 1;
+  }
+  return withCompatibility({
     ...state,
-    zone: { position: zonePosition, size: state.zone.size },
-    fish: { position: fishPosition, velocity },
-    reel,
-    tension,
-    redTensionSeconds,
-  };
+    needle: { ...state.needle, position: clamp(position), direction },
+    remainingMs: Math.max(0, state.remainingMs - deltaSeconds * 1000),
+  });
+}
 
-  // Red tension for more than a second snaps the line (never in easy mode).
-  if (!state.easyMode && redTensionSeconds > LINE_BREAK_SECONDS) {
-    return { ...progressed, phase: 'failed', failure: 'line-break' };
-  }
-  if (reel >= 1) return { ...progressed, reel: 1, phase: 'won' };
-  // Emptying the meter loses the fish, but only once some line has been reeled in.
-  if (reel <= 0 && state.reel > 0) {
-    return { ...progressed, reel: 0, phase: 'failed', failure: 'reel-empty' };
-  }
-  return progressed;
+/** Advances the automatic horizontal needle sweep. Pure and timer-free. */
+export function fishingMinigameStep(state: FishingMinigameState, input: FishingMinigameInput): FishingMinigameState {
+  if (state.phase !== 'active' || input.deltaSeconds <= 0) return state;
+  const moved = moveNeedle(state, input.deltaSeconds);
+  if (moved.remainingMs <= 0) return withCompatibility({ ...moved, remainingMs: 0, phase: 'failed', failure: 'escaped' });
+  if (input.tap || input.pulling) return fishingMinigameTap(moved);
+  return moved;
+}
+
+/** Resolves the single player tap against the current needle position. */
+export function fishingMinigameTap(state: FishingMinigameState): FishingMinigameState {
+  if (state.phase !== 'active') return state;
+  const attempts = state.attempts + 1;
+  const distance = Math.abs(state.needle.position - state.target.position);
+  const inTarget = distance <= state.target.size / 2;
+  if (inTarget) return withCompatibility({ ...state, phase: 'won', attempts, remainingMs: state.remainingMs });
+  const missRatio = distance / Math.max(state.target.size / 2, 0.001);
+  const tension = clamp(missRatio / 2);
+  const lineBreak = !state.easyMode && state.difficulty >= 4 && missRatio >= 2;
+  return withCompatibility({
+    ...state,
+    phase: 'failed',
+    failure: lineBreak ? 'line-break' : 'escaped',
+    attempts,
+    tension,
+  });
 }

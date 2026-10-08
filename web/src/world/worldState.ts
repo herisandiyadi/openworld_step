@@ -41,6 +41,18 @@ export const worldState: {
 export const chunkAt = (x: number, z: number): ChunkRecord | undefined =>
   worldState.chunks.get(chunkKey(chunkCoord(x), chunkCoord(z)));
 
+/**
+ * Linear scan of streamed chunks to find a fishing spot by id.
+ * POIs live in `worldState.chunks[]`, not `worldState.index`.
+ */
+export function findStreamedFishingSpot(id: string): import('./worldSpec').FishingSpot | undefined {
+  for (const chunk of worldState.chunks.values()) {
+    const spot = chunk.fishingSpots.find((s) => s.id === id);
+    if (spot) return spot;
+  }
+  return undefined;
+}
+
 /** Walkable ground height; 0 where the chunk is not streamed in (only happens far from the player). */
 export function groundHeightAt(x: number, z: number): number {
   const chunk = chunkAt(x, z);

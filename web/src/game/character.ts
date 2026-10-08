@@ -1,6 +1,6 @@
 import { useEffect, useMemo } from 'react';
 import { useGLTF } from '@react-three/drei';
-import { type AnimationAction, AnimationMixer, LoopRepeat, type Mesh, type Object3D } from 'three';
+import { type AnimationAction, AnimationMixer, LoopOnce, LoopRepeat, type Mesh, type Object3D } from 'three';
 import { clone } from 'three/examples/jsm/utils/SkeletonUtils.js';
 import { type AssetId, assetUrl } from '../app/assets';
 
@@ -44,6 +44,20 @@ export class ClipPlayer {
   play(action: AnimationAction, fadeSeconds = 0.2): void {
     if (action === this.current) return;
     action.reset().setLoop(LoopRepeat, Infinity).fadeIn(fadeSeconds).play();
+    this.current?.fadeOut(fadeSeconds);
+    this.current = action;
+  }
+
+  /**
+   * Cross-fades into a one-shot clip (e.g. anim_Cast). The one-shot becomes the current
+   * action, so a later play() call fades it out normally; without this, casting from a
+   * run would pop instantly instead of blending, and the looping action would keep playing
+   * under the one-shot.
+   */
+  playOnce(action: AnimationAction, fadeSeconds = 0.2): void {
+    if (action === this.current) return;
+    action.reset().setLoop(LoopOnce, 1).clampWhenFinished = true;
+    action.fadeIn(fadeSeconds).play();
     this.current?.fadeOut(fadeSeconds);
     this.current = action;
   }

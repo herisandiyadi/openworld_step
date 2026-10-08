@@ -1,11 +1,10 @@
-import { createFishingMinigame, fishingMinigameStep, type FishingMinigameState } from './fishingMinigame';
+import { createFishingMinigame, fishingMinigameStep, fishingMinigameTap, type FishingMinigameState } from './fishingMinigame';
 import { fishSpecies, lootTable, type FishingLoot, type FishingLootConfig } from './lootTable';
 
 export type FishingSessionPhase = 'cast' | 'wait' | 'bite' | 'reel' | 'result';
-export type FishingOutcome = 'caught' | 'missed' | 'failed' | 'cancelled';
+export type FishingOutcome = 'caught' | 'escaped' | 'line-broken' | 'cancelled';
 export type FishingSound = 'cast' | 'splash' | 'bite' | 'reel' | 'line-break' | 'catch';
 
-/** All side effects are injected, keeping the state machine deterministic and testable. */
 export interface FishingCallbacks {
   readonly rng: () => number;
   readonly now: () => number;
@@ -15,6 +14,8 @@ export interface FishingCallbacks {
 
 export interface FishingSessionOptions {
   readonly spotId: string;
+  /** Streamed spot geometry snapshot; keeps 3D visuals correct even if the chunk streams out. */
+  readonly spot?: { id: string; x: number; z: number; yaw: number };
   readonly easyMode?: boolean;
   readonly carbonRod?: boolean;
   readonly bait?: boolean;
@@ -27,10 +28,13 @@ export interface FishingSessionOptions {
 export interface FishingSession {
   readonly phase: FishingSessionPhase;
   readonly spotId: string;
+  /** Snapshot of the streamed spot geometry for the visuals; taken once at start. */
+  readonly spot?: { id: string; x: number; z: number; yaw: number };
   readonly phaseEnteredAt: number;
   readonly lastStepAt: number;
   readonly castWindowMs: number;
   readonly waitMs: number;
+  /** Kept for wire/store compatibility; the timing gauge owns the active deadline. */
   readonly biteWindowMs: number;
   readonly easyMode: boolean;
   readonly carbonRod: boolean;
@@ -47,8 +51,8 @@ export interface FishingSession {
 
 export interface FishingAdvanceInput {
   readonly now?: number;
+  /** A rising-edge action: one press resolves the gauge; holding is not required. */
   readonly pull?: boolean;
-  /** Deterministic integration/test hook; production callers omit it. */
   readonly fishPositionOverride?: number;
 }
 
@@ -56,7 +60,6 @@ const CAST_WINDOW_MS = 700;
 export const BITE_WINDOW_MS = 1200;
 const MIN_WAIT_MS = 3000;
 const MAX_WAIT_MS = 12000;
-
 const noop = (): void => undefined;
 
 function callbacks(overrides: Partial<FishingCallbacks> | undefined): FishingCallbacks {
@@ -68,7 +71,6 @@ function callbacks(overrides: Partial<FishingCallbacks> | undefined): FishingCal
   };
 }
 
-/** Starts an attempt in the cast animation phase. No timers are allocated. */
 export function createFishingSession(options: FishingSessionOptions): FishingSession {
   const sideEffects = callbacks(options.callbacks);
   const now = sideEffects.now();
@@ -78,6 +80,7 @@ export function createFishingSession(options: FishingSessionOptions): FishingSes
   return {
     phase: 'cast',
     spotId: options.spotId,
+    ...(options.spot ? { spot: options.spot } : {}),
     phaseEnteredAt: now,
     lastStepAt: now,
     castWindowMs: CAST_WINDOW_MS,
@@ -109,25 +112,21 @@ function enterBite(session: FishingSession, now: number): FishingSession {
     catchesAtSpot: session.catchesAtSpot,
     config: session.fishingConfig,
   });
-  // Accessibility mode trades maximum catch value for a gentler minigame.
   if (session.easyMode && pendingLoot.kind === 'fish' && pendingLoot.weight !== undefined) {
-    const species = fishSpecies(pendingLoot.species ?? pendingLoot.id);
+    const species = fishSpecies(pendingLoot.species ?? pendingLoot.id, session.fishingConfig?.species);
     if (species) pendingLoot = { ...pendingLoot, weight: Math.min(pendingLoot.weight, species.maxWeight * 0.7) };
   }
-  return { ...session, phase: 'bite', phaseEnteredAt: now, lastStepAt: now, pendingLoot };
-}
-
-function enterReel(session: FishingSession, now: number): FishingSession {
-  session.callbacks.vibrate(10);
-  const species = session.pendingLoot?.species ? fishSpecies(session.pendingLoot.species) : undefined;
-  const difficulty = session.pendingLoot?.kind === 'trash' ? 1 : species?.difficulty ?? 1;
+  const species = pendingLoot.kind === 'fish'
+    ? fishSpecies(pendingLoot.species ?? pendingLoot.id, session.fishingConfig?.species)
+    : undefined;
+  const difficulty = pendingLoot.kind === 'trash' ? 1 : species?.difficulty ?? 1;
   return {
     ...session,
-    phase: 'reel',
+    phase: 'bite',
     phaseEnteredAt: now,
     lastStepAt: now,
+    pendingLoot,
     minigame: createFishingMinigame({
-      random: session.callbacks.rng,
       difficulty,
       easyMode: session.easyMode,
       carbonRod: session.carbonRod,
@@ -146,65 +145,46 @@ function finish(session: FishingSession, now: number, outcome: FishingOutcome): 
   };
 }
 
-/**
- * Advances one frame. The caller owns the scheduling (R3F frame, interval, or tests),
- * so this module cannot leak timers when the component unmounts.
- */
-export function advanceFishingSession(
-  session: FishingSession,
-  input: FishingAdvanceInput = {},
-): FishingSession {
+function resolveGauge(session: FishingSession, now: number, minigame: FishingMinigameState): FishingSession {
+  if (minigame.phase === 'active') return { ...session, minigame, lastStepAt: now };
+  session.callbacks.vibrate(10);
+  if (minigame.phase === 'won') {
+    session.callbacks.vibrate(50);
+    session.callbacks.playSound('catch');
+    return finish({ ...session, minigame }, now, 'caught');
+  }
+  if (minigame.failure === 'line-break') {
+    session.callbacks.playSound('line-break');
+    return finish({ ...session, minigame }, now, 'line-broken');
+  }
+  return finish({ ...session, minigame }, now, 'escaped');
+}
+
+/** Advances one frame. Scheduling remains owned by the caller, so no timers can leak. */
+export function advanceFishingSession(session: FishingSession, input: FishingAdvanceInput = {}): FishingSession {
   if (session.phase === 'result') return session;
   const now = input.now ?? session.callbacks.now();
-
   if (session.phase === 'cast') {
     if (now - session.phaseEnteredAt < session.castWindowMs) return { ...session, lastStepAt: now };
     return enterWait(session, now);
   }
-
   if (session.phase === 'wait') {
     if (now - session.phaseEnteredAt < session.waitMs) return { ...session, lastStepAt: now };
     return enterBite(session, now);
   }
 
-  if (session.phase === 'bite') {
-    const elapsed = now - session.phaseEnteredAt;
-    if (elapsed > session.biteWindowMs) return finish(session, now, 'missed');
-    if (input.pull) return enterReel(session, now);
-    return { ...session, lastStepAt: now };
-  }
-
   const minigame = session.minigame;
-  if (!minigame) return finish(session, now, 'failed');
-  const deltaSeconds = Math.max(0, Math.min((now - session.lastStepAt) / 1000, 0.25));
-  const nextMinigame = fishingMinigameStep(minigame, {
-    deltaSeconds,
-    pulling: input.pull === true,
-    fishPosition: input.fishPositionOverride,
-    random: session.callbacks.rng,
-  });
-  if (input.pull) session.callbacks.playSound('reel');
-  // FISHING.md 3.1: a short pulse whenever the fish enters or leaves the green zone.
-  const fishInside =
-    session.minigame !== undefined &&
-    Math.abs(nextMinigame.fish.position - nextMinigame.zone.position) <= nextMinigame.zone.size / 2;
-  const wasInside =
-    session.minigame !== undefined &&
-    Math.abs(session.minigame.fish.position - session.minigame.zone.position) <= session.minigame.zone.size / 2;
-  if (fishInside !== wasInside) session.callbacks.vibrate(10);
-  if (nextMinigame.phase === 'won') {
-    session.callbacks.vibrate(50);
-    session.callbacks.playSound('catch');
-    return finish({ ...session, minigame: nextMinigame }, now, 'caught');
+  if (!minigame) return finish(session, now, 'escaped');
+  // Preserve the historical reel phase if one is restored from an older saved session.
+  const activeSession = session.phase === 'reel' ? { ...session, phase: 'bite' as const } : session;
+  if (input.pull) {
+    activeSession.callbacks.playSound('reel');
+    return resolveGauge(activeSession, now, fishingMinigameTap(minigame));
   }
-  if (nextMinigame.phase === 'failed') {
-    if (nextMinigame.failure === 'line-break') session.callbacks.playSound('line-break');
-    return finish({ ...session, minigame: nextMinigame }, now, 'failed');
-  }
-  return { ...session, minigame: nextMinigame, lastStepAt: now };
+  const deltaSeconds = Math.max(0, (now - session.lastStepAt) / 1000);
+  return resolveGauge(activeSession, now, fishingMinigameStep(minigame, { deltaSeconds }));
 }
 
-/** Cancels an active attempt and preserves a terminal result already shown. */
 export function cancelFishingSession(session: FishingSession): FishingSession {
   if (session.phase === 'result') return session;
   return finish(session, session.callbacks.now(), 'cancelled');
