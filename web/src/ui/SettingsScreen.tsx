@@ -9,7 +9,17 @@ import {
 } from '../state/aiSettings';
 import { useGameStore } from '../state/gameStore';
 import { BRIGHTNESS_RANGE, DENSITY_LABELS, DENSITY_PRESETS, QUALITY_LABELS, QUALITY_PRESETS, useGraphicsSettings } from '../state/graphicsSettings';
+import { ContentUpdatePanel } from './ContentUpdatePanel';
 import { AudioControls } from './AudioControls';
+import {
+  activeContentManifest,
+  checkAndStageContentUpdate,
+  contentUpdatesRuntime,
+  getAllowCellularDownloads,
+  rollbackContentToBundled,
+  setAllowCellularDownloads,
+  subscribeToContentUpdateStatus,
+} from '../app/contentUpdatesRuntime';
 
 /** AI endpoint settings (base URL, API key, model), saved on the device with Capacitor Preferences. */
 export function SettingsScreen() {
@@ -28,9 +38,17 @@ export function SettingsScreen() {
   const [error, setError] = useState<string | null>(null);
   const [status, setStatus] = useState<ConnectionResult | null>(null);
   const [busy, setBusy] = useState(false);
+  const [contentVersion, setContentVersion] = useState('...');
+  const [allowCellular, setAllowCellular] = useState(false);
+  const [updateStatus, setUpdateStatus] = useState(contentUpdatesRuntime.status);
   const ids = { url: useId(), key: useId(), model: useId(), status: useId(), brightness: useId() };
 
   useEffect(() => setForm(stored), [stored]);
+  useEffect(() => {
+    void activeContentManifest().then((manifest) => setContentVersion(manifest.version)).catch(() => setContentVersion('unknown'));
+    void getAllowCellularDownloads().then(setAllowCellular).catch(() => undefined);
+    return subscribeToContentUpdateStatus(setUpdateStatus);
+  }, []);
 
   const update = (field: keyof AiSettings) => (event: { target: { value: string } }) => {
     setForm((current) => ({ ...current, [field]: event.target.value }));
@@ -199,6 +217,22 @@ export function SettingsScreen() {
             ))}
           </div>
           <p className="appearance-label">Makin ramai, makin banyak kendaraan dan pejalan kaki (butuh HP lebih kuat).</p>
+        </fieldset>
+
+        <fieldset className="audio-fieldset">
+          <legend>Pembaruan Konten</legend>
+          <ContentUpdatePanel
+            activeVersion={contentVersion}
+            status={updateStatus}
+            allowCellular={allowCellular}
+            onCheck={async () => { await checkAndStageContentUpdate(); }}
+            onRollback={async () => { await rollbackContentToBundled(); }}
+            onToggleCellular={() => {
+              const next = !allowCellular;
+              setAllowCellular(next);
+              void setAllowCellularDownloads(next);
+            }}
+          />
         </fieldset>
 
         <p id={ids.status} className={`settings-status${error || (status && !status.ok) ? ' error' : ''}`} role="status" aria-live="polite">

@@ -190,5 +190,5 @@ export function travelTo(stop: BusStop): void {
   jumpState.vy = 0;
   markExplored(stop.x, stop.z);
   audio.bus();
-  useGameStore.setState({ busMenuOpen: false, busRide: null, nearby: { npcId: null, vehicleId: null, busStopId: stop.id, seatId: null } });
+  useGameStore.setState({ busMenuOpen: false, busRide: null, nearby: { npcId: null, vehicleId: null, busStopId: stop.id, seatId: null, shopId: null, fishingSpotId: null, trashBinId: null, fishStallId: null } });
 }

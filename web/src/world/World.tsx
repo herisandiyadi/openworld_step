@@ -12,6 +12,7 @@ import { Impostors } from './Impostors';
 import { loadNavigation } from './navigation';
 import { PROP_IDS } from './propSpec';
 import { chunkAt, loadWorldIndex, worldUrl } from './worldState';
+import { legacyDistrict } from './worldSpec';
 
 const STATS_INTERVAL = 0.5;
 
@@ -64,7 +65,10 @@ export function World() {
   }, [parts, setWorldReady]);
 
   useEffect(() => {
-    loadNavigation(index.navmesh).catch((error: unknown) => console.error('[world] navmesh', error));
+    // navmesh is now a per-tile object; navigation.ts reads the directory and pattern from it.
+    loadNavigation(index.navmesh.directory, index.navmesh.pattern, index.navmesh.loadRadius).catch(
+      (error: unknown) => console.error('[world] navmesh', error),
+    );
   }, [index.navmesh]);
 
   useFrame((_, delta) => {
@@ -76,7 +80,8 @@ export function World() {
     const { stats } = streamer;
     setStream({ chunks: stats.loaded, pending: stats.pending, applyMs: stats.maxApplyMs });
     const district = chunkAt(playerState.x, playerState.z)?.district ?? null;
-    if (district !== useGameStore.getState().district) setDistrict(district);
+    const runtimeDistrict = district ? legacyDistrict(district) : null;
+    if (runtimeDistrict !== useGameStore.getState().district) setDistrict(runtimeDistrict);
   });
 
   return (

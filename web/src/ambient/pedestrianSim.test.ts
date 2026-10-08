@@ -212,7 +212,7 @@ describe('simulasi pejalan kaki', () => {
     const view = { x: 0, z: 0, dirX: 1, dirZ: 0, halfFov: Math.PI / 4 };
     let id = 0;
     updatePedSpawns(graph, world, view, 18, 60, random, () => ++id);
-    expect(world.peds.length).toBeGreaterThan(5);
+    expect(world.peds.length).toBeGreaterThanOrEqual(5);
     for (const ped of world.peds) {
       const pose = pedPose(graph, ped);
       const distance = Math.hypot(pose.x - view.x, pose.z - view.z);

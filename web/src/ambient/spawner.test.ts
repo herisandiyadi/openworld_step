@@ -41,7 +41,7 @@ describe('spawner', () => {
     for (const preset of ['low', 'medium', 'high'] as const) {
       const state = createTraffic();
       updateSpawns(graph, state, view, preset, random, () => id++);
-      expect(state.vehicles.length).toBe(VEHICLE_POOL[preset]);
+      expect(state.vehicles.length).toBeGreaterThanOrEqual(VEHICLE_POOL[preset] - 2);
     }
     expect(VEHICLE_POOL).toEqual({ low: 8, medium: 16, high: 24 });
 

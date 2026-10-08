@@ -18,6 +18,14 @@ import { worldState } from '../world/worldState';
 import { useGraphicsSettings } from '../state/graphicsSettings';
 import { isDebugOverlayVisible } from '../polish/debugOverlay';
 import { useDisplayPreferences } from './useDisplayPreferences';
+import { useContentProgress } from '../state/contentProgress';
+import { ContentOverlays } from './ContentOverlays';
+import { QuestTracker } from './QuestTracker';
+import { bagCapacityFor } from '../game/economyActions';
+import { openNearbyBag } from '../game/economyActions';
+import { bagSlotsUsed } from '../economy/bag';
+import type { QuestTrackerEntry } from './QuestTracker';
+import { questDefinitions } from '../game/questRuntime';
 
 /** Renderer stats are for developers only; production needs ?debug-overlay. */
 const SHOW_DEBUG_OVERLAY =
@@ -89,6 +97,7 @@ export function Hud() {
   const setGraphics = useGraphicsSettings((state) => state.update);
   const mode = useGameStore((state) => state.mode);
   const [chatOpen, setChatOpen] = useState(false);
+  const [jobBoardOpen, setJobBoardOpen] = useState(false);
   // Lencana hanya menghitung kanal yang belum dibuka pemain.
   const unread = useNetStore((state) => state.unread.session + state.unread.nearby);
   const inSession = currentMode() !== null;
@@ -111,12 +120,28 @@ export function Hud() {
   const soakResult = useGameStore((state) => state.soakResult);
   const setSoakActive = useGameStore((state) => state.setSoakActive);
   const setSoakResult = useGameStore((state) => state.setSoakResult);
+  const coins = useContentProgress((state) => state.coins);
+  const bag = useContentProgress((state) => state.bag);
+  const quests = useContentProgress((state) => state.quests);
+  const questTracker: QuestTrackerEntry[] = quests.map((quest) => ({
+    id: quest.questId,
+    title: questDefinitions().find((d) => d.id === quest.questId)?.title ?? quest.questId,
+    stepText: questDefinitions().find((d) => d.id === quest.questId)?.steps[quest.step]?.text,
+    status: quest.status === 'completed' ? 'completed' : 'active',
+  }));
+  const bagUsed = bagSlotsUsed(bag.capacity === bagCapacityFor() ? bag : { ...bag, capacity: bagCapacityFor() });
 
   return (
     <div className="hud">
       <div className="hud-top-left">
         <Minimap />
         <div className="status-panel">
+          <div className="hud-currency-row">
+            <span className="hud-currency" aria-label={`${coins} koin`}>🪙 {coins}</span>
+            <button type="button" className="hud-bag-button" aria-label={`Buka tas, ${bagUsed} dari ${bagCapacityFor()} slot`} onClick={openNearbyBag}>
+              🎒 {bagUsed}/{bagCapacityFor()}
+            </button>
+          </div>
           <div className="stamina" aria-label="Stamina">
             <div className="stamina-fill" style={{ width: '100%' }} />
           </div>
@@ -152,6 +177,9 @@ export function Hud() {
             {unread > 0 && !chatOpen && <span className="chat-unread-badge">{unread > 9 ? '9+' : unread}</span>}
           </button>
         )}
+        <button type="button" className="hud-button" aria-label="Buka papan pekerjaan" onClick={() => setJobBoardOpen(true)}>
+          📋
+        </button>
         <button type="button" className="hud-button" aria-label="Jeda" onClick={() => setPaused(true)}>
           II
         </button>
@@ -161,6 +189,8 @@ export function Hud() {
       {!busRide && <Joystick />}
 
       <ActionButtons />
+
+      <ContentOverlays jobBoardOpen={jobBoardOpen} onCloseJobBoard={() => setJobBoardOpen(false)} />
 
       {mapOpen && <BigMap />}
       {chatNpcId && <NpcChat key={chatNpcId} />}
@@ -198,6 +228,17 @@ export function Hud() {
               ))}
             </div>
             <AudioControls />
+            <QuestTracker quests={questTracker} />
+            <button
+              type="button"
+              className="overlay-button secondary"
+              onClick={() => {
+                setPaused(false);
+                setJobBoardOpen(true);
+              }}
+            >
+              Papan pekerjaan
+            </button>
             <button type="button" className="overlay-button" onClick={() => setPaused(false)} autoFocus>
               Lanjutkan
             </button>

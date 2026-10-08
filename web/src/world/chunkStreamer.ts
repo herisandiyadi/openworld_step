@@ -16,9 +16,11 @@ import { replaceChunkStreetLamps, removeChunkStreetLamps } from '../render/stree
 import type { BuiltChunk, ChunkLoadRequest, ChunkWorkerResponse } from './chunkProtocol';
 import type { PropId } from './propSpec';
 import { type ChunkCoord, chunkDistance, planStreaming, withinRadius } from './streaming';
-import { chunkCoord, chunkKey, inWorld, LOAD_RADIUS, UNLOAD_RADIUS } from './worldSpec';
+import { chunkCoord, chunkKey, inWorld, LOAD_RADIUS, sampleChunkHeight, UNLOAD_RADIUS } from './worldSpec';
+import { loadNavigationTile, unloadNavigationTile } from './navigation';
 import { streamingPolicyFor } from '../optimization/streamingPolicy';
 import { rebuildCollision, worldState } from './worldState';
+import { createPoiMarkerAssets, createPoiMarkerGroup, type PoiMarkerAssets } from './poiMarkers';
 
 export interface PropPart {
   geometry: BufferGeometry;
@@ -45,6 +47,7 @@ interface ChunkView {
   coord: ChunkCoord;
   group: Group;
   props: Group;
+  poiMarkers: Group | null;
   /** Objects tap-to-move may raycast (terrain + buildings). */
   pickables: Object3D[];
   dispose: () => void;
@@ -75,6 +78,7 @@ export class ChunkStreamer {
   private readonly unitBox = new BoxGeometry(1, 1, 1);
   private readonly scratch = new Matrix4();
   private readonly placement = new Matrix4();
+  private readonly poiMarkerAssets: PoiMarkerAssets = createPoiMarkerAssets();
 
   constructor(
     private readonly parts: PropParts,
@@ -107,7 +111,11 @@ export class ChunkStreamer {
       for (const key of plan.unload) this.unload(key);
       this.queue = plan.load;
       changed = true;
-      for (const view of this.views.values()) view.props.visible = chunkDistance(view.coord, this.center) <= PROP_RADIUS;
+      for (const view of this.views.values()) {
+        const nearby = chunkDistance(view.coord, this.center) <= PROP_RADIUS;
+        view.props.visible = nearby;
+        if (view.poiMarkers) view.poiMarkers.visible = nearby;
+      }
     }
 
     while (this.pending.size < this.streamingPolicy.maxInFlight && this.queue.length > 0) {
@@ -154,6 +162,7 @@ export class ChunkStreamer {
     this.terrainMaterial.dispose();
     this.buildingMaterial.dispose();
     this.unitBox.dispose();
+    this.poiMarkerAssets.dispose();
   }
 
   private initialAreaLoaded(): boolean {
@@ -231,6 +240,16 @@ export class ChunkStreamer {
     const coord = { cx: chunk.cx, cz: chunk.cz };
     props.visible = chunkDistance(coord, this.center) <= PROP_RADIUS;
     group.add(props);
+
+    const poiWithY = {
+      fishingSpots: chunk.fishingSpots.map((p) => ({ ...p, y: sampleChunkHeight(chunk, p.x, p.z) })),
+      trashBins: chunk.trashBins.map((p) => ({ ...p, y: sampleChunkHeight(chunk, p.x, p.z) })),
+      fishStalls: chunk.fishStalls.map((p) => ({ ...p, y: sampleChunkHeight(chunk, p.x, p.z) })),
+    };
+    const poiMarkerResult = createPoiMarkerGroup(poiWithY, this.poiMarkerAssets);
+    poiMarkerResult.group.visible = chunkDistance(coord, this.center) <= PROP_RADIUS;
+    group.add(poiMarkerResult.group);
+
     this.root.add(group);
     group.updateMatrixWorld(true);
 
@@ -241,15 +260,22 @@ export class ChunkStreamer {
       district: chunk.district,
       heights: chunk.heights,
       surface: chunk.surface,
+      fishingSpots: chunk.fishingSpots,
+      trashBins: chunk.trashBins,
+      fishStalls: chunk.fishStalls,
       colliders: chunk.colliders,
     });
+    // Kick off the per-tile navmesh fetch in the background (non-blocking).
+    loadNavigationTile(chunk.cx, chunk.cz).catch(() => {/* tile not available, fallback to straight-line */});
     this.views.set(chunk.key, {
       key: chunk.key,
       coord,
       group,
       props,
+      poiMarkers: poiMarkerResult.group,
       pickables,
       dispose: () => {
+        poiMarkerResult.dispose();
         for (const item of disposables) item.dispose();
       },
     });
@@ -264,6 +290,7 @@ export class ChunkStreamer {
     removeChunkStreetLamps(key);
     this.views.delete(key);
     worldState.chunks.delete(key);
+    unloadNavigationTile(...(key.split('_').map(Number) as [number, number]));
     this.stats.unloads += 1;
   }
 }

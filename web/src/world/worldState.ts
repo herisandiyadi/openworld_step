@@ -3,7 +3,11 @@ import {
   chunkCoord,
   chunkGroundHeight,
   chunkKey,
-  type DistrictId,
+  configureWorldDimensions,
+  type FishingSpot,
+  type FishStallPoint,
+  type TrashBinPoint,
+  type WorldDistrictId,
   WORLD_BOUNDS,
   type WorldIndex,
 } from './worldSpec';
@@ -13,9 +17,12 @@ export interface ChunkRecord {
   key: string;
   cx: number;
   cz: number;
-  district: DistrictId;
+  district: WorldDistrictId;
   heights: ArrayLike<number>;
   surface: ArrayLike<number>;
+  fishingSpots: FishingSpot[];
+  trashBins: TrashBinPoint[];
+  fishStalls: FishStallPoint[];
   colliders: Aabb[];
 }
 
@@ -65,6 +72,7 @@ export function loadWorldIndex(): Promise<WorldIndex> {
       return response.json() as Promise<WorldIndex>;
     })
     .then((index) => {
+      configureWorldDimensions({ chunkSize: index.chunkSize, worldChunks: index.worldChunks });
       worldState.index = index;
       return index;
     });

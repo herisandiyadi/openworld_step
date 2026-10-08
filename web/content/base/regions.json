@@ -1,0 +1,68 @@
+[
+  {
+    "id": "downtown",
+    "name": "Pusat Kota",
+    "bounds": {
+      "minX": -128,
+      "maxX": 128,
+      "minZ": -128,
+      "maxZ": 128
+    },
+    "busStops": [
+      {
+        "id": "stop_plaza",
+        "x": 5,
+        "z": 20
+      },
+      {
+        "id": "stop_office",
+        "x": 70,
+        "z": -60
+      }
+    ]
+  },
+  {
+    "id": "residential",
+    "name": "Perumahan",
+    "bounds": {
+      "minX": -256,
+      "maxX": 128,
+      "minZ": -256,
+      "maxZ": 256
+    },
+    "busStops": [
+      {
+        "id": "stop_perumahan_barat",
+        "x": -180,
+        "z": -160
+      },
+      {
+        "id": "stop_danau",
+        "x": -70,
+        "z": 190
+      }
+    ]
+  },
+  {
+    "id": "industrial",
+    "name": "Kawasan Industri",
+    "bounds": {
+      "minX": 128,
+      "maxX": 256,
+      "minZ": -256,
+      "maxZ": 256
+    },
+    "busStops": [
+      {
+        "id": "stop_bengkel",
+        "x": 205,
+        "z": -45
+      },
+      {
+        "id": "stop_gudang",
+        "x": 180,
+        "z": 130
+      }
+    ]
+  }
+]

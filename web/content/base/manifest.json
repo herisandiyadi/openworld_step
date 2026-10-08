@@ -1,0 +1,118 @@
+{
+  "id": "base",
+  "version": "1.0.0",
+  "minAppVersion": "0.1.0",
+  "worldVersion": 2,
+  "files": [
+    {
+      "path": "npcs.json",
+      "sha256": "85254918745fd6610e0f449c473879596e1d6d3f5f9199194e33ce5ccaf424c7",
+      "size": 7732
+    },
+    {
+      "path": "quests.json",
+      "sha256": "956b2cd2458cc26f4e76179c6f05ac29f81eeb224c22d0c1ce565fa6e7cd5a8f",
+      "size": 5678
+    },
+    {
+      "path": "regions.json",
+      "sha256": "676d08241d055d248b1a13edea626b27442c593b827a512719a9c16c593b3f1d",
+      "size": 1044
+    },
+    {
+      "path": "shops.json",
+      "sha256": "6fcc0c4fa3951a3d77af38b4065a97f65d4641c0dec35fcd8bab75ca8c51e90f",
+      "size": 1317
+    },
+    {
+      "path": "items.json",
+      "sha256": "9b1ac2dd9a3060491b3ef768b70c05e8ac61cbd13a3d1f233b53616a1f891ac5",
+      "size": 6667
+    },
+    {
+      "path": "economy.json",
+      "sha256": "9094bb898f1f4aa71ce01d5bddfe6b8aca76fda24de5cd6881b4b92c5cb89349",
+      "size": 661
+    },
+    {
+      "path": "fishing.json",
+      "sha256": "a013968342315e6354c7b575d3fdbc8b2f549de8ab529e28b9b0bd99dab753f4",
+      "size": 2508
+    },
+    {
+      "path": "dialogue/npc_agus.json",
+      "sha256": "7681268c6c84d18bae07bc21f346814f7e0e6305fc9ce24aaa5c679048208a53",
+      "size": 667
+    },
+    {
+      "path": "dialogue/npc_budi.json",
+      "sha256": "1e0941948ba2464e1fe619f89ff3ee568bd4dad8e065373c1f5613b54220ccc3",
+      "size": 648
+    },
+    {
+      "path": "dialogue/npc_darto.json",
+      "sha256": "1c7ab78da96ead3fcd02d32b2f1fd9be4b018d7d43810920a24e3b9e41bfce6f",
+      "size": 1013
+    },
+    {
+      "path": "dialogue/npc_dewi.json",
+      "sha256": "75f31aa72c5e2980b6235c6c4beec9515d866c9c3f5f688145bce32e46b03a9b",
+      "size": 576
+    },
+    {
+      "path": "dialogue/npc_fitri.json",
+      "sha256": "8a1630a05f518948eab2872140d2a080604733a925f3b1c9e4c384755b0babd8",
+      "size": 546
+    },
+    {
+      "path": "dialogue/npc_hasan.json",
+      "sha256": "30559a107011f809dada415e4c645b8f0724ce519a9eba02a7965833a9449b59",
+      "size": 503
+    },
+    {
+      "path": "dialogue/npc_joko.json",
+      "sha256": "16aad0e0a73bf1c00f63f647893e2bc9c2d63aa914195501fb9d40ac0dbd6dd7",
+      "size": 521
+    },
+    {
+      "path": "dialogue/npc_pak_gun.json",
+      "sha256": "72b0201b3755a5f63621aac26f676b9a021f32004ee2eea82a1faa4e68b2dc0d",
+      "size": 517
+    },
+    {
+      "path": "dialogue/npc_rina.json",
+      "sha256": "43fc2a39eafa4347ca442733abb905872bed5781157bbdc509114e158462138e",
+      "size": 548
+    },
+    {
+      "path": "dialogue/npc_rudi.json",
+      "sha256": "66363751d3d57eb5a15b2ba56f3344d1ce4c42875d5ce8ffe651fedab7b5e342",
+      "size": 587
+    },
+    {
+      "path": "dialogue/npc_sari.json",
+      "sha256": "b6c570da64b90a732563e171b1069ec312a7965abcc22f1e5901b6a1272517f2",
+      "size": 574
+    },
+    {
+      "path": "dialogue/npc_sri.json",
+      "sha256": "e3d32395276658548f8f617af2bb86d016afc1af9e48d3bebadcad0e86fb72f9",
+      "size": 549
+    },
+    {
+      "path": "dialogue/npc_tini.json",
+      "sha256": "26243871983a6b67ad77eba85e75815bb095335304980c652f9efc9857e382e4",
+      "size": 577
+    },
+    {
+      "path": "dialogue/npc_wahyu.json",
+      "sha256": "2fa18376a59e2e50d766a23a6b87001df3294c4be269e3e7d1475bd36efd3b90",
+      "size": 577
+    },
+    {
+      "path": "dialogue/npc_yanti.json",
+      "sha256": "70ac4ccc3a876846becf3be25202e82a2994b7afe88d5d2fc41d898fd28901d4",
+      "size": 574
+    }
+  ]
+}
