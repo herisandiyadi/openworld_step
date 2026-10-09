@@ -299,7 +299,7 @@
       "triangles": 500,
       "drawCalls": 1,
       "materials": 1,
-      "bytes": 43900,
+      "bytes": 43904,
       "bones": 13,
       "animations": [
         {
@@ -368,7 +368,7 @@
       "triangles": 2302,
       "drawCalls": 16,
       "materials": 5,
-      "bytes": 110220,
+      "bytes": 110228,
       "bones": 13,
       "animations": [
         {
@@ -456,7 +456,7 @@
       "triangles": 1748,
       "drawCalls": 16,
       "materials": 5,
-      "bytes": 98308,
+      "bytes": 98316,
       "bones": 13,
       "animations": [
         {
@@ -545,7 +545,7 @@
       "triangles": 552,
       "drawCalls": 1,
       "materials": 1,
-      "bytes": 30728,
+      "bytes": 30736,
       "bones": 13,
       "animations": [
         {
@@ -604,7 +604,7 @@
       "triangles": 692,
       "drawCalls": 1,
       "materials": 1,
-      "bytes": 32760,
+      "bytes": 32764,
       "bones": 13,
       "animations": [
         {
@@ -818,7 +818,7 @@
       "triangles": 920,
       "drawCalls": 1,
       "materials": 1,
-      "bytes": 37252,
+      "bytes": 37268,
       "bones": 13,
       "animations": [
         {
