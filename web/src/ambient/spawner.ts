@@ -120,6 +120,7 @@ export function updateSpawns(
   const despawned = despawnFar(graph, state, view);
   const spawned: Vehicle[] = [];
   const pool = vehiclePoolFor(preset, quality);
+  if (state.vehicles.length > pool) state.vehicles.length = pool;
   while (state.vehicles.length < pool) {
     const spot = findSpawnSpot(graph, view, random, state.vehicles);
     if (!spot) break;

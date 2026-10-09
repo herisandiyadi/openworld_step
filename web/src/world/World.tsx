@@ -7,6 +7,7 @@ import { AmbientLayer } from '../ambient/AmbientLayer';
 import { contentRuntime } from '../app/contentRuntime';
 import { playerState, sceneRefs } from '../game/runtime';
 import { useGameStore } from '../state/gameStore';
+import { useGraphicsSettings } from '../state/graphicsSettings';
 import { ChunkStreamer, type PropParts } from './chunkStreamer';
 import { Impostors } from './Impostors';
 import { loadNavigation } from './navigation';
@@ -48,13 +49,16 @@ export function World() {
   const statsTimer = useRef(0);
 
   // Created inside the effect (not useMemo) so a StrictMode/remount cleanup can never leave a
-  // disposed streamer with a terminated worker in use.
+  // disposed streamer with a terminated worker in use. The prop-distance LOD tier is read once
+  // here (getState, not a subscription): changing quality in settings does NOT recreate the
+  // streamer, because that would discard every loaded chunk. The new tier applies on next world mount.
   useEffect(() => {
     const instance = new ChunkStreamer(
       parts,
       (key) => worldUrl(`chunks/${key}.json`),
       () => setWorldReady(true),
       (message) => console.error(`[world] ${message}`),
+      useGraphicsSettings.getState().settings.quality,
     );
     sceneRefs.pickables = instance.pickables;
     setStreamer(instance);

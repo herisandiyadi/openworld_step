@@ -72,4 +72,39 @@ describe('spawner', () => {
     updateSpawns(graph, state, view, 'high', random, () => id++, 11, 'low');
     expect(state.vehicles.length).toBe(VEHICLE_POOL.low);
   });
+
+  it('batas pool per tier monotonik dan tetap di budget HP low-end', () => {
+    expect(VEHICLE_POOL.low).toBeLessThanOrEqual(VEHICLE_POOL.medium);
+    expect(VEHICLE_POOL.medium).toBeLessThanOrEqual(VEHICLE_POOL.high);
+    expect(VEHICLE_POOL.high).toBeLessThanOrEqual(24);
+  });
+
+  it('vehiclePoolFor selalu mengembalikan pool positif (minimum density vs quality) tanpa throw', () => {
+    for (const density of ['low', 'medium', 'high'] as const) {
+      for (const quality of ['low', 'medium', 'high'] as const) {
+        expect(() => vehiclePoolFor(density, quality)).not.toThrow();
+        expect(vehiclePoolFor(density, quality)).toBeGreaterThan(0);
+        // tier yang lebih ketat (indeks lebih rendah) menang.
+        expect(vehiclePoolFor(density, quality)).toBe(VEHICLE_POOL[density === 'low' || quality === 'low' ? 'low' : density === 'medium' || quality === 'medium' ? 'medium' : 'high']);
+      }
+    }
+  });
+
+  it('updateSpawns tidak throw dan tidak melampaui pool saat dipanggil berulang (pool exhaustion)', () => {
+    const random = mulberry32(13);
+    let id = 0;
+    const view: CameraView = { x: 0, z: 0, dirX: 0, dirZ: -1, halfFov: 35 * DEG };
+    const state = createTraffic();
+    for (let call = 0; call < 5; call++) {
+      const result = updateSpawns(graph, state, view, 'high', random, () => id++, 11, 'low');
+      // Pool terketat (low) menang: tidak pernah melebihi VEHICLE_POOL.low.
+      expect(state.vehicles.length).toBeLessThanOrEqual(VEHICLE_POOL.low);
+      expect(result.spawned.length).toBeLessThanOrEqual(VEHICLE_POOL.low);
+    }
+    // Sudah penuh -> panggilan berikutnya tidak menambah apa pun dan tidak throw.
+    const before = state.vehicles.length;
+    const result = updateSpawns(graph, state, view, 'high', random, () => id++, 11, 'low');
+    expect(result.spawned).toEqual([]);
+    expect(state.vehicles.length).toBe(before);
+  });
 });
