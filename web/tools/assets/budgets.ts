@@ -10,10 +10,11 @@ export interface Budget {
 
 /** Per-category hard limits (prompt section 6B), checked after optimisation. */
 export const BUDGETS: Record<Category, Budget> = {
-  // Hero kustomisasi: 16 node varian (badan, kulit, 3 rambut, 3 baju, 3 bawahan, 3 ekspresi, 2 aksesori)
-  // + 5 material (palet + slot kulit/rambut/baju/celana) di file. Angka ini hanya isi file: runtime
-  // (HeroAppearance.applyAppearance) menggabung node terlihat jadi 1 SkinnedMesh = 1 draw call di HP.
-  hero: { maxTriangles: 5000, maxMaterials: 5, maxDrawCalls: 16, maxBytes: 400_000, maxBones: 40 },
+  // Hero kustomisasi: 17 node varian (badan, kulit, kalung emas, 3 rambut, 3 baju, 3 bawahan,
+  // 3 ekspresi, 2 aksesori) + 6 material (palet, PBR emas, slot kulit/rambut/baju/celana) di file.
+  // Runtime menggabung badan + varian terlihat menjadi 1 SkinnedMesh, sementara kalung sengaja tetap
+  // terpisah agar material metaliknya bertahan: total runtime hero = 2 draw call.
+  hero: { maxTriangles: 5000, maxMaterials: 6, maxDrawCalls: 17, maxBytes: 400_000, maxBones: 40 },
   npc: { maxTriangles: 3000, maxMaterials: 2, maxDrawCalls: 2, maxBytes: 300_000, maxBones: 40 },
   vehicle_bike: { maxTriangles: 800, maxMaterials: 2, maxDrawCalls: 4, maxBytes: 60_000 },
   vehicle_small: { maxTriangles: 500, maxMaterials: 2, maxDrawCalls: 2, maxBytes: 40_000 },

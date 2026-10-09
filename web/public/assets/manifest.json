@@ -365,10 +365,10 @@
         "player",
         "custom"
       ],
-      "triangles": 2302,
-      "drawCalls": 16,
-      "materials": 5,
-      "bytes": 110228,
+      "triangles": 2446,
+      "drawCalls": 17,
+      "materials": 6,
+      "bytes": 114360,
       "bones": 13,
       "animations": [
         {
@@ -403,6 +403,7 @@
       "nodes": [
         "char_hero_f",
         "skin",
+        "gold_chain",
         "hair_0",
         "hair_1",
         "hair_2",
@@ -453,10 +454,10 @@
         "player",
         "custom"
       ],
-      "triangles": 1748,
-      "drawCalls": 16,
-      "materials": 5,
-      "bytes": 98316,
+      "triangles": 1892,
+      "drawCalls": 17,
+      "materials": 6,
+      "bytes": 100928,
       "bones": 13,
       "animations": [
         {
@@ -491,6 +492,7 @@
       "nodes": [
         "char_hero_m",
         "skin",
+        "gold_chain",
         "hair_0",
         "hair_1",
         "hair_2",
