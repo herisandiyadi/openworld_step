@@ -1259,6 +1259,18 @@
           0.18
         ]
       },
+      "lods": [
+        {
+          "level": 1,
+          "path": "assets/prop_streetlamp_01_lod1.glb",
+          "triangles": 46
+        },
+        {
+          "level": 2,
+          "path": "assets/prop_streetlamp_01_lod2.glb",
+          "triangles": 42
+        }
+      ],
       "collider": {
         "type": "box",
         "center": [
