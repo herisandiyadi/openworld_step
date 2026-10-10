@@ -85,6 +85,27 @@ function boneForNode(nodeName: string): BoneName {
   return 'head';
 }
 
+
+/** Sendi yang dihaluskan: vertex dalam BLEND_RADIUS dari sendi dicampur dengan tulang induknya. */
+const BLEND_RADIUS = 0.07;
+
+/**
+ * Smooth skinning dua tulang. `bone` adalah tulang utama dari peta nama bagian.
+ * Jika vertex berada dekat pangkal tulang (joint dengan parent), bobotnya dibagi ke parent
+ * dengan falloff linear: di sendi 50/50, di luar BLEND_RADIUS 100% ke `bone`.
+ * Posisi sendi diambil dari scaledRest (world space, sudah diskala).
+ */
+function smoothWeights(x: number, y: number, z: number, bone: number): [number, number, number, number] {
+  const parent = BONES[bone]!.parent;
+  if (parent < 0) return [bone, 1, bone, 0];
+  const joint = SCALED_REST[bone]!;
+  const dist = Math.hypot(x - joint[0], y - joint[1], z - joint[2]);
+  if (dist >= BLEND_RADIUS) return [bone, 1, bone, 0];
+  const t = 0.5 * (1 - dist / BLEND_RADIUS); // 0.5 di sendi, 0 di batas
+  return [bone, 1 - t, parent, t];
+}
+let SCALED_REST: Vec3[] = [];
+
 async function main(): Promise<void> {
   await MeshoptDecoder.ready;
   await MeshoptEncoder.ready;
@@ -94,11 +115,17 @@ async function main(): Promise<void> {
 
   const source = await io.read(SOURCE);
   await source.transform(dequantize());
+  await MeshoptSimplifier.ready;
+  // Decimate BEFORE rigging: weld/simplify would otherwise rebuild vertices and drop the
+  // per-vertex JOINTS/WEIGHTS blend that smoothWeights writes below.
+  const sourceTriangles = source.getRoot().listMeshes().reduce((sum, m) => sum + m.listPrimitives().reduce((k, pr) => k + (pr.getIndices()?.getCount() ?? 0) / 3, 0), 0);
+  await source.transform(weld(), simplify({ simplifier: MeshoptSimplifier, ratio: TARGET_TRIANGLES / sourceTriangles, error: 0.02, lockBorder: true }));
   const sourceBounds = boundsOf(evaluateScene(source));
   const sourceHeight = sourceBounds.max[1]! - sourceBounds.min[1]!;
   const scale = TARGET_HEIGHT / sourceHeight;
 
   const root = source.getRoot();
+  SCALED_REST = BONES.map((bone) => bone.rest.map((v) => v * scale) as Vec3);
   const positions: number[] = [];
   const normals: number[] = [];
   const colors: number[] = [];
@@ -143,8 +170,9 @@ async function main(): Promise<void> {
           normals.push(n.x, n.y, n.z);
         } else normals.push(0, 1, 0);
         colors.push(base[0] ?? 1, base[1] ?? 1, base[2] ?? 1, 1);
-        joints.push(bone, 0, 0, 0);
-        weights.push(1, 0, 0, 0);
+        const [j0, w0, j1, w1] = smoothWeights(v.x, v.y, v.z, bone);
+        joints.push(j0, j1, 0, 0);
+        weights.push(w0, w1, 0, 0);
       }
       const primIndices = prim.getIndices()?.getArray();
       if (primIndices) for (let i = 0; i < primIndices.length; i++) indices.push(offset + primIndices[i]!);
@@ -229,9 +257,7 @@ async function main(): Promise<void> {
     addTrack(jointNodes[boneIndex('hips')]!, 'translation', hipsTranslation);
   }
 
-  await MeshoptSimplifier.ready;
-  const before = doc.getRoot().listMeshes().reduce((sum, m) => sum + m.listPrimitives().reduce((k, pr) => k + (pr.getIndices()?.getCount() ?? 0) / 3, 0), 0);
-  await doc.transform(weld(), simplify({ simplifier: MeshoptSimplifier, ratio: TARGET_TRIANGLES / before, error: 0.02, lockBorder: true }));
+  const before = sourceTriangles;
   await doc.transform(meshopt({ encoder: MeshoptEncoder, level: 'medium' }));
   const glb = await io.writeBinary(doc);
   await mkdir(dirname(OUT_GLB), { recursive: true });
