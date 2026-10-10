@@ -15,8 +15,8 @@
  */
 import { Document, NodeIO } from '@gltf-transform/core';
 import { EXTMeshoptCompression, KHRMeshQuantization } from '@gltf-transform/extensions';
-import { dequantize, meshopt } from '@gltf-transform/functions';
-import { MeshoptDecoder, MeshoptEncoder } from 'meshoptimizer';
+import { dequantize, meshopt, simplify, weld } from '@gltf-transform/functions';
+import { MeshoptDecoder, MeshoptEncoder, MeshoptSimplifier } from 'meshoptimizer';
 import { mkdir, writeFile } from 'node:fs/promises';
 import { dirname, join as pathJoin, resolve } from 'node:path';
 import { fileURLToPath } from 'node:url';
@@ -34,6 +34,8 @@ const OUT_GLB = pathJoin(WEB_ROOT, 'tools/reference/slim_hero_rigged.glb');
 const OUT_PNG = pathJoin(WEB_ROOT, 'asset-previews/slim_hero_rigged.png');
 
 const TARGET_HEIGHT = 1.75;
+/** Hero mobile budget (Notion 11.4): 8.000–25.000 tris. Aim for the middle of the band. */
+const TARGET_TRIANGLES = 12000;
 const FPS = 30;
 const TILE = 256;
 const VIEWS: View[] = [
@@ -44,17 +46,23 @@ const VIEWS: View[] = [
   { yawDeg: 180, elevationDeg: 55, label: 'game-camera' },
 ];
 
-/** Rig 13 tulang, penamaan sejajar runtime supaya klip humanoid bisa dipakai. */
+/**
+ * Rig 13 tulang, penamaan sejajar runtime supaya klip humanoid bisa dipakai.
+ * Rest ditulis dalam SATUAN SUMBER (satuan node slim_urban_hero.glb) dan dikali
+ * `scale` saat dipakai, karena mesh juga diskala ke TARGET_HEIGHT. Titik pivot
+ * diambil dari node sumber: Pelvis 1.40, Waist 1.58, Chest 1.86, Neck 2.14,
+ * UpperArm 1.80, ForeArm 1.36, Thigh top 1.40, Shin knee 0.82.
+ */
 const BONES: { name: BoneName; parent: number; rest: Vec3 }[] = [
   { name: 'root', parent: -1, rest: [0, 0, 0] },
   { name: 'hips', parent: 0, rest: [0, 1.4, 0] },
-  { name: 'spine', parent: 1, rest: [0, 1.6, 0] },
+  { name: 'spine', parent: 1, rest: [0, 1.58, 0] },
   { name: 'chest', parent: 2, rest: [0, 1.86, 0] },
-  { name: 'head', parent: 3, rest: [0, 2.24, 0] },
-  { name: 'upperArm_L', parent: 3, rest: [-0.31, 1.95, 0] },
-  { name: 'lowerArm_L', parent: 5, rest: [-0.41, 1.56, 0.03] },
-  { name: 'upperArm_R', parent: 3, rest: [0.31, 1.95, 0] },
-  { name: 'lowerArm_R', parent: 7, rest: [0.41, 1.56, 0.03] },
+  { name: 'head', parent: 3, rest: [0, 2.14, 0] },
+  { name: 'upperArm_L', parent: 3, rest: [-0.35, 1.8, 0] },
+  { name: 'lowerArm_L', parent: 5, rest: [-0.42, 1.36, 0.03] },
+  { name: 'upperArm_R', parent: 3, rest: [0.35, 1.8, 0] },
+  { name: 'lowerArm_R', parent: 7, rest: [0.42, 1.36, 0.03] },
   { name: 'upperLeg_L', parent: 1, rest: [-0.14, 1.4, 0] },
   { name: 'lowerLeg_L', parent: 9, rest: [-0.135, 0.82, 0] },
   { name: 'upperLeg_R', parent: 1, rest: [0.14, 1.4, 0] },
@@ -151,11 +159,12 @@ async function main(): Promise<void> {
   const acc = (type: 'SCALAR' | 'VEC3' | 'VEC4', array: Float32Array | Uint16Array | Uint32Array) =>
     doc.createAccessor().setType(type).setArray(array).setBuffer(buffer);
 
-  const jointNodes = BONES.map((bone) => {
-    const parent = BONES[bone.parent];
-    const localPos: Vec3 = parent
-      ? [bone.rest[0] - parent.rest[0], bone.rest[1] - parent.rest[1], bone.rest[2] - parent.rest[2]]
-      : bone.rest;
+  const scaledRest = BONES.map((bone) => bone.rest.map((v) => v * scale) as Vec3);
+  const jointNodes = BONES.map((bone, i) => {
+    const rest = scaledRest[i]!;
+    const localPos: Vec3 = bone.parent >= 0
+      ? [rest[0] - scaledRest[bone.parent]![0], rest[1] - scaledRest[bone.parent]![1], rest[2] - scaledRest[bone.parent]![2]]
+      : rest;
     return doc.createNode(`bone_${bone.name}`).setTranslation(localPos);
   });
   BONES.forEach((bone, i) => {
@@ -164,8 +173,8 @@ async function main(): Promise<void> {
   });
 
   const inverseBind = new Float32Array(BONES.length * 16);
-  BONES.forEach((bone, i) => {
-    inverseBind.set([1, 0, 0, 0, 0, 1, 0, 0, 0, 0, 1, 0, -bone.rest[0], -bone.rest[1], -bone.rest[2], 1], i * 16);
+  scaledRest.forEach((rest, i) => {
+    inverseBind.set([1, 0, 0, 0, 0, 1, 0, 0, 0, 0, 1, 0, -rest[0], -rest[1], -rest[2], 1], i * 16);
   });
   const skin = doc.createSkin('skin_slim_hero').setSkeleton(jointNodes[0]!);
   const ibmAccessor = doc.createAccessor('inverseBind').setType('MAT4').setArray(inverseBind).setBuffer(buffer);
@@ -191,7 +200,7 @@ async function main(): Promise<void> {
   doc.getRoot().setDefaultScene(scene);
 
   const clips: Clip[] = [IDLE, WALK, RUN, SIT, TALK];
-  const hipsRest = BONES[boneIndex('hips')]!.rest;
+  const hipsRest = scaledRest[boneIndex('hips')]!;
   for (const clip of clips) {
     const frames = Math.max(2, Math.round(clip.duration * FPS));
     const times = new Float32Array(frames + 1);
@@ -220,6 +229,9 @@ async function main(): Promise<void> {
     addTrack(jointNodes[boneIndex('hips')]!, 'translation', hipsTranslation);
   }
 
+  await MeshoptSimplifier.ready;
+  const before = doc.getRoot().listMeshes().reduce((sum, m) => sum + m.listPrimitives().reduce((k, pr) => k + (pr.getIndices()?.getCount() ?? 0) / 3, 0), 0);
+  await doc.transform(weld(), simplify({ simplifier: MeshoptSimplifier, ratio: TARGET_TRIANGLES / before, error: 0.02, lockBorder: true }));
   await doc.transform(meshopt({ encoder: MeshoptEncoder, level: 'medium' }));
   const glb = await io.writeBinary(doc);
   await mkdir(dirname(OUT_GLB), { recursive: true });
@@ -238,6 +250,7 @@ async function main(): Promise<void> {
     source: { triangles: 27028, size: size(sourceBounds) },
     rigged: {
       triangles: triangleTotal,
+      trianglesBeforeDecimate: before,
       vertices: vertexCount,
       materials: materialNames.size,
       bones: BONES.length,
