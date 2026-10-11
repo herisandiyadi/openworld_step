@@ -91,6 +91,8 @@ const SLOT_OF: Record<string, 'skinTone' | 'hairColor' | 'shirtColor' | 'pantsCo
 };
 const VARIANT = /^(skin|hair_\d|shirt_\d|pants_\d|face_\d|acc_\d)$/;
 const MERGED = 'hero_merged';
+/** Kalung emas: node terpisah, TIDAK digabung dan selalu terlihat supaya material metaliknya tetap. */
+const CHAIN = 'gold_chain';
 
 /** Atribut terkuantisasi (meshopt) jadi Float32 supaya bisa digabung. */
 function toFloat(attribute: BufferAttribute | InterleavedBufferAttribute): BufferAttribute {
@@ -123,6 +125,11 @@ export function applyAppearance(root: Object3D, appearance: Appearance): void {
     const mesh = object as SkinnedMesh;
     if (!mesh.isSkinnedMesh) return;
     if (mesh.name === MERGED) return;
+    // Kalung emas tetap jadi SkinnedMesh terpisah: tidak digabung, tidak disembunyikan.
+    if (mesh.name === CHAIN) {
+      mesh.visible = true;
+      return;
+    }
     if (!VARIANT.test(mesh.name)) body = mesh;
     else if (wanted.has(mesh.name)) parts.push(mesh);
   });
@@ -161,7 +168,8 @@ export function applyAppearance(root: Object3D, appearance: Appearance): void {
   merged.bind(body.skeleton, body.bindMatrix);
   body.parent?.add(merged);
   root.traverse((object) => {
-    if ((object as SkinnedMesh).isSkinnedMesh && object !== merged) object.visible = false;
+    const mesh = object as SkinnedMesh;
+    if (mesh.isSkinnedMesh && object !== merged && mesh.name !== CHAIN) mesh.visible = false;
   });
 }
 

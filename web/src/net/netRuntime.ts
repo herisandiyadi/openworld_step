@@ -1,5 +1,6 @@
 import { INITIAL_VEHICLES } from '../game/vehicles';
 import type { Appearance } from '../state/profile';
+import { loadWorldIndex } from '../world/worldState';
 import { createNearbyClientTransport, createNearbyHostTransport, type NearbyPluginPart } from './nearbyTransport';
 import { useNetStore } from './netStore';
 import type { ChatChannel, PlayerId, PlayerInfo, PlayerSnapshot } from './protocol';
@@ -41,7 +42,7 @@ export interface FetchResponseLike {
   json(): Promise<unknown>;
 }
 
-export type FetchLike = (url: string, init?: { method?: string }) => Promise<FetchResponseLike>;
+export type FetchLike = (url: string, init?: { method?: string; headers?: Record<string, string> }) => Promise<FetchResponseLike>;
 
 export interface NetDeps {
   /** Plugin Nearby; default plugin native asli. */
@@ -50,6 +51,8 @@ export interface NetDeps {
   createSocket?: WebSocketFactory;
   /** Pengambil HTTP untuk endpoint room; default `fetch` global. */
   fetch?: FetchLike;
+  /** Metadata dunia aktif; default dibaca dari public/world/index.json. */
+  getWorldVersion?: () => Promise<string>;
   /** Opsi tambahan WsTransport (backoff, ping, dll). */
   ws?: WsTransportOptions;
   /** Waktu (ms); default Date.now. */
@@ -99,6 +102,51 @@ let lastPingMs = 0;
 let hostPlayersKey = '';
 const hostVehicleOwners = new Map<string, PlayerId>();
 const vehicleListeners = new Set<VehicleListener>();
+const fishingStateListeners = new Set<FishingStateListener>();
+
+export type FishingStateListener = (playerId: number, sequence: number, payload: Uint8Array) => void;
+
+/** Subscribes to live fishing-state frames (local host and remote players). */
+export function onFishingState(cb: FishingStateListener): Unsubscribe | null {
+  if (!activeSession) return null;
+  fishingStateListeners.add(cb);
+  return () => fishingStateListeners.delete(cb);
+}
+
+/** Local player id of the active session (null when not connected or not yet welcomed). */
+export function localPlayerId(): PlayerId | null {
+  const session = activeSession;
+  if (!session) return null;
+  return session instanceof HostSession ? session.localPlayerId : session.playerId;
+}
+
+/** Publishes 8-byte fishing state with a monotonically increasing sequence. */
+export function publishFishingState(payload: Uint8Array, sequence: number): boolean {
+  const session = activeSession;
+  if (!session) return false;
+  if (session instanceof HostSession) return session.publishLocalFishingState(sequence, payload);
+  session.sendFishingState(sequence, payload);
+  return true;
+}
+
+/** Reserves a fishing spot in the active session (local host direct, clients via the host). */
+export function reserveFishingSpot(spotId: string, _now?: number): boolean {
+  const session = activeSession;
+  if (!session) return false;
+  if (session instanceof HostSession) return session.reserveLocalFishingSpot(spotId);
+  session.claimFishingSpot(spotId, 'reserve');
+  return true;
+}
+
+/** Releases a fishing spot owned by the local player in the active session. */
+export function releaseFishingSpot(spotId: string): boolean {
+  const session = activeSession;
+  if (!session) return false;
+  if (session instanceof HostSession) return session.releaseLocalFishingSpot(spotId);
+  session.claimFishingSpot(spotId, 'release');
+  return true;
+}
+
 
 const emitVehicle = (vehicle: VehicleInfo): void => {
   for (const listener of [...vehicleListeners]) listener(vehicle);
@@ -146,6 +194,13 @@ function clientEvents(): ClientEvents {
     onState: (snapshots) => store().applySnapshots(snapshots),
     onChat: (entry: ChatEntry) => store().addChat(entry),
     onVehicle: (vehicle) => emitVehicle(vehicle),
+    onFishingState: (playerId, sequence, payload) => {
+      for (const listener of [...fishingStateListeners]) listener(playerId, sequence, payload);
+    },
+    onFishingSpotEvent: (event) => {
+      // Reservation ownership is authoritative in HostSession; runtime listeners only observe state.
+      void event;
+    },
     onPing: (rttMs) => store().setPing(rttMs),
     // WsTransport (dan UI mode lokal) menyambung ulang sendiri, jadi putus bukan akhir sesi.
     onDisconnect: () => store().setStatus('connecting'),
@@ -182,6 +237,13 @@ export async function connectLocalHost(opts: LocalHostOptions): Promise<void> {
     },
     // Chat yang lolos aturan host langsung tampil di HP host sendiri.
     onLocalChat: (entry) => useNetStore.getState().addChat(entry),
+    // Kejadian pancing host ikut dioper ke listener runtime (mode live).
+    onFishingState: (playerId, sequence, payload) => {
+      for (const listener of [...fishingStateListeners]) listener(playerId, sequence, payload);
+    },
+    onFishingSpotEvent: (event) => {
+      void event;
+    },
   });
   mode = 'local-host';
   activeTransport = transport;
@@ -247,20 +309,32 @@ const parseTicket = (body: unknown): RoomTicket | null => {
 };
 
 /**
- * POST /rooms (buat, 201) atau POST /rooms/KODE/join (gabung, 200). Kegagalan jaringan
+ * POST /rooms (buat, 201) atau POST /rooms/KODE/join (gabung, 200). `worldVersion` aplikasi
+ * ini (versi data peta dari index.json, lihat worldSpec.ts) dikirim lewat header
+ * `x-world-version`; server menolak dengan 409 `{ error: 'world-version' }` kalau pemain
+ * lain di room memakai versi yang berbeda (CONTENT_UPDATES.md bagian 5). Kegagalan jaringan
  * dan jawaban 404/409 dibedakan supaya pesan di UI tepat.
  */
-async function requestRoom(serverUrl: string, roomCodeInput: string | undefined, fetchFn: FetchLike): Promise<RoomTicket> {
+export const ERR_WORLD_VERSION = 'Versi peta berbeda dari pemain lain. Perbarui konten dulu.';
+
+async function requestRoom(serverUrl: string, roomCodeInput: string | undefined, worldVersion: string, fetchFn: FetchLike): Promise<RoomTicket> {
   const base = httpBase(serverUrl);
   const code = roomCodeInput?.trim().toUpperCase();
   const url = code ? `${base}/rooms/${encodeURIComponent(code)}/join` : `${base}/rooms`;
   let response: FetchResponseLike;
   try {
-    response = await fetchFn(url, { method: 'POST' });
+    response = await fetchFn(url, { method: 'POST', headers: { 'x-world-version': worldVersion } });
   } catch (error) {
     fail(ERR_SERVER, error);
   }
-  if (response.status === 404 || response.status === 409) fail(ERR_ROOM, null);
+  if (response.status === 404) fail(ERR_ROOM, null);
+  const errorBody = response.status === 409 ? await response.json().catch(() => null) : null;
+  if (
+    response.status === 409 &&
+    typeof errorBody === 'object' && errorBody !== null &&
+    (errorBody as { error?: unknown }).error === 'world-version'
+  ) fail(ERR_WORLD_VERSION, null);
+  if (response.status === 409) fail(ERR_ROOM, null);
   if (!response.ok) fail(ERR_SERVER, null);
   let body: unknown;
   try {
@@ -279,8 +353,9 @@ export async function connectOnline(opts: OnlineOptions): Promise<string> {
   const deps = opts.deps ?? {};
   nowFn = deps.now ?? Date.now;
   useNetStore.getState().setStatus('connecting');
-  const fetchFn = deps.fetch ?? ((url: string, init?: { method?: string }) => fetch(url, init));
-  const ticket = await requestRoom(opts.serverUrl, opts.roomCode, fetchFn);
+  const fetchFn = deps.fetch ?? ((url: string, init?: { method?: string; headers?: Record<string, string> }) => fetch(url, init));
+  const worldVersion = await (deps.getWorldVersion ?? (async () => (await loadWorldIndex()).worldVersion))();
+  const ticket = await requestRoom(opts.serverUrl, opts.roomCode, worldVersion, fetchFn);
   const transport = new WsTransport(wsUrl(opts.serverUrl, ticket), {
     ...(deps.ws ?? {}),
     ...(deps.createSocket ? { createSocket: deps.createSocket } : {}),
@@ -310,6 +385,7 @@ export function disconnect(): void {
   lastPingMs = 0;
   hostPlayersKey = '';
   hostVehicleOwners.clear();
+  fishingStateListeners.clear();
   // ClientSession.close() sudah menutup transport; HostSession tidak, jadi ditutup di sini.
   if (session instanceof ClientSession) session.close();
   else if (session) {

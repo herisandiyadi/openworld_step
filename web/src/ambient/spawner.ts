@@ -4,6 +4,7 @@
  */
 import { edgeAt, edgePoint, type LaneGraph } from './laneGraph';
 import { createVehicle, type TrafficState, type Vehicle } from './trafficSim';
+import { CHUNK_SIZE, HALF_WORLD, WORLD_CHUNKS } from '../world/worldSpec';
 
 export const SPAWN_MIN = 40;
 export const SPAWN_MAX = 110;
@@ -71,9 +72,23 @@ export function findSpawnSpot(
   occupied: readonly Vehicle[] = [],
   attempts = 200,
 ): { edge: number; s: number } | undefined {
-  const count = graph.data.edges.length;
+  // Sampel bucket grid di sekitar kamera, bukan seluruh graf: dunia 16x16 punya 4x edge dunia
+  // lama, jadi sampling acak global jarang kena cincin spawn dan memindai semua edge itu lambat.
+  const reach = Math.ceil(SPAWN_MAX / CHUNK_SIZE) + 1;
+  const bx = Math.floor((view.x + HALF_WORLD) / CHUNK_SIZE);
+  const bz = Math.floor((view.z + HALF_WORLD) / CHUNK_SIZE);
+  const buckets: number[][] = [];
+  for (let dz = -reach; dz <= reach; dz++) {
+    for (let dx = -reach; dx <= reach; dx++) {
+      const bucket = graph.grid.get((bz + dz) * WORLD_CHUNKS + bx + dx);
+      if (bucket && bucket.length > 0) buckets.push(bucket);
+    }
+  }
+  if (buckets.length === 0) return undefined;
+
   for (let i = 0; i < attempts; i++) {
-    const edge = Math.floor(random() * count);
+    const bucket = buckets[Math.floor(random() * buckets.length)] as number[];
+    const edge = bucket[Math.floor(random() * bucket.length)] as number;
     // Hanya di segmen lajur: persimpangan butuh reservasi, jangan spawn di tengahnya.
     if (edgeAt(graph, edge).kind !== 'lane') continue;
     const s = random() * edgeAt(graph, edge).length;
@@ -105,6 +120,7 @@ export function updateSpawns(
   const despawned = despawnFar(graph, state, view);
   const spawned: Vehicle[] = [];
   const pool = vehiclePoolFor(preset, quality);
+  if (state.vehicles.length > pool) state.vehicles.length = pool;
   while (state.vehicles.length < pool) {
     const spot = findSpawnSpot(graph, view, random, state.vehicles);
     if (!spot) break;

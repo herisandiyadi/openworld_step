@@ -56,9 +56,14 @@ async function connect(code: string, token: string): Promise<Client> {
   return { ws, messages, closed, waitFor };
 }
 
-const post = async (path: string) => {
-  const res = await fetch(`http://${base}${path}`, { method: 'POST' });
-  return { status: res.status, body: (await res.json()) as { code: string; token: string; error?: string } };
+const WORLD_VERSION = '3.0.0-u4-fishing';
+
+const post = async (path: string, worldVersion: string | null = WORLD_VERSION) => {
+  const res = await fetch(`http://${base}${path}`, {
+    method: 'POST',
+    headers: worldVersion === null ? {} : { 'x-world-version': worldVersion },
+  });
+  return { status: res.status, body: (await res.json()) as { code: string; token: string; error?: string; message?: string } };
 };
 
 describe('server WebSocket end-to-end', () => {
@@ -105,6 +110,24 @@ describe('server WebSocket end-to-end', () => {
     a.ws.close();
     expect((await b.waitFor('playerLeave')).playerId).toBe(welcome.playerId);
     b.ws.close();
+  });
+
+  it('menolak create/join tanpa worldVersion atau dengan versi berbeda secara jelas', async () => {
+    const missing = await post('/rooms', null);
+    expect(missing).toMatchObject({
+      status: 400,
+      body: { error: 'world-version-required', message: 'Perbarui konten dulu: worldVersion wajib dikirim.' },
+    });
+
+    const created = await post('/rooms');
+    expect(created.status).toBe(201);
+    const mismatch = await post(`/rooms/${created.body.code}/join`, '2.0.0-old-world');
+    expect(mismatch).toMatchObject({
+      status: 409,
+      body: { error: 'world-version', message: `Perbarui konten dulu: room memakai worldVersion ${WORLD_VERSION}.` },
+    });
+    const compatible = await post(`/rooms/${created.body.code}/join`);
+    expect(compatible.status).toBe(200);
   });
 
   it('room/token salah ditutup dengan kode aplikasi', async () => {

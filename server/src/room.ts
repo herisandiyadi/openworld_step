@@ -42,6 +42,12 @@ export const ROOM_CODE_LENGTH = 6;
 export const ROOM_EMPTY_TTL_MS = 60_000;
 /** Kalau buffer kirim WebSocket melebihi ini, snapshot `state` (unreliable) dibuang untuk koneksi itu. */
 export const UNRELIABLE_DROP_BYTES = 64 * 1024;
+export const FISHING_SPOT_TTL_MS = 5_000;
+
+interface FishingReservation {
+  playerId: PlayerId;
+  heartbeatAt: number;
+}
 
 export function generateRoomCode(): string {
   let code = '';
@@ -105,6 +111,8 @@ export interface RoomOptions {
   maxPlayers?: number;
   /** Jam dunia awal (detik). */
   startTimeOfDay?: number;
+  /** Kunci kompatibilitas konten dunia: semua pemain di room harus memakai versi yang sama. */
+  worldVersion?: string;
   onReject?: (code: string, playerId: PlayerId | null, reason: RejectReason) => void;
 }
 
@@ -118,6 +126,8 @@ export type HelloResult = { ok: true; player: RoomPlayer } | { ok: false; reason
 export class Room {
   readonly players = new Map<PlayerId, RoomPlayer>();
   readonly vehicles = new Map<string, VehicleInfo>();
+  private readonly fishingReservations = new Map<string, FishingReservation>();
+  readonly worldVersion: string;
   readonly history: Record<ChatChannel, ChatEntry[]> = { session: [], nearby: [] };
   /** Token yang diterbitkan untuk room ini (token → playerId atau null kalau belum dipakai). */
   readonly tokens = new Map<string, PlayerId | null>();
@@ -138,6 +148,7 @@ export class Room {
     this.now = options.now ?? Date.now;
     this.maxPlayers = options.maxPlayers ?? MAX_PLAYERS_ONLINE;
     this.startTimeOfDay = options.startTimeOfDay ?? DAY_SECONDS * 0.35;
+    this.worldVersion = options.worldVersion ?? 'legacy';
     this.createdAtMs = this.now();
     this.emptySinceMs = this.createdAtMs;
     for (const vehicle of INITIAL_VEHICLES) {
@@ -172,6 +183,10 @@ export class Room {
 
   playerList(): PlayerInfo[] {
     return [...this.players.values()].map((player) => player.info);
+  }
+
+  fishingSpotOwner(spotId: string): PlayerId | null {
+    return this.fishingReservations.get(spotId)?.playerId ?? null;
   }
 
   private reject(player: RoomPlayer | null, reason: RejectReason): void {
@@ -282,6 +297,11 @@ export class Room {
       vehicle.ownerId = 0;
       this.broadcast(this.vehicleMessage(vehicle));
     }
+    for (const [spotId, reservation] of this.fishingReservations) {
+      if (reservation.playerId !== id) continue;
+      this.fishingReservations.delete(spotId);
+      this.broadcast({ type: 'fishingRelease', playerId: id, spotId });
+    }
     this.broadcast({ type: 'playerLeave', playerId: id });
     if (this.players.size === 0) this.emptySinceMs = this.now();
   }
@@ -307,6 +327,19 @@ export class Room {
         return;
       case 'vehicleClaim':
         this.handleVehicleClaim(player, message.vehicleId, message.action, message.x, message.z, message.yaw);
+        return;
+      case 'fishingReserve':
+        this.handleFishingReservation(player, 'reserve', message.spotId);
+        return;
+      case 'fishingRelease':
+        this.handleFishingReservation(player, 'release', message.spotId);
+        return;
+      case 'fishingState':
+        // Id dari klien diabaikan: server yang menentukan pengirimnya.
+        this.broadcast(
+          { type: 'fishingState', playerId: player.info.id, sequence: message.sequence, payload: message.payload },
+          player,
+        );
         return;
       case 'ping':
         this.sendTo(player, { type: 'pong', nonce: message.nonce });
@@ -402,6 +435,33 @@ export class Room {
   }
 
   /**
+   * Reservasi titik pancing (FISHING.md 8): klaim pertama menang; klaim kedua ditolak dan
+   * pengirim diberi tahu pemilik sekarang lewat `fishingReserve` versi server. Lepas hanya
+   * boleh oleh pemilik. Pemilik bisa mengulang `fishingReserve` sebagai detak jantung.
+   */
+  private handleFishingReservation(player: RoomPlayer, action: 'reserve' | 'release', spotId: string): boolean {
+    const id = player.info.id;
+    if (action === 'reserve') {
+      const ownerId = this.fishingReservations.get(spotId)?.playerId;
+      if (ownerId !== undefined && ownerId !== id) {
+        this.reject(player, 'spot-taken');
+        return false;
+      }
+      this.fishingReservations.set(spotId, { playerId: id, heartbeatAt: this.now() });
+      this.broadcast({ type: 'fishingReserve', playerId: id, spotId }, player);
+      return true;
+    }
+    const ownerId = this.fishingReservations.get(spotId)?.playerId;
+    if (ownerId !== id) {
+      this.reject(player, 'not-owner');
+      return false;
+    }
+    this.fishingReservations.delete(spotId);
+    this.broadcast({ type: 'fishingRelease', playerId: id, spotId }, player);
+    return true;
+  }
+
+  /**
    * Dipanggil 15 Hz: snapshot posisi per penerima sesuai AOI (grid 64 m), penampilan yang belum
    * diketahui penerima untuk subjek di AOI dekat/menengah, dan jam tiap 10 detik.
    * Mengembalikan tier tiap pasangan yang dikirim (dipakai test).
@@ -451,6 +511,11 @@ export class Room {
     if (nowMs - this.lastClockMs >= CLOCK_INTERVAL_MS) {
       this.lastClockMs = nowMs;
       this.broadcast({ type: 'clock', timeOfDay: this.timeOfDay(), timeMs: nowMs >>> 0 });
+    }
+    for (const [spotId, reservation] of this.fishingReservations) {
+      if (nowMs - reservation.heartbeatAt < FISHING_SPOT_TTL_MS) continue;
+      this.fishingReservations.delete(spotId);
+      this.broadcast({ type: 'fishingRelease', playerId: 0, spotId });
     }
     return sent;
   }

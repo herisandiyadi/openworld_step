@@ -1,0 +1,47 @@
+[
+  {
+    "id": "downtown",
+    "name": "Pusat Kota",
+    "bounds": { "minX": -128, "maxX": 128, "minZ": -128, "maxZ": 128 },
+    "busStops": [
+      { "id": "stop_plaza", "x": 5, "z": 20 },
+      { "id": "stop_office", "x": 70, "z": -60 }
+    ]
+  },
+  {
+    "id": "residential",
+    "name": "Perumahan",
+    "bounds": { "minX": -256, "maxX": 128, "minZ": -256, "maxZ": 256 },
+    "busStops": [
+      { "id": "stop_perumahan_barat", "x": -180, "z": -160 },
+      { "id": "stop_danau", "x": -70, "z": 190 }
+    ]
+  },
+  {
+    "id": "industrial",
+    "name": "Kawasan Industri",
+    "bounds": { "minX": 128, "maxX": 512, "minZ": -512, "maxZ": 512 },
+    "busStops": [
+      { "id": "stop_bengkel", "x": 205, "z": -45 },
+      { "id": "stop_gudang", "x": 180, "z": 130 }
+    ]
+  },
+  {
+    "id": "harbor",
+    "name": "Pelabuhan/Pantai",
+    "bounds": { "minX": -512, "maxX": 256, "minZ": 256, "maxZ": 512 },
+    "busStops": [
+      { "id": "bus_173", "x": -464, "z": 258.8 },
+      { "id": "bus_189", "x": 80, "z": 354.8 }
+    ]
+  },
+  {
+    "id": "city_park",
+    "name": "Taman Kota",
+    "bounds": { "minX": -512, "maxX": 256, "minZ": -512, "maxZ": 256 },
+    "busStops": [
+      { "id": "bus_0", "x": -496, "z": -509.2 },
+      { "id": "bus_159", "x": -400, "z": 194.8 }
+    ]
+  }
+]

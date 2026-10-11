@@ -25,17 +25,19 @@ const overlaps = (a: Aabb, b: Aabb) => a.minX < b.maxX && a.maxX > b.minX && a.m
 const allBuildings = world.chunks.flatMap((chunk) => chunk.buildings);
 
 describe('generateWorld', () => {
-  it('is deterministic', () => {
+  it('is deterministic', { timeout: 60_000 }, () => {
     expect(JSON.stringify(generateWorld(1337).chunks)).toBe(JSON.stringify(world.chunks));
   });
 
-  it('produces a full chunk grid with correctly sized arrays and both districts', () => {
+  it('produces a full chunk grid with correctly sized arrays and all five districts', () => {
     expect(world.chunks).toHaveLength(WORLD_CHUNKS * WORLD_CHUNKS);
     for (const chunk of world.chunks) {
       expect(chunk.heights).toHaveLength(GRID_VERTS * GRID_VERTS);
       expect(chunk.surface).toHaveLength(GRID_CELLS * GRID_CELLS);
     }
-    expect(new Set(world.chunks.map((chunk) => chunk.district))).toEqual(new Set(['downtown', 'residential', 'industrial']));
+    expect(new Set(world.chunks.map((chunk) => chunk.district))).toEqual(
+      new Set(['downtown', 'residential', 'industrial', 'harbor', 'city_park']),
+    );
   });
 
   it('stores every object in the chunk that contains it', () => {
@@ -49,7 +51,7 @@ describe('generateWorld', () => {
     }
   });
 
-  it('keeps props out of buildings and on the ground', () => {
+  it('keeps props out of buildings and on the ground', { timeout: 60_000 }, () => {
     for (const chunk of world.chunks) {
       for (const prop of chunk.props) {
         expect(allBuildings.some((building) => overlaps(building, propCollider(prop)))).toBe(false);
@@ -69,7 +71,9 @@ describe('generateWorld', () => {
 
   it('lists bus stops off the buildings in every district', () => {
     expect(world.index.busStops.length).toBeGreaterThan(10);
-    expect(new Set(world.index.busStops.map((stop) => stop.district))).toEqual(new Set(['downtown', 'residential', 'industrial']));
+    expect(new Set(world.index.busStops.map((stop) => stop.district))).toEqual(
+      new Set(['downtown', 'residential', 'industrial', 'harbor', 'city_park']),
+    );
     for (const stop of world.index.busStops) {
       const spot = { minX: stop.x - 0.4, maxX: stop.x + 0.4, minZ: stop.z - 0.4, maxZ: stop.z + 0.4 };
       expect(allBuildings.some((building) => overlaps(spot, building))).toBe(false);

@@ -9,7 +9,7 @@ import { useGraphicsSettings } from '../state/graphicsSettings';
 import { GreetingBubbles, type GreetWalker } from './GreetingBubbles';
 import { mulberry32 } from '../world/worldGen';
 import { groundHeightAt, worldUrl } from '../world/worldState';
-import { chunkCoord, districtOf } from '../world/worldSpec';
+import { chunkCoord, districtOf, legacyDistrict } from '../world/worldSpec';
 import type { LanesData } from './laneGraph';
 import { densityAt } from './density';
 import { generateResidents } from './residents';
@@ -72,7 +72,7 @@ function targetCount(preset: 'low' | 'medium' | 'high', x: number, z: number, t:
   const district = districtOf(chunkCoord(x), chunkCoord(z));
   const pool = PED_POOL[preset];
   // Kepadatan Pusat Kota (14) dipakai sebagai acuan 100%.
-  return Math.max(2, Math.round((pool * densityAt(district, 'pedestrian', t)) / 14));
+  return Math.max(2, Math.round((pool * densityAt(legacyDistrict(district), 'pedestrian', t)) / 14));
 }
 
 /** Mesh sumber pertama (SkinnedMesh) di dalam GLB warga. */

@@ -1,0 +1,366 @@
+[
+  {
+    "id": "bike_city",
+    "category": "vehicle",
+    "name": "Sepeda Kota",
+    "price": 180,
+    "asset": {
+      "model": "bike_city"
+    }
+  },
+  {
+    "id": "scooter_standard",
+    "category": "vehicle",
+    "name": "Skuter Standar",
+    "price": 450,
+    "asset": {
+      "model": "scooter_standard"
+    }
+  },
+  {
+    "id": "skateboard",
+    "category": "vehicle",
+    "name": "Skateboard",
+    "price": 120,
+    "asset": {
+      "model": "skateboard"
+    }
+  },
+  {
+    "id": "paint_scooter_blue",
+    "category": "vehicle_paint",
+    "name": "Cat Skuter Biru",
+    "price": 120,
+    "appliesTo": "scooter_standard",
+    "asset": {
+      "color": "#2f6fd6"
+    },
+    "unlockAfter": "q_antar_paket"
+  },
+  {
+    "id": "paint_scooter_red",
+    "category": "vehicle_paint",
+    "name": "Cat Skuter Merah",
+    "price": 110,
+    "appliesTo": "scooter_standard",
+    "asset": {
+      "color": "#d63030"
+    }
+  },
+  {
+    "id": "paint_bike_green",
+    "category": "vehicle_paint",
+    "name": "Cat Sepeda Hijau",
+    "price": 80,
+    "appliesTo": "bike_city",
+    "asset": {
+      "color": "#2ea84b"
+    }
+  },
+  {
+    "id": "paint_bike_yellow",
+    "category": "vehicle_paint",
+    "name": "Cat Sepeda Kuning",
+    "price": 80,
+    "appliesTo": "bike_city",
+    "asset": {
+      "color": "#e8c73c"
+    }
+  },
+  {
+    "id": "horn_klakson",
+    "category": "vehicle_upgrade",
+    "name": "Klakson Lucu",
+    "price": 60,
+    "appliesTo": "scooter_standard",
+    "asset": {
+      "sfx": "horn_beep"
+    }
+  },
+  {
+    "id": "lamp_led",
+    "category": "vehicle_upgrade",
+    "name": "Lampu LED Depan",
+    "price": 90,
+    "appliesTo": "scooter_standard",
+    "asset": {
+      "light": "led_white"
+    }
+  },
+  {
+    "id": "rack_cargo",
+    "category": "vehicle_upgrade",
+    "name": "Rak Kargo Sepeda",
+    "price": 110,
+    "appliesTo": "bike_city",
+    "asset": {
+      "mesh": "rack_01"
+    },
+    "unlockAfter": "q_kenalan"
+  },
+  {
+    "id": "handlebar_tape",
+    "category": "vehicle_upgrade",
+    "name": "Grip Handlebar Warna",
+    "price": 45,
+    "appliesTo": "bike_city",
+    "asset": {
+      "color": "#8b2fc9"
+    }
+  },
+  {
+    "id": "hat_cap_red",
+    "category": "clothing",
+    "name": "Topi Merah",
+    "price": 50,
+    "asset": {
+      "slot": "hat",
+      "model": "cap",
+      "color": "#cc2222"
+    }
+  },
+  {
+    "id": "hat_cap_navy",
+    "category": "clothing",
+    "name": "Topi Navy",
+    "price": 50,
+    "asset": {
+      "slot": "hat",
+      "model": "cap",
+      "color": "#1e2f77"
+    }
+  },
+  {
+    "id": "shirt_stripe",
+    "category": "clothing",
+    "name": "Kaos Garis-Garis",
+    "price": 70,
+    "asset": {
+      "slot": "shirt",
+      "model": "shirt_stripe"
+    }
+  },
+  {
+    "id": "shirt_plain_white",
+    "category": "clothing",
+    "name": "Kaos Polos Putih",
+    "price": 55,
+    "asset": {
+      "slot": "shirt",
+      "model": "shirt_plain",
+      "color": "#f5f5f5"
+    }
+  },
+  {
+    "id": "jacket_denim",
+    "category": "clothing",
+    "name": "Jaket Denim",
+    "price": 140,
+    "asset": {
+      "slot": "jacket",
+      "model": "jacket_denim"
+    }
+  },
+  {
+    "id": "pants_cargo",
+    "category": "clothing",
+    "name": "Celana Cargo",
+    "price": 100,
+    "asset": {
+      "slot": "pants",
+      "model": "pants_cargo"
+    }
+  },
+  {
+    "id": "shoes_sneaker_white",
+    "category": "clothing",
+    "name": "Sneakers Putih",
+    "price": 90,
+    "asset": {
+      "slot": "shoes",
+      "model": "sneaker",
+      "color": "#ffffff"
+    }
+  },
+  {
+    "id": "backpack_school",
+    "category": "clothing",
+    "name": "Tas Punggung Sekolah",
+    "price": 80,
+    "asset": {
+      "slot": "back",
+      "model": "backpack_school"
+    }
+  },
+  {
+    "id": "helmet_full",
+    "category": "clothing",
+    "name": "Helm Full-face",
+    "price": 160,
+    "asset": {
+      "slot": "hat",
+      "model": "helmet_full"
+    }
+  },
+  {
+    "id": "ticket_bus_day",
+    "category": "ticket",
+    "name": "Tiket Bus Harian",
+    "price": 30,
+    "asset": {
+      "duration": "day"
+    }
+  },
+  {
+    "id": "ticket_bus_trip",
+    "category": "ticket",
+    "name": "Tiket Bus Sekali Jalan",
+    "price": 5,
+    "asset": {
+      "duration": "trip"
+    }
+  },
+  {
+    "id": "fishing_rod_bamboo",
+    "category": "tool",
+    "name": "Joran Bambu",
+    "price": 0,
+    "asset": {
+      "slot": "rod",
+      "model": "rod_bamboo"
+    }
+  },
+  {
+    "id": "fishing_rod_carbon",
+    "category": "tool",
+    "name": "Joran Karbon",
+    "price": 300,
+    "asset": {
+      "slot": "rod",
+      "model": "rod_carbon",
+      "greenZoneBonus": 0.25
+    },
+    "unlockAfter": "q_belajar_mancing"
+  },
+  {
+    "id": "bait_worm",
+    "category": "tool",
+    "name": "Umpan Cacing",
+    "price": 10,
+    "asset": {
+      "consumable": true,
+      "bait": true
+    }
+  },
+  {
+    "id": "bait_pellet",
+    "category": "tool",
+    "name": "Umpan Pelet",
+    "price": 12,
+    "asset": {
+      "consumable": true,
+      "bait": true
+    }
+  },
+  {
+    "id": "bag_ransel",
+    "category": "tool",
+    "name": "Tas Ransel",
+    "price": 250,
+    "asset": {
+      "bagCapacity": 14
+    }
+  },
+  {
+    "id": "bag_carrier",
+    "category": "tool",
+    "name": "Tas Carrier",
+    "price": 600,
+    "asset": {
+      "bagCapacity": 20
+    },
+    "unlockAfter": "q_belajar_mancing"
+  },
+  {
+    "id": "fish_mujair",
+    "category": "fish",
+    "name": "Ikan Mujair",
+    "price": 0,
+    "asset": {
+      "species": "mujair"
+    }
+  },
+  {
+    "id": "fish_nila",
+    "category": "fish",
+    "name": "Ikan Nila",
+    "price": 0,
+    "asset": {
+      "species": "nila"
+    }
+  },
+  {
+    "id": "fish_lele",
+    "category": "fish",
+    "name": "Ikan Lele",
+    "price": 0,
+    "asset": {
+      "species": "lele"
+    }
+  },
+  {
+    "id": "fish_ikan_mas",
+    "category": "fish",
+    "name": "Ikan Mas",
+    "price": 0,
+    "asset": {
+      "species": "ikan_mas"
+    }
+  },
+  {
+    "id": "fish_gurame",
+    "category": "fish",
+    "name": "Ikan Gurame",
+    "price": 0,
+    "asset": {
+      "species": "gurame"
+    }
+  },
+  {
+    "id": "fish_patin",
+    "category": "fish",
+    "name": "Ikan Patin",
+    "price": 0,
+    "asset": {
+      "species": "patin"
+    }
+  },
+  {
+    "id": "trash_can",
+    "category": "trash",
+    "name": "Kaleng Bekas",
+    "price": 0,
+    "asset": {}
+  },
+  {
+    "id": "trash_sandal",
+    "category": "trash",
+    "name": "Sandal Bekas",
+    "price": 0,
+    "asset": {}
+  },
+  {
+    "id": "trash_boot",
+    "category": "trash",
+    "name": "Sepatu Bot Bekas",
+    "price": 0,
+    "asset": {}
+  },
+  {
+    "id": "trash_underwear",
+    "category": "trash",
+    "name": "Celana Dalam Bekas",
+    "price": 0,
+    "asset": {}
+  }
+]

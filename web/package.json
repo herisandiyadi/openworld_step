@@ -10,6 +10,9 @@
     "typecheck": "tsc --noEmit && tsc --noEmit -p tools",
     "assets": "vite-node tools/assets/build.ts",
     "world": "vite-node tools/world/build.ts",
+    "content:check": "vite-node tools/content/check.ts",
+    "content:pack": "vite-node tools/content/pack.ts",
+    "test:content": "vitest run src/content src/content-runtime",
     "test": "vitest run",
     "cap:sync": "cap sync android",
     "android:debug": "npm run build && cap sync android && cd android && gradlew assembleDebug"
@@ -17,6 +20,9 @@
   "dependencies": {
     "@capacitor/android": "7.6.9",
     "@capacitor/core": "7.6.9",
+    "@capacitor/filesystem": "7.1.9",
+    "@capacitor/haptics": "7.0.5",
+    "@capacitor/network": "7.0.4",
     "@capacitor/preferences": "7.0.4",
     "@react-three/drei": "10.7.9",
     "@react-three/fiber": "9.8.1",
@@ -24,6 +30,7 @@
     "react-dom": "19.3.0",
     "recast-navigation": "0.43.1",
     "three": "0.186.1",
+    "zod": "3.25.67",
     "zustand": "5.0.15"
   },
   "devDependencies": {

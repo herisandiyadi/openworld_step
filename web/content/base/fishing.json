@@ -1,0 +1,150 @@
+{
+  "biteWaitSeconds": {
+    "min": 3,
+    "max": 12
+  },
+  "hookWindowSeconds": 1.2,
+  "catches": [
+    {
+      "id": "fish",
+      "kind": "fish",
+      "chance": 0.55
+    },
+    {
+      "id": "can",
+      "kind": "trash",
+      "chance": 0.13
+    },
+    {
+      "id": "sandal",
+      "kind": "trash",
+      "chance": 0.12
+    },
+    {
+      "id": "boot",
+      "kind": "trash",
+      "chance": 0.1
+    },
+    {
+      "id": "underwear",
+      "kind": "trash",
+      "chance": 0.1
+    }
+  ],
+  "baitedCatches": [
+    {
+      "id": "fish",
+      "kind": "fish",
+      "chance": 0.7
+    },
+    {
+      "id": "can",
+      "kind": "trash",
+      "chance": 0.09
+    },
+    {
+      "id": "sandal",
+      "kind": "trash",
+      "chance": 0.08
+    },
+    {
+      "id": "boot",
+      "kind": "trash",
+      "chance": 0.07
+    },
+    {
+      "id": "underwear",
+      "kind": "trash",
+      "chance": 0.06
+    }
+  ],
+  "species": [
+    {
+      "id": "mujair",
+      "name": "Mujair",
+      "chance": 0.3,
+      "minWeight": 0.1,
+      "maxWeight": 0.6,
+      "pricePerKg": 8,
+      "difficulty": 1
+    },
+    {
+      "id": "nila",
+      "name": "Nila",
+      "chance": 0.28,
+      "minWeight": 0.2,
+      "maxWeight": 1.2,
+      "pricePerKg": 10,
+      "difficulty": 1
+    },
+    {
+      "id": "lele",
+      "name": "Lele",
+      "chance": 0.18,
+      "minWeight": 0.3,
+      "maxWeight": 1.5,
+      "pricePerKg": 9,
+      "difficulty": 2
+    },
+    {
+      "id": "ikan_mas",
+      "name": "Ikan mas",
+      "chance": 0.14,
+      "minWeight": 0.5,
+      "maxWeight": 3.0,
+      "pricePerKg": 14,
+      "difficulty": 2
+    },
+    {
+      "id": "gurame",
+      "name": "Gurame",
+      "chance": 0.08,
+      "minWeight": 0.8,
+      "maxWeight": 4.0,
+      "pricePerKg": 18,
+      "difficulty": 3
+    },
+    {
+      "id": "patin",
+      "name": "Patin",
+      "chance": 0.02,
+      "minWeight": 2.0,
+      "maxWeight": 8.0,
+      "pricePerKg": 22,
+      "difficulty": 3
+    }
+  ],
+  "peakHours": [
+    {
+      "from": 5,
+      "to": 8,
+      "fishChanceBonus": 0.1
+    },
+    {
+      "from": 16,
+      "to": 18,
+      "fishChanceBonus": 0.1
+    }
+  ],
+  "antiFarming": {
+    "catchesBeforePenalty": 10,
+    "fishChancePenalty": 0.15
+  },
+  "market": {
+    "fullPriceSalesPerSpecies": 10,
+    "discountPerExtraSale": 0.05,
+    "minimumMultiplier": 0.5
+  },
+  "bag": {
+    "capacities": [
+      8,
+      14,
+      20
+    ],
+    "trashStackSize": 5
+  },
+  "disposal": {
+    "coinsPerTrash": 1,
+    "dailyCoinLimit": 30
+  }
+}

@@ -1,0 +1,39 @@
+{
+  "currency": "coins",
+  "dailyBonus": 20,
+  "busFare": 5,
+  "jobs": [
+    {
+      "id": "job_bengkel",
+      "title": "Antar Suku Cadang",
+      "rewardCoins": 25,
+      "dailyLimit": 10,
+      "stepTypes": [
+        "talk",
+        "reach",
+        "talk"
+      ]
+    },
+    {
+      "id": "job_kurir",
+      "title": "Kurir Paket Pabrik",
+      "rewardCoins": 30,
+      "dailyLimit": 8,
+      "stepTypes": [
+        "talk",
+        "reach",
+        "talk"
+      ]
+    },
+    {
+      "id": "job_ojek",
+      "title": "Ojek Antar Warga",
+      "rewardCoins": 20,
+      "dailyLimit": 12,
+      "stepTypes": [
+        "talk",
+        "ride"
+      ]
+    }
+  ]
+}

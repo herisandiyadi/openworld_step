@@ -2,6 +2,7 @@ import { Preferences } from '@capacitor/preferences';
 import { create } from 'zustand';
 import type { DistrictId } from '../world/worldSpec';
 import { INITIAL_VEHICLES, type ParkedVehicle, type VehicleKind } from '../game/vehicles';
+import type { FishingSession } from '../fishing/FishingController';
 
 /** 'walk' is the default; every other mode needs a parked vehicle next to the player. */
 export type MoveMode = 'walk' | VehicleKind;
@@ -38,6 +39,10 @@ export interface Nearby {
   busStopId: string | null;
   /** Kursi bangku kosong dalam 1.5 m (hanya saat jalan kaki, tidak di udara, belum duduk). */
   seatId: string | null;
+  shopId: string | null;
+  fishingSpotId: string | null;
+  trashBinId: string | null;
+  fishStallId: string | null;
 }
 
 interface GameState {
@@ -70,6 +75,12 @@ interface GameState {
   stream: StreamInfo;
   worldReady: boolean;
   district: DistrictId | null;
+  /** Active fishing minigame session; set by the fishing action, cleared on release. Not saved. */
+  fishing: FishingSession | null;
+  /** Overlay open in the economy UI: shop / bag / stall / null. Not saved. */
+  economyScreen: 'shop' | 'bag' | 'stall' | null;
+  /** Current shop id while the shop screen is open. */
+  activeShopId: string | null;
   /** Automated map-crossing performance run (pause menu or ?soak). */
   soakActive: boolean;
   soakResult: string | null;
@@ -92,6 +103,8 @@ interface GameState {
   setStream: (stream: StreamInfo) => void;
   setWorldReady: (ready: boolean) => void;
   setDistrict: (district: DistrictId | null) => void;
+  setFishing: (session: FishingSession | null) => void;
+  setEconomyScreen: (screen: 'shop' | 'bag' | 'stall' | null, shopId?: string) => void;
   setSoakActive: (active: boolean) => void;
   setSoakResult: (result: string | null) => void;
 }
@@ -125,7 +138,16 @@ export interface BusRideInfo {
   eta: number;
 }
 
-export const NO_NEARBY: Nearby = { npcId: null, vehicleId: null, busStopId: null, seatId: null };
+export const NO_NEARBY: Nearby = {
+  npcId: null,
+  vehicleId: null,
+  busStopId: null,
+  seatId: null,
+  shopId: null,
+  fishingSpotId: null,
+  trashBinId: null,
+  fishStallId: null,
+};
 
 /** UI-facing state only. Per-frame simulation state lives in game/runtime.ts to avoid React re-renders. */
 export const useGameStore = create<GameState>()((set, get) => ({
@@ -147,6 +169,9 @@ export const useGameStore = create<GameState>()((set, get) => ({
   stream: { chunks: 0, pending: 0, applyMs: 0 },
   worldReady: false,
   district: null,
+  fishing: null,
+  economyScreen: null,
+  activeShopId: null,
   soakActive: false,
   soakResult: null,
   controls: DEFAULT_CONTROLS,
@@ -185,6 +210,8 @@ export const useGameStore = create<GameState>()((set, get) => ({
   setStream: (stream) => set({ stream }),
   setWorldReady: (worldReady) => set({ worldReady }),
   setDistrict: (district) => set({ district }),
+  setFishing: (fishing) => set({ fishing }),
+  setEconomyScreen: (economyScreen, shopId) => set({ economyScreen, activeShopId: economyScreen === 'shop' ? (shopId ?? null) : null }),
   setSoakActive: (soakActive) => set({ soakActive }),
   setSoakResult: (soakResult) => set({ soakResult }),
 }));

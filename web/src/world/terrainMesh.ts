@@ -89,7 +89,13 @@ const UP: Vec3 = [0, 1, 0];
  * sampleChunkHeight, so ground queries match the rendered surface exactly. Raised cells (sidewalks,
  * lots) get vertical curb faces toward neighbouring road cells.
  */
-export function buildTerrainBuffers(chunk: ChunkGround): TerrainBuffers {
+/**
+ * Flat-shaded, vertex-coloured terrain buffers for one chunk (built in the chunk worker).
+ * @param chunk  The chunk ground data.
+ * @param excludeSurfaces  If provided, cells with a surface id in this set are omitted from
+ *   the output. Used by the navmesh bake to skip water cells.
+ */
+export function buildTerrainBuffers(chunk: ChunkGround, excludeSurfaces?: ReadonlySet<number>): TerrainBuffers {
   const sink = new TriangleSink();
   const originX = chunkOrigin(chunk.cx);
   const originZ = chunkOrigin(chunk.cz);
@@ -99,6 +105,7 @@ export function buildTerrainBuffers(chunk: ChunkGround): TerrainBuffers {
 
   for (let j = 0; j < GRID_CELLS; j++) {
     for (let i = 0; i < GRID_CELLS; i++) {
+      if (excludeSurfaces?.has(surfaceOf(i, j))) continue;
       const x0 = originX + i * GRID_STEP;
       const z0 = originZ + j * GRID_STEP;
       const x1 = x0 + GRID_STEP;

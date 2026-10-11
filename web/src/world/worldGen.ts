@@ -8,11 +8,21 @@ import {
   chunkKey,
   chunkOrigin,
   districtOf,
-  type DistrictId,
+  type WorldDistrictId,
   GRID_CELLS,
   GRID_STEP,
   GRID_VERTS,
   HALF_WORLD,
+  LEGACY_CHUNK_OFFSET,
+  LEGACY_HALF_WORLD,
+  LEGACY_WORLD_CHUNKS,
+  type FishingSpot,
+  type FishStallPoint,
+  type TrashBinPoint,
+  type WaterBounds,
+  type BusRoute,
+  type DistrictMeta,
+  WORLD_DISTRICT_NAMES,
   type NpcSpawn,
   type PropPlacement,
   propCollider,
@@ -22,6 +32,7 @@ import {
   WORLD_CHUNKS,
   WORLD_DATA_VERSION,
   WORLD_SIZE,
+  LOAD_RADIUS,
   type WorldIndex,
 } from './worldSpec';
 import { BENCH_IDS, PROP_COLLIDERS, PROP_IDS, type PropId, SEAT_HEIGHT, SEAT_OFFSETS_X } from './propSpec';
@@ -36,12 +47,12 @@ export interface GeneratedWorld {
   chunks: ChunkData[];
 }
 
-type BlockKind = 'towers' | 'plaza' | 'houses' | 'park' | 'warehouses';
+type BlockKind = 'towers' | 'plaza' | 'houses' | 'park' | 'warehouses' | 'harbor' | 'lake';
 
 interface Block extends Aabb {
   bx: number;
   bz: number;
-  district: DistrictId;
+  district: WorldDistrictId;
   kind: BlockKind;
 }
 
@@ -59,6 +70,69 @@ const STREET_BENCH: PropId = (PROP_IDS as readonly string[]).includes('prop_benc
 const BENCH_CLEARANCE = 1.5;
 const BENCH_CLEAR_OF: readonly PropId[] = ['prop_streetlamp_01', 'prop_trashbin_01', 'prop_busstop_01'];
 const HOUSE_COLORS = ['#e8d8c3', '#d9a68b', '#b8c4a6', '#e3c46f', '#f0e4d0', '#c98f7a'];
+
+/**
+ * Lake block: chosen once in the city_park district, adjacent to a park block.
+ * cx/cz in chunk coords, bx/bz in block coords.
+ */
+/**  Fishing spots: 1 per 6 m along the perimeter. */
+function makeFishingSpots(lakeBlocks: Block[], spotIdStart: number): FishingSpot[] {
+  const spots: FishingSpot[] = [];
+  let sid = spotIdStart;
+  for (const block of lakeBlocks) {
+    const cx = (block.minX + block.maxX) / 2;
+    const cz = (block.minZ + block.maxZ) / 2;
+    const halfW = (block.maxX - block.minX) / 2 - 2;
+    const halfH = (block.maxZ - block.minZ) / 2 - 2;
+    const step = 6;
+    // North edge (z = minZ + 2)
+    for (let x = block.minX + 2; x <= block.maxX - 2; x += step) {
+      spots.push({ id: `fish_${sid++}`, x: Math.round(x * 100) / 100, z: Math.round((cz - halfH) * 100) / 100, yaw: Math.PI, water: 'lake' });
+    }
+    // South edge
+    for (let x = block.minX + 2; x <= block.maxX - 2; x += step) {
+      spots.push({ id: `fish_${sid++}`, x: Math.round(x * 100) / 100, z: Math.round((cz + halfH) * 100) / 100, yaw: 0, water: 'lake' });
+    }
+    // West edge
+    for (let z = block.minZ + 2; z <= block.maxZ - 2; z += step) {
+      spots.push({ id: `fish_${sid++}`, x: Math.round((cx - halfW) * 100) / 100, z: Math.round(z * 100) / 100, yaw: HALF_PI, water: 'lake' });
+    }
+    // East edge
+    for (let z = block.minZ + 2; z <= block.maxZ - 2; z += step) {
+      spots.push({ id: `fish_${sid++}`, x: Math.round((cx + halfW) * 100) / 100, z: Math.round(z * 100) / 100, yaw: -HALF_PI, water: 'lake' });
+    }
+  }
+  return spots;
+}
+
+/** Sea fishing spots at the harbor — scattered along south edge of harbor blocks. */
+function makeSeaFishingSpots(harborBlocks: Block[], spotIdStart: number): FishingSpot[] {
+  const spots: FishingSpot[] = [];
+  let sid = spotIdStart;
+  for (const block of harborBlocks.slice(0, 2)) {
+    const cx = (block.minX + block.maxX) / 2;
+    const step = 8;
+    for (let x = block.minX + 2; x <= block.maxX - 2; x += step) {
+      spots.push({ id: `fish_sea_${sid++}`, x: Math.round(x * 100) / 100, z: Math.round((block.maxZ - 2) * 100) / 100, yaw: 0, water: 'sea' });
+    }
+    void cx;
+  }
+  return spots;
+}
+
+/** One trash bin every ~25 m along the outer ring streets (simple grid placement). */
+function makeOuterTrashBins(outerBlocks: Block[], binIdStart: number): TrashBinPoint[] {
+  const bins: TrashBinPoint[] = [];
+  let bid = binIdStart;
+  for (const block of outerBlocks) {
+    const cx = (block.minX + block.maxX) / 2;
+    const cz = (block.minZ + block.maxZ) / 2;
+    bins.push({ id: `bin_outer_${bid++}`, x: Math.round((cx + 3) * 100) / 100, z: Math.round((block.minZ + 1) * 100) / 100 });
+    bins.push({ id: `bin_outer_${bid++}`, x: Math.round((cx - 3) * 100) / 100, z: Math.round((block.maxZ - 1) * 100) / 100 });
+    void cz;
+  }
+  return bins;
+}
 
 export const NPCS: NpcSpawn[] = [
   { id: 'npc_budi', asset: 'npc_vendor', name: 'Pak Budi', x: 5, z: 10, yaw: HALF_PI },
@@ -105,7 +179,9 @@ function valueNoise(x: number, z: number, seed: number): number {
 /** Gentle terrain: nearly flat downtown, rolling hills (up to ~5 m) in the residential ring. */
 export function terrainHeight(x: number, z: number, seed: number): number {
   const noise = valueNoise(x / 96, z / 96, seed) * 0.7 + valueNoise(x / 40, z / 40, seed + 1) * 0.3;
-  const ring = Math.max(Math.abs(x), Math.abs(z)) / HALF_WORLD;
+  // The original central 512 m keeps its old height profile; only the new outer ring uses the wider scale.
+  const inLegacy = Math.abs(x) <= LEGACY_HALF_WORLD && Math.abs(z) <= LEGACY_HALF_WORLD;
+  const ring = Math.max(Math.abs(x), Math.abs(z)) / (inLegacy ? LEGACY_HALF_WORLD : HALF_WORLD);
   const amplitude = 0.5 + 4.5 * smoothstep(0.4, 0.75, ring);
   return noise * amplitude;
 }
@@ -119,22 +195,35 @@ const isSidewalkBand = (local: number) =>
 function makeBlocks(seed: number): Block[] {
   const random = mulberry32(seed ^ 0x5bd1e995);
   const blocks: Block[] = [];
+  const legacyBlockStart = LEGACY_CHUNK_OFFSET * (CHUNK_SIZE / BLOCK_PITCH);
+  const legacyBlockEnd = legacyBlockStart + LEGACY_WORLD_CHUNKS * (CHUNK_SIZE / BLOCK_PITCH);
+  // Fixed 2x2-block lake in the outer city-park district, directly beside park blocks.
+  const lakeMinBx = 2;
+  const lakeMinBz = legacyBlockStart - 2;
   for (let bz = 0; bz < BLOCKS_PER_SIDE; bz++) {
     for (let bx = 0; bx < BLOCKS_PER_SIDE; bx++) {
       const district = districtOf(Math.floor((bx * BLOCK_PITCH) / CHUNK_SIZE), Math.floor((bz * BLOCK_PITCH) / CHUNK_SIZE));
       const roll = random();
-      const kind: BlockKind =
-        district === 'downtown'
-          ? roll < 0.18
-            ? 'plaza'
-            : 'towers'
-          : district === 'industrial'
-            ? roll < 0.15
-              ? 'park'
-              : 'warehouses'
-            : roll < 0.2
-              ? 'park'
-              : 'houses';
+      const isLake = bx >= lakeMinBx && bx < lakeMinBx + 2 && bz >= lakeMinBz && bz < lakeMinBz + 2;
+      const inLegacy = bx >= legacyBlockStart && bx < legacyBlockEnd && bz >= legacyBlockStart && bz < legacyBlockEnd;
+      let kind: BlockKind;
+      if (isLake) kind = 'lake';
+      else if (inLegacy) {
+        // Preserve the old deterministic generator exactly: old RNG was consumed in local 8x8 order.
+        // Outer blocks are generated around it, but their random sequence does not affect legacy coordinates.
+        const legacyBx = bx - legacyBlockStart;
+        const legacyBz = bz - legacyBlockStart;
+        const oldRandom = mulberry32(seed ^ 0x5bd1e995);
+        let oldRoll = 0;
+        const oldBlocksPerSide = LEGACY_WORLD_CHUNKS * (CHUNK_SIZE / BLOCK_PITCH);
+        for (let n = 0; n <= legacyBz * oldBlocksPerSide + legacyBx; n++) oldRoll = oldRandom();
+        if (district === 'downtown') kind = oldRoll < 0.18 ? 'plaza' : 'towers';
+        else if (district === 'industrial') kind = oldRoll < 0.15 ? 'park' : 'warehouses';
+        else kind = oldRoll < 0.2 ? 'park' : 'houses';
+      } else if (district === 'harbor') kind = roll < 0.45 ? 'harbor' : roll < 0.65 ? 'park' : 'warehouses';
+      else if (district === 'city_park') kind = roll < 0.65 ? 'park' : 'houses';
+      else if (district === 'industrial') kind = roll < 0.15 ? 'park' : 'warehouses';
+      else kind = roll < 0.2 ? 'park' : 'houses';
       const minX = -HALF_WORLD + bx * BLOCK_PITCH + HALF_ROAD;
       const minZ = -HALF_WORLD + bz * BLOCK_PITCH + HALF_ROAD;
       blocks.push({ bx, bz, district, kind, minX, minZ, maxX: minX + BLOCK_PITCH - ROAD_WIDTH, maxZ: minZ + BLOCK_PITCH - ROAD_WIDTH });
@@ -151,6 +240,7 @@ function surfaceAtWorld(x: number, z: number, blocks: readonly Block[]): number 
   const bx = Math.floor((x + HALF_WORLD) / BLOCK_PITCH);
   const bz = Math.floor((z + HALF_WORLD) / BLOCK_PITCH);
   const kind = blocks[bz * BLOCKS_PER_SIDE + bx]?.kind ?? 'park';
+  if (kind === 'lake' || kind === 'harbor') return SURFACE.water;
   if (kind === 'towers' || kind === 'plaza' || kind === 'warehouses') return SURFACE.plaza;
   return SURFACE.grass;
 }
@@ -181,6 +271,10 @@ function makeChunkGround(cx: number, cz: number, seed: number, blocks: readonly 
     props: [],
     colliders: [],
     seats: [],
+    water: [],
+    fishingSpots: [],
+    trashBins: [],
+    fishStalls: [],
   };
 }
 
@@ -235,6 +329,10 @@ export function generateWorld(seed = 1337): GeneratedWorld {
     const centerX = (block.minX + block.maxX) / 2;
     const centerZ = (block.minZ + block.maxZ) / 2;
 
+    if (block.kind === 'lake' || block.kind === 'harbor') {
+      // Water blocks are baked after props/buildings so they remain open and non-navigable.
+      continue;
+    }
     if (block.kind === 'towers') {
       if (random() < 0.15) {
         const inset = 1 + random();
@@ -402,11 +500,59 @@ export function generateWorld(seed = 1337): GeneratedWorld {
     if (box) chunkAt(npc.x, npc.z).colliders.push(box);
   });
 
+  // Bake non-navigable water, interaction points and fish stalls into owning chunks.
+  const lakeBlocks = blocks.filter((block) => block.kind === 'lake');
+  const harborBlocks = blocks.filter((block) => block.kind === 'harbor');
+  const waterBodies: WaterBounds[] = [];
+  for (const block of lakeBlocks) {
+    const bounds = { minX: block.minX, maxX: block.maxX, minZ: block.minZ, maxZ: block.maxZ };
+    const water: WaterBounds = { id: 'lake_city_park', kind: 'lake', bounds, noNav: true, adjacentDistrict: 'city_park' };
+    const chunk = chunkAt((block.minX + block.maxX) / 2, (block.minZ + block.maxZ) / 2);
+    chunk.water.push(water);
+    chunk.colliders.push(bounds);
+    waterBodies.push(water);
+  }
+  for (const block of harborBlocks.slice(0, 2)) {
+    const bounds = { minX: block.minX, maxX: block.maxX, minZ: block.minZ, maxZ: block.maxZ };
+    const water: WaterBounds = { id: 'sea_harbor', kind: 'sea', bounds, noNav: true };
+    const chunk = chunkAt((block.minX + block.maxX) / 2, (block.minZ + block.maxZ) / 2);
+    chunk.water.push(water);
+    chunk.colliders.push(bounds);
+    waterBodies.push(water);
+  }
+  const fishingSpots = [...makeFishingSpots(lakeBlocks, 0), ...makeSeaFishingSpots(harborBlocks, 0)];
+  for (const spot of fishingSpots) chunkAt(spot.x, spot.z).fishingSpots.push(spot);
+  const outerBlocks = blocks.filter((block) =>
+    block.bx < LEGACY_CHUNK_OFFSET * 2 || block.bx >= (LEGACY_CHUNK_OFFSET + LEGACY_WORLD_CHUNKS) * 2 ||
+    block.bz < LEGACY_CHUNK_OFFSET * 2 || block.bz >= (LEGACY_CHUNK_OFFSET + LEGACY_WORLD_CHUNKS) * 2,
+  );
+  const trashBins = makeOuterTrashBins(outerBlocks.filter((block) => block.kind !== 'lake' && block.kind !== 'harbor'), 0);
+  for (const prop of props.filter((entry) => entry.id === 'prop_trashbin_01')) {
+    trashBins.push({ id: `bin_${trashBins.length}`, x: prop.x, z: prop.z });
+  }
+  for (const bin of trashBins) chunkAt(bin.x, bin.z).trashBins.push(bin);
+  const lake = lakeBlocks[0];
+  const harbor = harborBlocks[0];
+  const fishStalls: FishStallPoint[] = [];
+  if (lake) fishStalls.push({ id: 'fish_stall_lake', x: lake.maxX + 2, z: (lake.minZ + lake.maxZ) / 2, water: 'lake' });
+  if (harbor) fishStalls.push({ id: 'fish_stall_harbor', x: harbor.minX + 2, z: harbor.minZ - 2, water: 'sea' });
+  for (const stall of fishStalls) chunkAt(stall.x, stall.z).fishStalls.push(stall);
+
+  const districtMetas: DistrictMeta[] = (Object.entries(WORLD_DISTRICT_NAMES) as [WorldDistrictId, string][]).map(([id, name]) => ({ id, name }));
+  const busRoutes: BusRoute[] = [
+    { id: 'route_industrial', districts: ['downtown', 'industrial'], stops: [] },
+    { id: 'route_harbor', districts: ['downtown', 'harbor'], stops: [] },
+    { id: 'route_city_park', districts: ['downtown', 'city_park'], stops: [] },
+  ];
+
   const index: WorldIndex = {
     version: WORLD_DATA_VERSION,
+    worldVersion: '3.0.0-u4-fishing',
     chunkSize: CHUNK_SIZE,
     worldChunks: WORLD_CHUNKS,
+    worldSize: WORLD_SIZE,
     gridStep: GRID_STEP,
+    bounds: { minX: -HALF_WORLD, maxX: HALF_WORLD, minZ: -HALF_WORLD, maxZ: HALF_WORLD },
     spawn: { x: 0, z: 0 },
     npcs: NPCS,
     busStops: props
@@ -424,9 +570,24 @@ export function generateWorld(seed = 1337): GeneratedWorld {
       cz: chunk.cz,
       district: chunk.district,
       file: `chunks/${chunkKey(chunk.cx, chunk.cz)}.json`,
+      navmesh: `navmesh/${chunkKey(chunk.cx, chunk.cz)}.bin`,
     })),
-    navmesh: 'navmesh.bin',
-    map: { file: 'map.png', pixelsPerMeter: 2 },
+    waterBodies,
+    busRoutes,
+    districts: districtMetas,
+    navmesh: {
+      format: 'recast-tile-v1',
+      directory: 'navmesh',
+      pattern: '{cx}_{cz}.bin',
+      loadRadius: LOAD_RADIUS,
+    },
+    map: { file: 'map.png', pixelsPerMeter: 1, width: WORLD_SIZE, height: WORLD_SIZE },
+    exploration: { version: 2, cellSize: 8, width: WORLD_SIZE / 8, height: WORLD_SIZE / 8, originX: -HALF_WORLD, originZ: -HALF_WORLD },
+    legacy: {
+      chunkOffset: { x: LEGACY_CHUNK_OFFSET, z: LEGACY_CHUNK_OFFSET },
+      worldChunks: LEGACY_WORLD_CHUNKS,
+      bounds: { minX: -LEGACY_HALF_WORLD, maxX: LEGACY_HALF_WORLD, minZ: -LEGACY_HALF_WORLD, maxZ: LEGACY_HALF_WORLD },
+    },
   };
   return { index, chunks };
 }

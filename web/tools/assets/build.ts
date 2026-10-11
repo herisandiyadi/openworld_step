@@ -18,6 +18,12 @@ import { boundsOf, evaluateScene, type Bounds, type Triangle } from './lib/evalu
 import { encodePng } from './lib/png';
 import { composeSheet, renderTile, type View } from './lib/render';
 import { ASSETS } from './registry';
+import { PIPELINE_CONFIG } from './pipeline/config';
+import { buildLodChain } from './pipeline/lod';
+import type { Category } from './defs/types';
+
+/** Categories that get runtime LOD files (Notion §12.6). Start narrow; widen per category after validation. */
+const LOD_CATEGORIES: ReadonlySet<Category> = new Set<Category>(['prop_small']);
 
 const WEB_ROOT = resolve(dirname(fileURLToPath(import.meta.url)), '../..');
 const OUT_DIR = join(WEB_ROOT, 'public/assets');
@@ -48,6 +54,7 @@ interface ManifestEntry {
   animations: { name: string; duration: number }[];
   nodes: string[];
   bounds: Bounds;
+  lods?: { level: number; path: string; triangles: number }[];
   collider: AssetDef['collider'];
   license: string;
   preview: string;
@@ -60,6 +67,7 @@ interface Result {
   warnings: string[];
   entry?: ManifestEntry;
   glb?: Uint8Array;
+  lodFiles?: { level: number; path: string; glb: Uint8Array; triangles: number }[];
 }
 
 const round = (value: number, digits = 3) => Number(value.toFixed(digits));
@@ -162,6 +170,31 @@ async function processAsset(def: AssetDef, io: NodeIO, built: Map<string, Docume
   if (budget.maxBones !== undefined && stats.bones > budget.maxBones) result.errors.push(`Bones ${stats.bones} > ${budget.maxBones}`);
   if (reloaded.getRoot().listTextures().length > 0) result.errors.push('Textures present; Mode B assets must use vertex colours');
 
+  if (LOD_CATEGORIES.has(def.category)) {
+    const lodDocs = await buildLodChain(reloaded, PIPELINE_CONFIG.lod.scales);
+    result.lodFiles = [];
+    let previousTriangles = stats.triangles;
+    for (let level = 1; level < lodDocs.length; level++) {
+      const lodDoc = lodDocs[level]!;
+      await lodDoc.transform(meshopt({ encoder: MeshoptEncoder, level: 'medium', quantizationVolume: 'mesh' }));
+      const lodGlb = await io.writeBinary(lodDoc);
+      const lodPath = `assets/${def.id}_lod${level}.glb`;
+      summarizeValidation(await validateBytes(lodGlb, { uri: `${def.id}_lod${level}.glb`, maxIssues: 50 }), `lod${level}`, result);
+      const decodedLod = await io.readBinary(lodGlb);
+      const lodStats = countStats(decodedLod);
+      // Prop kecil dengan banyak vertex di tepi AABB (bench, trash) tidak bisa disederhanakan lebih
+      // jauh: simplifier terkunci dan LOD2 sama dengan LOD1. Level seperti itu dibuang, bukan
+      // dipaksa lulus. Yang dianggap error hanya bila LOD yang dihasilkan lebih berat dari budget.
+      if (lodStats.triangles >= previousTriangles) {
+        result.warnings.push(`LOD${level} dibuang: ${lodStats.triangles} tri tidak di bawah ${previousTriangles} (vertex terkunci di tepi AABB)`);
+        break;
+      }
+      if (lodStats.triangles > budget.maxTriangles) result.errors.push(`LOD${level} triangles ${lodStats.triangles} > ${budget.maxTriangles}`);
+      result.lodFiles.push({ level, path: lodPath, glb: lodGlb, triangles: lodStats.triangles });
+      previousTriangles = lodStats.triangles;
+    }
+  }
+
   const tiles = VIEWS.map((view) => renderTile(sourceTriangles, view, TILE));
   for (const pose of def.previews ?? []) {
     let triangles: Triangle[] = evaluateScene(source, pose.clip, pose.phase);
@@ -194,6 +227,7 @@ async function processAsset(def: AssetDef, io: NodeIO, built: Map<string, Docume
     })),
     nodes: reloaded.getRoot().listNodes().map((n) => n.getName()).filter((n) => !n.startsWith('bone_')),
     bounds: roundBounds(finalBounds),
+    ...(result.lodFiles ? { lods: result.lodFiles.map(({ level, path, triangles }) => ({ level, path, triangles })) } : {}),
     collider: def.collider,
     license: LICENSE,
     preview: `asset-previews/${def.id}.png`,
@@ -233,6 +267,7 @@ async function main(): Promise<void> {
       continue;
     }
     await writeFile(target, result.glb);
+    for (const lod of result.lodFiles ?? []) await writeFile(join(OUT_DIR, `${def.id}_lod${lod.level}.glb`), lod.glb);
     entries.set(def.id, result.entry);
   }
 

@@ -26,10 +26,15 @@ export function TapToMove() {
     const downs = new Map<number, { x: number; y: number; time: number }>();
 
     const onPointerDown = (event: PointerEvent) => {
+      if (useGameStore.getState().fishing) return;
       downs.set(event.pointerId, { x: event.clientX, y: event.clientY, time: performance.now() });
     };
 
     const onPointerUp = (event: PointerEvent) => {
+      if (useGameStore.getState().fishing) {
+        downs.clear();
+        return;
+      }
       const down = downs.get(event.pointerId);
       downs.delete(event.pointerId);
       if (!down) return;

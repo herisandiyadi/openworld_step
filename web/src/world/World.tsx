@@ -4,14 +4,17 @@ import { useGLTF } from '@react-three/drei';
 import type { Mesh } from 'three';
 import { assetUrl } from '../app/assets';
 import { AmbientLayer } from '../ambient/AmbientLayer';
-import { Npcs } from '../game/Npc';
+import { contentRuntime } from '../app/contentRuntime';
 import { playerState, sceneRefs } from '../game/runtime';
 import { useGameStore } from '../state/gameStore';
+import { useGraphicsSettings } from '../state/graphicsSettings';
 import { ChunkStreamer, type PropParts } from './chunkStreamer';
 import { Impostors } from './Impostors';
 import { loadNavigation } from './navigation';
+import { NpcLayer } from './NpcLayer';
 import { PROP_IDS } from './propSpec';
 import { chunkAt, loadWorldIndex, worldUrl } from './worldState';
+import { legacyDistrict } from './worldSpec';
 
 const STATS_INTERVAL = 0.5;
 
@@ -46,13 +49,16 @@ export function World() {
   const statsTimer = useRef(0);
 
   // Created inside the effect (not useMemo) so a StrictMode/remount cleanup can never leave a
-  // disposed streamer with a terminated worker in use.
+  // disposed streamer with a terminated worker in use. The prop-distance LOD tier is read once
+  // here (getState, not a subscription): changing quality in settings does NOT recreate the
+  // streamer, because that would discard every loaded chunk. The new tier applies on next world mount.
   useEffect(() => {
     const instance = new ChunkStreamer(
       parts,
       (key) => worldUrl(`chunks/${key}.json`),
       () => setWorldReady(true),
       (message) => console.error(`[world] ${message}`),
+      useGraphicsSettings.getState().settings.quality,
     );
     sceneRefs.pickables = instance.pickables;
     setStreamer(instance);
@@ -64,7 +70,10 @@ export function World() {
   }, [parts, setWorldReady]);
 
   useEffect(() => {
-    loadNavigation(index.navmesh).catch((error: unknown) => console.error('[world] navmesh', error));
+    // navmesh is now a per-tile object; navigation.ts reads the directory and pattern from it.
+    loadNavigation(index.navmesh.directory, index.navmesh.pattern, index.navmesh.loadRadius).catch(
+      (error: unknown) => console.error('[world] navmesh', error),
+    );
   }, [index.navmesh]);
 
   useFrame((_, delta) => {
@@ -76,14 +85,15 @@ export function World() {
     const { stats } = streamer;
     setStream({ chunks: stats.loaded, pending: stats.pending, applyMs: stats.maxApplyMs });
     const district = chunkAt(playerState.x, playerState.z)?.district ?? null;
-    if (district !== useGameStore.getState().district) setDistrict(district);
+    const runtimeDistrict = district ? legacyDistrict(district) : null;
+    if (runtimeDistrict !== useGameStore.getState().district) setDistrict(runtimeDistrict);
   });
 
   return (
     <>
       {streamer && <primitive object={streamer.root} />}
       <Impostors />
-      <Npcs spawns={index.npcs} />
+      <NpcLayer baked={index.npcs} registry={contentRuntime.registry} />
       <AmbientLayer busStops={index.busStops} />
     </>
   );

@@ -29,12 +29,29 @@ import { QUALITY_PRESETS, type Quality, useGameStore } from '../state/gameStore'
 import { RenderFoundation } from '../render/RenderFoundation';
 import { VisualEffects } from '../render/VisualEffects';
 import { SceneLighting } from '../render/SceneLighting';
+import { QuestSignals } from '../game/QuestSignals';
+import { initQuests } from '../game/questRuntime';
+import { initJobs } from '../game/jobRuntime';
+import { useContentProgress } from '../state/contentProgress';
+
+import { ensureContentBooted } from './contentBoot';
 
 const SKY_COLOR = '#bcd3e6';
 preloadAssets();
 void useAiSettings.getState().load();
 void usePlayerProfile.getState().load();
 installAudio();
+
+// Boot content runtime: activate any staged pack, then load bundled or active content.
+void ensureContentBooted().then((pack) => {
+  initQuests(pack.registry);
+  initJobs(pack.registry, pack.economy);
+  const today = new Date().toISOString().slice(0, 10);
+  useContentProgress.getState().rollDailyState(today);
+  useContentProgress.getState().claimDailyBonus(today, pack.economy?.dailyBonus ?? 0);
+  useContentProgress.getState().setContentVersion(pack.manifest.version);
+}).catch((error) => console.error('[content] Boot failed:', error));
+
 if (SOAK_FROM_URL) useGameStore.setState({ screen: 'game', soakActive: true });
 
 const DOWNGRADE: Record<Quality, Quality> = { high: 'medium', medium: 'low', low: 'low' };
@@ -115,6 +132,7 @@ function Game() {
         {soakActive && <SoakTest />}
       </Canvas>
       <Hud />
+      <QuestSignals />
       <LoadingScreen />
       <AudioDirector />
       <NetDriver />

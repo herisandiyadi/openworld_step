@@ -14,7 +14,10 @@ import { DRIVE, stepDrive } from './vehicleSpec';
 import { cameraState, rotateCameraInput } from '../camera/followCamera';
 import { CameraRig } from '../camera/CameraRig';
 import { useGameStore } from '../state/gameStore';
+import { FishingVisuals } from '../fishing/FishingVisuals';
 import { groundHeightAt, worldState } from '../world/worldState';
+import { createFishingMovementLock, enforceFishingMovementLock } from './fishingLock';
+import { filteredRawInput } from './inputLock';
 
 const TURN_SMOOTHING = 14;
 const LIGHT_OFFSET = new Vector3(18, 30, 12);
@@ -36,6 +39,7 @@ function lerpAngle(from: number, to: number, alpha: number): number {
 export function PlayerController({ shadows }: { shadows: boolean }) {
   const mode = useGameStore((state) => state.mode);
   const seated = useGameStore((state) => state.seated);
+  const fishing = useGameStore((state) => state.fishing);
   /** Naik bus (menunggu, duduk di dalam, sampai turun): kontrol jalan kaki dan gravitasi mati. */
   const onBus = useGameStore((state) => state.busRide !== null);
   /** Sudah di dalam bus (bukan sekadar menunggu di halte): hero memakai pose duduk. */
@@ -47,15 +51,23 @@ export function PlayerController({ shadows }: { shadows: boolean }) {
   const markerRef = useRef<Mesh>(null);
   const lightRef = useRef<DirectionalLight>(null);
   const lightTarget = useMemo(() => new Object3D(), []);
+  const fishingLock = useMemo(() => createFishingMovementLock(), []);
 
   useFrame((state, rawDelta) => {
     const dt = Math.min(rawDelta, MAX_DT);
-    const raw = { x: joystickInput.x + keyboardInput.x, z: joystickInput.z + keyboardInput.z };
+    const fishingActive = fishing !== null;
+    const combinedInput = { x: joystickInput.x + keyboardInput.x, z: joystickInput.z + keyboardInput.z };
+    const raw = filteredRawInput(fishingActive, combinedInput);
     const startX = onBus ? lastPos.current.x : playerState.x;
     const startZ = onBus ? lastPos.current.z : playerState.z;
 
     const seat = playerSeat.seat;
-    if (onBus) {
+    if (enforceFishingMovementLock(fishingLock, fishingActive, playerState)) {
+      driveState.speed = 0;
+      playerMotion.speed = 0;
+      jumpState.y = 0;
+      jumpState.vy = 0;
+    } else if (onBus) {
       // Posisi di kursi bus ditulis AmbientLayer (useFrame prioritas -1, jadi sudah terjadi frame ini).
       // Tidak ada stepPlayer/pushOutOfBoxes di sini: collider jalan/halte tidak boleh mendorong pemain
       // keluar dari bus. Selama bus belum datang pemain diam menunggu di halte.
@@ -169,10 +181,14 @@ export function PlayerController({ shadows }: { shadows: boolean }) {
 
       <group ref={playerRef}>
         <group ref={bodyRef}>
-          {mode !== 'car' && <Hero mode={mode} seated={seated || boarded} />}
+          {mode !== 'car' && <Hero mode={mode} seated={seated || boarded} fishing={fishing} />}
           <PlayerVehicle />
         </group>
       </group>
+
+      {fishing && fishing.phase !== 'result' && (
+        <FishingVisuals session={fishing} player={{ x: playerState.x, z: playerState.z, heading: playerState.heading }} />
+      )}
 
       <mesh ref={markerRef} rotation-x={-Math.PI / 2} visible={false}>
         <ringGeometry args={[0.45, 0.65, 24]} />
