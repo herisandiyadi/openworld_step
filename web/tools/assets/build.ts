@@ -173,6 +173,7 @@ async function processAsset(def: AssetDef, io: NodeIO, built: Map<string, Docume
   if (LOD_CATEGORIES.has(def.category)) {
     const lodDocs = await buildLodChain(reloaded, PIPELINE_CONFIG.lod.scales);
     result.lodFiles = [];
+    let previousTriangles = stats.triangles;
     for (let level = 1; level < lodDocs.length; level++) {
       const lodDoc = lodDocs[level]!;
       await lodDoc.transform(meshopt({ encoder: MeshoptEncoder, level: 'medium', quantizationVolume: 'mesh' }));
@@ -181,10 +182,16 @@ async function processAsset(def: AssetDef, io: NodeIO, built: Map<string, Docume
       summarizeValidation(await validateBytes(lodGlb, { uri: `${def.id}_lod${level}.glb`, maxIssues: 50 }), `lod${level}`, result);
       const decodedLod = await io.readBinary(lodGlb);
       const lodStats = countStats(decodedLod);
-      const previousTriangles = level === 1 ? stats.triangles : (result.lodFiles[level - 2]?.triangles ?? stats.triangles);
-      if (lodStats.triangles >= previousTriangles) result.errors.push(`LOD${level} triangles ${lodStats.triangles} not below previous level ${previousTriangles}`);
+      // Prop kecil dengan banyak vertex di tepi AABB (bench, trash) tidak bisa disederhanakan lebih
+      // jauh: simplifier terkunci dan LOD2 sama dengan LOD1. Level seperti itu dibuang, bukan
+      // dipaksa lulus. Yang dianggap error hanya bila LOD yang dihasilkan lebih berat dari budget.
+      if (lodStats.triangles >= previousTriangles) {
+        result.warnings.push(`LOD${level} dibuang: ${lodStats.triangles} tri tidak di bawah ${previousTriangles} (vertex terkunci di tepi AABB)`);
+        break;
+      }
       if (lodStats.triangles > budget.maxTriangles) result.errors.push(`LOD${level} triangles ${lodStats.triangles} > ${budget.maxTriangles}`);
       result.lodFiles.push({ level, path: lodPath, glb: lodGlb, triangles: lodStats.triangles });
+      previousTriangles = lodStats.triangles;
     }
   }
 

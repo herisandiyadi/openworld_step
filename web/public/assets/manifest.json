@@ -1098,6 +1098,13 @@
           0.32
         ]
       },
+      "lods": [
+        {
+          "level": 1,
+          "path": "assets/prop_bench_01_lod1.glb",
+          "triangles": 84
+        }
+      ],
       "collider": {
         "type": "box",
         "center": [
@@ -1145,6 +1152,13 @@
           0.294
         ]
       },
+      "lods": [
+        {
+          "level": 1,
+          "path": "assets/prop_bench_02_lod1.glb",
+          "triangles": 72
+        }
+      ],
       "collider": {
         "type": "box",
         "center": [
@@ -1378,6 +1392,13 @@
           0.257
         ]
       },
+      "lods": [
+        {
+          "level": 1,
+          "path": "assets/prop_trashbin_01_lod1.glb",
+          "triangles": 66
+        }
+      ],
       "collider": {
         "type": "box",
         "center": [
