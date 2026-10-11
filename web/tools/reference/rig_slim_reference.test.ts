@@ -71,4 +71,18 @@ describe('slim_hero_rigged.glb', () => {
     expect(b.min[1]!).toBeGreaterThanOrEqual(-0.02);
     expect(b.max[1]! - b.min[1]!).toBeCloseTo(TARGET_HEIGHT, 1);
   });
+
+  it('plants the feet in locomotion clips (no sole under the ground)', () => {
+    // Guard regresi untuk koreksi hips: sebelum koreksi telapak Walk menembus ~3,8 cm dan Run ~2,6 cm.
+    const N = 60;
+    for (const clip of ['anim_Walk', 'anim_Run']) {
+      let min = Infinity;
+      for (let f = 0; f <= N; f++) {
+        for (const t of evaluateScene(doc, clip, f / N)) {
+          for (const v of [t.a, t.b, t.c]) min = Math.min(min, v[1]);
+        }
+      }
+      expect(min, `${clip} sole under ground`).toBeGreaterThan(-0.004);
+    }
+  }, 60_000); // evaluasi 120 pose ~7 s; default vitest 5 s terlalu ketat
 });

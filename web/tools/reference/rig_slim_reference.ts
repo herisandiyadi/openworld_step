@@ -89,6 +89,18 @@ function boneForNode(nodeName: string): BoneName {
 /** Sendi yang dihaluskan: vertex dalam BLEND_RADIUS dari sendi dicampur dengan tulang induknya. */
 const BLEND_RADIUS = 0.07;
 
+/** Klip lokomosi yang telapaknya harus menapak tanah; Sit tidak termasuk (ditentukan bangku). */
+const GROUNDED_CLIPS = ['anim_Walk', 'anim_Run'] as const;
+/** Jarak aman telapak ke tanah setelah koreksi (2 mm). */
+const FOOT_CLEARANCE = 0.002;
+/** Jumlah frame per klip, diisi saat klip dibangun agar koreksi memakai sample yang sama. */
+const FRAMES = new Map<string, number>();
+const FRAMES_OF = (name: string): number => {
+  const frames = FRAMES.get(name);
+  if (frames === undefined) throw new Error(`Frame count missing for ${name}`);
+  return frames;
+};
+
 /**
  * Smooth skinning dua tulang. `bone` adalah tulang utama dari peta nama bagian.
  * Jika vertex berada dekat pangkal tulang (joint dengan parent), bobotnya dibagi ke parent
@@ -231,6 +243,7 @@ async function main(): Promise<void> {
   const hipsRest = scaledRest[boneIndex('hips')]!;
   for (const clip of clips) {
     const frames = Math.max(2, Math.round(clip.duration * FPS));
+    FRAMES.set(clip.name, frames);
     const times = new Float32Array(frames + 1);
     const rotations = BONES.map(() => new Float32Array((frames + 1) * 4));
     const hipsTranslation = new Float32Array((frames + 1) * 3);
@@ -255,6 +268,41 @@ async function main(): Promise<void> {
       if (i > 0) addTrack(jointNodes[i]!, 'rotation', rotations[i]!);
     });
     addTrack(jointNodes[boneIndex('hips')]!, 'translation', hipsTranslation);
+  }
+
+  // Kontak kaki: klip lokomosi (Walk/Run) menurunkan hips sampai ~4 cm sehingga telapak
+  // menembus tanah. Hitung terlebih dahulu offset yang dibutuhkan per frame dari pose yang
+  // sudah dievaluasi (bukan dari angka tetap), lalu angkat hips hanya bila titik terendah di
+  // bawah 0 (lift-only). Frame terakhir identik dengan frame pertama, jadi loop tetap mulus.
+  // Sit/Idle/Talk tidak disentuh: Sit diatur oleh tinggi bangku, bukan tanah.
+  for (const name of GROUNDED_CLIPS) {
+    const animation = doc.getRoot().listAnimations().find((a) => a.getName() === name);
+    const hipsChannel = animation?.listChannels().find((c) => c.getTargetNode() === jointNodes[boneIndex('hips')] && c.getTargetPath() === 'translation');
+    const output = hipsChannel?.getSampler()?.getOutput();
+    if (!animation || !output) throw new Error(`Hips translation channel missing for ${name}`);
+    // Kebutuhan angkat di tiap sub-sample (4 per frame). Key frame diberi nilai maksimum dari
+    // tetangganya, karena interpolasi linear antar key bisa menurunkan telapak di antara key.
+    const frames = FRAMES_OF(name);
+    const SUB = 4;
+    const need: number[] = [];
+    for (let s = 0; s <= frames * SUB; s++) {
+      const minY = Math.min(...evaluateScene(doc, name, s / (frames * SUB)).flatMap((t) => [t.a[1], t.b[1], t.c[1]]));
+      need.push(minY < 0 ? -minY + FOOT_CLEARANCE : 0);
+    }
+    const lifts: number[] = [];
+    for (let frame = 0; frame <= frames; frame++) {
+      let lift = 0;
+      for (let s = Math.max(0, (frame - 1) * SUB); s <= Math.min(frames * SUB, (frame + 1) * SUB); s++) lift = Math.max(lift, need[s]!);
+      lifts.push(lift);
+    }
+    // Loop: key terakhir harus identik dengan key pertama, jadi samakan angkatnya.
+    const loopLift = Math.max(lifts[0]!, lifts[frames]!);
+    lifts[0] = loopLift;
+    lifts[frames] = loopLift;
+    const array = output.getArray() as Float32Array;
+    lifts.forEach((lift, frame) => { array[frame * 3 + 1] = array[frame * 3 + 1]! + lift; });
+    output.setArray(array);
+    console.log(`${name}: max hips lift ${(Math.max(...lifts) * 100).toFixed(2)} cm`);
   }
 
   const before = sourceTriangles;
