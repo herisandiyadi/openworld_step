@@ -26,8 +26,11 @@ const listeners = new Set<MapUpdateListener>();
 let state: MapUpdateState = { phase: 'idle' };
 let pollTimer: ReturnType<typeof setTimeout> | null = null;
 
-export const MAP_LATEST_URL: string =
-  (import.meta.env.VITE_MAPS_LATEST_URL as string | undefined) ?? '/maps-manifest/latest.json';
+/** Absolute URL: `new URL()` tanpa base gagal untuk path relatif ("Invalid base URL"). */
+export const MAP_LATEST_URL: string = new URL(
+  (import.meta.env.VITE_MAPS_LATEST_URL as string | undefined) ?? '/maps-manifest/latest.json',
+  typeof document !== 'undefined' ? document.baseURI : 'http://localhost/',
+).toString();
 
 export const MAP_POLL_INTERVAL_MS: number =
   Number(import.meta.env.VITE_MAPS_POLL_MS ?? 30 * 60 * 1000); // default 30 menit
@@ -56,8 +59,9 @@ async function resolveLatest(): Promise<MapUpdateState> {
   if (!response.ok) throw new Error(`HTTP ${response.status}`);
   const latest = (await response.json()) as { manifestUrl: string; contentBaseUrl?: string };
 
-  // Ambil manifest peta (tanpa verifikasi di sini; ContentUpdateManager yang verifikasi saat stage).
-  const manifestResponse = await fetch(new URL(latest.manifestUrl, MAP_LATEST_URL), { cache: 'no-store' });
+  // latest.manifestUrl sudah absolute atau relative ke domain root; resolve ke document.baseURI
+  const manifestUrl = new URL(latest.manifestUrl, typeof document !== 'undefined' ? document.baseURI : MAP_LATEST_URL).toString();
+  const manifestResponse = await fetch(manifestUrl, { cache: 'no-store' });
   if (!manifestResponse.ok) throw new Error(`manifest HTTP ${manifestResponse.status}`);
   const manifest = (await manifestResponse.json()) as {
     id: string;

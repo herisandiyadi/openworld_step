@@ -131,6 +131,12 @@ export function PedestrianLayer() {
       .then((response) => (response.ok ? (response.json() as Promise<LanesData>) : Promise.reject(new Error(`lanes: HTTP ${response.status}`))))
       .then((lanes) => {
         if (!alive) return;
+        // Peta tanpa jalur pejalan (mis. geo map dengan lanes kosong): tidak ada warga yang di-spawn.
+        if (lanes.walkEdges.length === 0 || lanes.walkNodes.length === 0) {
+          pedRuntime.graph = null;
+          setData(lanes);
+          return;
+        }
         pedRuntime.graph = buildWalkGraph(lanes);
         setData(lanes);
       })
