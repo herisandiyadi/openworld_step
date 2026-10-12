@@ -121,8 +121,8 @@ export async function buildAllMapsManifest({ keyId, privateKey }) {
   return maps;
 }
 
-// CLI
-if (import.meta.url === `file://${process.argv[1]}`) {
+// Run when MAP_PACK_RUN=1 (set by geo-generator spawn); or when run directly via node (not imported)
+if (process.env.MAP_PACK_RUN === '1') {
   const keyId = process.env.CONTENT_SIGNING_KEY_ID;
   const privateKey = process.env.CONTENT_SIGNING_PRIVATE_KEY || (process.env.CONTENT_SIGNING_PRIVATE_KEY_FILE && readFileSync(process.env.CONTENT_SIGNING_PRIVATE_KEY_FILE, 'utf8'));
   if (!keyId || !privateKey) {

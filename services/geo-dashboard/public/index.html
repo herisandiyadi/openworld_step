@@ -68,10 +68,34 @@ const API = '/api';
 let currentJobId = null;
 
 async function loadJobs() {
-  const r = await fetch(API + '/jobs'); // server tidak punya endpoint ini, biar 404 -> handle
-  // fallback: tidak ada list endpoint, jadi kosongkan
-  document.getElementById('jobList').textContent = 'Gunakan form di atas untuk membuat job baru. Status akan muncul di sini setelah create.';
+  try {
+    const r = await fetch(API + '/jobs');
+    if (!r.ok) throw new Error('HTTP ' + r.status);
+    const jobs = await r.json();
+    if (!jobs.length) {
+      document.getElementById('jobList').textContent = 'Belum ada job. Buat lewat form di atas.';
+      return;
+    }
+    document.getElementById('jobList').innerHTML = jobs.slice(0, 20).map(j =>
+      `<div style="display:flex;gap:8px;align-items:center;padding:6px 0;border-bottom:1px solid var(--border)">
+        <span class="status s-${j.status}">${j.status}</span>
+        <strong>${j.name}</strong>
+        <span class="small">${j.id}</span>
+        <span class="small">${new Date(j.createdAt).toLocaleString()}</span>
+        <button style="padding:2px 10px;font-size:12px" onclick="showJob('${j.id}')">Lihat</button>
+      </div>`
+    ).join('');
+  } catch (e) {
+    document.getElementById('jobList').textContent = 'Gagal memuat daftar job: ' + e.message;
+  }
 }
+async function showJob(id) {
+  currentJobId = id;
+  const r = await fetch(API + '/jobs/' + id);
+  renderDetail(await r.json());
+  document.getElementById('detailCard').scrollIntoView({ behavior: 'smooth' });
+}
+window.showJob = showJob;
 
 async function poll(jobId) {
   document.getElementById('refreshStatus').textContent = 'memuat…';

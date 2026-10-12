@@ -2,7 +2,7 @@
 // Zero dependency: Node built-in only. Semua endpoint tulis butuh token admin.
 import http from "node:http";
 import { createHash, randomBytes, timingSafeEqual } from "node:crypto";
-import { mkdir, readFile, writeFile, stat } from "node:fs/promises";
+import { mkdir, readFile, writeFile, rename } from "node:fs/promises";
 import { spawn } from "node:child_process";
 import { join, dirname } from "node:path";
 import { fileURLToPath } from "node:url";
@@ -15,7 +15,19 @@ const ADMIN_TOKEN_HASH = process.env.GEO_ADMIN_TOKEN_SHA256 || "";
 const CACHE = process.env.GEO_CACHE || join(ROOT, "cache");
 const OSM_API = "https://api.openstreetmap.org/api/0.6/map";
 const MAX_BBOX_DEG2 = 0.0005; // ~2.3 km x 2.3 km per job; batas agar server tidak kebanjiran data
+const JOBS_FILE = join(CACHE, "jobs.json");
 const jobs = new Map();
+
+async function loadJobs() {
+  try {
+    const arr = JSON.parse(await readFile(JOBS_FILE, "utf8"));
+    for (const j of arr) jobs.set(j.id, j);
+  } catch { /* first run: belum ada file */ }
+}
+async function saveJobs() {
+  await writeFile(JOBS_FILE + ".tmp", JSON.stringify(Array.from(jobs.values()), null, 2));
+  await rename(JOBS_FILE + ".tmp", JOBS_FILE);
+}
 
 const json = (res, status, body) => {
   res.writeHead(status, { "Content-Type": "application/json", "Cache-Control": "no-store" });
@@ -47,7 +59,7 @@ async function buildMapPack() {
     const child = spawn(process.execPath, args, {
       cwd: WEB,
       stdio: ["ignore", "pipe", "pipe"],
-      env: { ...process.env, CONTENT_SIGNING_KEY_ID: process.env.MAP_PACK_KEY_ID, CONTENT_SIGNING_PRIVATE_KEY: process.env.MAP_PACK_PRIVATE_KEY },
+      env: { ...process.env, MAP_PACK_RUN: "1", CONTENT_SIGNING_KEY_ID: process.env.MAP_PACK_KEY_ID, CONTENT_SIGNING_PRIVATE_KEY: process.env.MAP_PACK_PRIVATE_KEY },
     });
     let out = "", err = "";
     child.stdout.on("data", (d) => { out += d.toString(); });
@@ -105,17 +117,20 @@ async function runJob(job) {
         resolveP();
       });
     });
+    await saveJobs();
 
     // Build map pack (content update manifest) - best effort, di luar callback spawn.
     if (job.status === "completed") {
       job.mapPack = await buildMapPack();
       job.updatedAt = new Date().toISOString();
+      await saveJobs();
     }
   } catch (err) {
     job.status = "failed";
     job.error = String(err.message || err);
   }
   job.updatedAt = new Date().toISOString();
+  await saveJobs();
 }
 
 async function readBody(req) {
@@ -124,6 +139,7 @@ async function readBody(req) {
   return chunks.length ? JSON.parse(Buffer.concat(chunks).toString("utf8")) : {};
 }
 
+await loadJobs();
 const server = http.createServer(async (req, res) => {
   const url = new URL(req.url || "/", `http://${req.headers.host || "localhost"}`);
   try {
@@ -139,10 +155,15 @@ const server = http.createServer(async (req, res) => {
       const id = `job_${Date.now().toString(36)}_${randomBytes(3).toString("hex")}`;
       const job = { id, name: String(body.name || "unnamed").slice(0, 80), bbox, status: "queued", createdAt: new Date().toISOString(), updatedAt: new Date().toISOString(), chunks: body.chunks || 32, buildingHeight: body.buildingHeight || 8 };
       jobs.set(id, job);
+      await saveJobs();
       runJob(job); // async; status dipolling via GET /jobs/:id
       return json(res, 202, job);
     }
 
+    if (req.method === "GET" && url.pathname === "/jobs") {
+      const list = Array.from(jobs.values()).sort((a, b) => b.createdAt.localeCompare(a.createdAt));
+      return json(res, 200, list);
+    }
     const m = url.pathname.match(/^\/jobs\/([\w-]+)$/);
     if (req.method === "GET" && m) {
       const job = jobs.get(m[1]);

@@ -31,6 +31,14 @@ const server = http.createServer(async (req, res) => {
       return res.end(html);
     }
 
+    // Proxy list job (GET /api/jobs) — token ditempel server-side.
+    if (req.method === "GET" && url.pathname === "/api/jobs") {
+      const r = await fetch(`${GENERATOR}/jobs`, { headers: { Authorization: `Bearer ${ADMIN_TOKEN}` } });
+      const body = await r.text();
+      res.writeHead(r.status, { "Content-Type": "application/json" });
+      return res.end(body);
+    }
+
     // Proxy baca status job (GET) — tidak butuh token di browser.
     const m = url.pathname.match(/^\/api\/jobs\/([\w-]+)$/);
     if (req.method === "GET" && m) {
