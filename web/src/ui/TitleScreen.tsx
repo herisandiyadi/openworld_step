@@ -5,6 +5,13 @@ import { applySave, deleteSave, loadSave, resetGame, type SaveData } from '../st
 import { usePlayerProfile } from '../state/profile';
 import { contentRuntime } from '../app/contentRuntime';
 import { initQuests } from '../game/questRuntime';
+import {
+  getMapUpdateState,
+  startMapUpdatePolling,
+  stageMapUpdate,
+  subscribeMapUpdate,
+  type MapUpdateState,
+} from '../app/mapUpdates';
 
 /** First screen after launch: start (or continue) the game, or open the AI settings. */
 export function TitleScreen() {
@@ -14,6 +21,13 @@ export function TitleScreen() {
   const username = usePlayerProfile((state) => state.profile?.username ?? '');
   const startRef = useRef<HTMLButtonElement>(null);
   const [save, setSave] = useState<SaveData | null | undefined>(undefined);
+  const [mapState, setMapState] = useState<MapUpdateState>(getMapUpdateState());
+
+  useEffect(() => {
+    const unsubscribe = subscribeMapUpdate(setMapState);
+    startMapUpdatePolling();
+    return unsubscribe;
+  }, []);
 
   useEffect(() => {
     let active = true;
@@ -67,6 +81,28 @@ export function TitleScreen() {
         <p className="menu-status" aria-live="polite">
           {aiStatus}
         </p>
+        {mapState.phase === 'available' && (
+          <div className="menu-status" style={{ color: '#4a9eff' }} aria-live="polite">
+            Peta baru tersedia: {mapState.manifestVersion}
+            <button
+              type="button"
+              className="overlay-button secondary menu-button"
+              onClick={() => void stageMapUpdate()}
+            >
+              Unduh peta
+            </button>
+          </div>
+        )}
+        {mapState.phase === 'staged' && (
+          <p className="menu-status" aria-live="polite" style={{ color: '#4ade80' }}>
+            Peta {((mapState.downloadSize ?? 0) / 1024 / 1024).toFixed(1)} MB siap dipakai pada peluncuran berikutnya.
+          </p>
+        )}
+        {mapState.phase === 'error' && (
+          <p className="menu-status" aria-live="polite" style={{ color: '#f87171' }}>
+            Cek peta gagal: {mapState.message}
+          </p>
+        )}
       </div>
     </main>
   );

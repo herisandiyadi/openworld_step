@@ -39,6 +39,24 @@ function parseBbox(raw) {
   return { w, s, e, n };
 }
 
+/** Build content-update manifest untuk peta selesai dibake. Best-effort: gagal tidak menggagalkan job. */
+async function buildMapPack() {
+  const WEB = join(ROOT, "..", "..", "web");
+  const args = [join(WEB, "node_modules", "vite-node", "vite-node.mjs"), join(WEB, "tools", "geo", "map-pack.mjs")];
+  return new Promise((resolveP) => {
+    const child = spawn(process.execPath, args, {
+      cwd: WEB,
+      stdio: ["ignore", "pipe", "pipe"],
+      env: { ...process.env, CONTENT_SIGNING_KEY_ID: process.env.MAP_PACK_KEY_ID, CONTENT_SIGNING_PRIVATE_KEY: process.env.MAP_PACK_PRIVATE_KEY },
+    });
+    let out = "", err = "";
+    child.stdout.on("data", (d) => { out += d.toString(); });
+    child.stderr.on("data", (d) => { err += d.toString(); });
+    child.on("error", (e) => resolveP(`spawn error: ${e}`));
+    child.on("close", (code) => resolveP(code === 0 ? "ok" : `exit ${code}: ${err.slice(-300)}`));
+  });
+}
+
 async function runJob(job) {
   job.status = "fetching";
   try {
@@ -87,6 +105,12 @@ async function runJob(job) {
         resolveP();
       });
     });
+
+    // Build map pack (content update manifest) - best effort, di luar callback spawn.
+    if (job.status === "completed") {
+      job.mapPack = await buildMapPack();
+      job.updatedAt = new Date().toISOString();
+    }
   } catch (err) {
     job.status = "failed";
     job.error = String(err.message || err);
