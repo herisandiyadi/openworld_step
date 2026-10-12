@@ -1,0 +1,143 @@
+<!doctype html>
+<html lang="id">
+<head>
+<meta charset="utf-8">
+<title>Geo Map Generator Dashboard</title>
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<style>
+:root { --bg:#0b0d12; --fg:#e8e8e8; --muted:#888; --accent:#10b981; --accent-dim:#059669; --warn:#f59e0b; --err:#ef4444; --card:#11141a; --border:#232833; }
+*{box-sizing:border-box} body{font-family:system-ui,-apple-system,Segoe UI,Roboto,sans-serif;margin:0;background:var(--bg);color:var(--fg);min-height:100vh}
+a{color:var(--accent)} button{font:inherit;cursor:pointer;border:none;border-radius:6px;padding:8px 14px;background:var(--accent);color:#051d13;font-weight:600}
+button:hover{background:var(--accent-dim)} button:disabled{background:#333;color:#777;cursor:not-allowed}
+input,select{background:#0e1118;border:1px solid var(--border);color:var(--fg);padding:8px 10px;border-radius:6px;width:100%}
+label{font-size:13px;color:var(--muted);display:block;margin:10px 0 4px}
+.card{background:var(--card);border:1px solid var(--border);border-radius:10px;padding:16px;margin:16px 0}
+.grid{display:grid;grid-template-columns:repeat(auto-fit,minmax(220px,1fr));gap:12px}
+.row{display:flex;gap:8px;flex-wrap:wrap;align-items:center}
+.hdr{display:flex;justify-content:space-between;align-items:center;margin-bottom:16px}
+.hdr h1{margin:0;font-size:18px} .badge{font-size:11px;padding:2px 8px;border-radius:999px;background:#1a2a20;color:var(--accent)}
+.status{display:inline-block;padding:2px 8px;border-radius:999px;font-size:12px;font-weight:600}
+.s-queued{background:#374151;color:#9ca3af} .s-fetching{background:#3b2f1a;color:#fbbf24}
+.s-building{background:#1e3a2e;color:#6ee7b7} .s-completed{background:#064e3b;color:#34d399}
+.s-failed{background:#450a0a;color:#f87171}
+#log{background:#06080d;border:1px solid var(--border);border-radius:6px;padding:12px;max-height:260px;overflow:auto;font-family:ui-monospace,monospace;font-size:12px;white-space:pre-wrap;color:#a5d6a5}
+.small{font-size:12px;color:var(--muted)}
+</style>
+</head>
+<body>
+<div style="max-width:960px;margin:0 auto;padding:24px 16px">
+  <header class="hdr"><h1>Geo Map Generator</h1><span class="badge">Admin</span></header>
+
+  <section class="card">
+    <h3 style="margin-top:0">Buat Peta Baru</h3>
+    <div class="grid">
+      <div><label>Nama (slug)</label><input id="name" placeholder="little_tokyo"></div>
+      <div><label>Chunks</label><input id="chunks" type="number" value="32" min="8" max="64"></div>
+      <div><label>Building Height (m)</label><input id="height" type="number" value="8" min="4" max="32"></div>
+    </div>
+    <div class="grid" style="margin-top:8px">
+      <div><label>BBox w,s,e,n (lon,lat)</label><input id="bbox" placeholder="106.7916,-6.2538,106.8097,-6.2358"></div>
+    </div>
+    <div class="row" style="margin-top:12px">
+      <button id="btnCreate">Generate Map</button>
+      <span id="createStatus" class="small"></span>
+    </div>
+  </section>
+
+  <section class="card">
+    <h3 style="margin-top:0">Job Terbaru</h3>
+    <div id="jobList" class="small">Loading…</div>
+  </section>
+
+  <section class="card" id="detailCard" style="display:none">
+    <h3 style="margin-top:0">Detail Job <span id="detailId" class="small"></span></h3>
+    <div class="grid">
+      <div><label>Status</label><span id="detailStatus" class="status s-queued"></span></div>
+      <div><label>Nama</label><span id="detailName"></span></div>
+      <div><label>BBox</label><span id="detailBbox"></span></div>
+      <div><label>Output Dir</label><span id="detailOutput"></span></div>
+    </div>
+    <div class="row" style="margin-top:12px"><button id="btnRefresh" disabled>Refresh</button><span id="refreshStatus" class="small"></span></div>
+    <label style="margin-top:16px">Build Log</label>
+    <pre id="log"></pre>
+  </section>
+</div>
+
+<script>
+const API = '/api';
+let currentJobId = null;
+
+async function loadJobs() {
+  const r = await fetch(API + '/jobs'); // server tidak punya endpoint ini, biar 404 -> handle
+  // fallback: tidak ada list endpoint, jadi kosongkan
+  document.getElementById('jobList').textContent = 'Gunakan form di atas untuk membuat job baru. Status akan muncul di sini setelah create.';
+}
+
+async function poll(jobId) {
+  document.getElementById('refreshStatus').textContent = 'memuat…';
+  try {
+    const r = await fetch(API + '/jobs/' + jobId);
+    const j = await r.json();
+    renderDetail(j);
+    if (j.status === 'completed' || j.status === 'failed') {
+      document.getElementById('refreshStatus').textContent = 'selesai ' + new Date().toLocaleTimeString();
+      document.getElementById('btnRefresh').disabled = true;
+    } else {
+      document.getElementById('refreshStatus').textContent = 'proses… refresh otomatis 5s';
+      setTimeout(() => poll(jobId), 5000);
+    }
+  } catch (e) {
+    document.getElementById('refreshStatus').textContent = 'error: ' + e;
+  }
+}
+
+function renderDetail(j) {
+  document.getElementById('detailCard').style.display = 'block';
+  document.getElementById('detailId').textContent = j.id;
+  document.getElementById('detailName').textContent = j.name;
+  document.getElementById('detailStatus').textContent = j.status;
+  document.getElementById('detailStatus').className = 'status s-' + j.status;
+  document.getElementById('detailBbox').textContent = JSON.stringify(j.bbox);
+  document.getElementById('detailOutput').textContent = j.outputDir || '-';
+  document.getElementById('log').textContent = j.buildLog || j.error || '(belum ada log)';
+  document.getElementById('btnRefresh').disabled = false;
+}
+
+document.getElementById('btnCreate').addEventListener('click', async () => {
+  const btn = document.getElementById('btnCreate');
+  const st = document.getElementById('createStatus');
+  btn.disabled = true; st.textContent = 'mengirim…';
+  try {
+    const body = {
+      name: document.getElementById('name').value || 'unnamed',
+      bbox: document.getElementById('bbox').value,
+      chunks: Number(document.getElementById('chunks').value),
+      buildingHeight: Number(document.getElementById('height').value),
+    };
+    const r = await fetch(API + '/jobs', {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify(body),
+    });
+    const j = await r.json();
+    if (!r.ok) throw new Error(j.error || 'HTTP ' + r.status);
+    st.textContent = 'job dibuat: ' + j.id;
+    currentJobId = j.id;
+    poll(j.id);
+  } catch (e) {
+    st.textContent = 'gagal: ' + e.message;
+    btn.disabled = false;
+  }
+});
+
+document.getElementById('btnRefresh').addEventListener('click', () => {
+  if (currentJobId) poll(currentJobId);
+});
+
+// prefetch defaults
+document.getElementById('bbox').value = '106.7916,-6.2538,106.8097,-6.2358';
+
+loadJobs();
+</script>
+</body>
+</html>
