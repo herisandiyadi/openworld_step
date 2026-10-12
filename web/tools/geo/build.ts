@@ -118,6 +118,20 @@ async function main(): Promise<void> {
   });
   const outDir = join(WEB_ROOT, 'public', `world-${args.name}`);
 
+  // Pick spawn: chunk with most buildings (downtown). Fallback to center if none.
+  let spawnCx = Math.floor(args.chunks / 2), spawnCz = Math.floor(args.chunks / 2);
+  let maxBuildings = 0;
+  for (const chunk of chunks) {
+    if (chunk.buildings.length > maxBuildings) {
+      maxBuildings = chunk.buildings.length;
+      spawnCx = chunk.cx;
+      spawnCz = chunk.cz;
+    }
+  }
+  const spawnX = (spawnCx + 0.5) * CHUNK_SIZE - halfWorld;
+  const spawnZ = (spawnCz + 0.5) * CHUNK_SIZE - halfWorld;
+  index.spawn = { x: spawnX, z: spawnZ };
+
   await rm(outDir, { recursive: true, force: true });
   await mkdir(join(outDir, 'chunks'), { recursive: true });
   for (const chunk of chunks) {
@@ -143,12 +157,17 @@ async function main(): Promise<void> {
   }
 
   await writeFile(join(outDir, index.map.file), renderMap(chunks, worldSize, halfWorld));
+  // Lanes: OSM tidak dipakai untuk lalu lintas (keputusan #5, lihat Notion). Tulis graf kosong
+  // yang valid sesuai skema LanesData supaya game tidak menerima HTML fallback saat fetch.
+  const emptyLanes = { version: 3, nodes: [], edges: [], intersections: [], walkNodes: [], walkEdges: [] };
+  await writeFile(join(outDir, 'lanes.json'), JSON.stringify(emptyLanes));
+
   console.log(
     [
       `geo world "${args.name}": ${worldSize} m (${args.chunks}x${args.chunks} chunk)`,
       `buildings: ${stats.buildings}, roads: ${stats.roadWays}, water: ${stats.waterWays}, green: ${stats.greenWays}`,
       `navmesh failures: ${failures.length}${failures.length ? ` (${failures.slice(0, 5).join(', ')})` : ''}`,
-      `spawn: ${index.spawn.x.toFixed(1)}, ${index.spawn.z.toFixed(1)}`,
+      `spawn: ${spawnX.toFixed(1)}, ${spawnZ.toFixed(1)} (chunk ${spawnCx},${spawnCz})`,
       `total ${((performance.now() - started) / 1000).toFixed(1)} s -> ${outDir}`,
     ].join('\n'),
   );

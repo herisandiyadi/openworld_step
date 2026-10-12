@@ -1,0 +1,25 @@
+[Unit]
+Description=OpenWorld City — Geo Dashboard (port 19101)
+Documentation=https://github.com/herisandiyadi/openworld_step
+After=network-online.target openworld-geo-generator.service
+Wants=network-online.target
+Requires=openworld-geo-generator.service
+
+[Service]
+Type=simple
+WorkingDirectory=/root/workspace/geo-map-pipeline
+EnvironmentFile=/etc/openworld/geo.env
+ExecStart=/root/.hermes/tools/node-26.7.0-linux-x64/bin/node services/geo-dashboard/src/server.mjs
+Restart=on-failure
+RestartSec=5
+StandardOutput=append:/var/log/openworld/geo-dashboard.log
+StandardError=append:/var/log/openworld/geo-dashboard.log
+
+# Hardening
+NoNewPrivileges=true
+PrivateTmp=true
+ProtectSystem=full
+ProtectHome=read-only
+
+[Install]
+WantedBy=multi-user.target

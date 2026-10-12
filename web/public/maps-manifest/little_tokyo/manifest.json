@@ -5130,6 +5130,11 @@
       "sha256": "dc679aea25b0ab2711de871c591d5b4597d99461c5aaa016d1ed6057dc717440"
     },
     {
+      "path": "world-little_tokyo/lanes.json",
+      "size": 95,
+      "sha256": "7418cfbee5383161ad85e24b5d5c4d6b234535470c971e9c93e150465891c9f5"
+    },
+    {
       "path": "world-little_tokyo/map.png",
       "size": 147921,
       "sha256": "cc36f5185417f58445e9905e924371024db5cef527ee538dd30fc7d77a496835"
@@ -10258,6 +10263,6 @@
   "signature": {
     "algorithm": "Ed25519",
     "keyId": "map-pack-1",
-    "value": "2QizkQ19CtWrY7TXp6o4bcwlN1mWbSA/GFvHO91hRzs8BtQhdlsx4jHVK7Q5IbgBHvJAPaAZht1o8mMRSx8DAA=="
+    "value": "rOH4/NO9yZF4R6UfCOkwofOnEtKyviKiX0N89x3y/VKr4DWYptGeeTtJvlY0BjtR3R35JXIRKcT7ufrdUxR0Aw=="
   }
 }

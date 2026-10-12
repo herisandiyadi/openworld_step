@@ -59,7 +59,13 @@ async function buildMapPack() {
     const child = spawn(process.execPath, args, {
       cwd: WEB,
       stdio: ["ignore", "pipe", "pipe"],
-      env: { ...process.env, MAP_PACK_RUN: "1", CONTENT_SIGNING_KEY_ID: process.env.MAP_PACK_KEY_ID, CONTENT_SIGNING_PRIVATE_KEY: process.env.MAP_PACK_PRIVATE_KEY },
+      env: {
+        ...process.env,
+        MAP_PACK_RUN: "1",
+        CONTENT_SIGNING_KEY_ID: process.env.MAP_PACK_KEY_ID,
+        CONTENT_SIGNING_PRIVATE_KEY: process.env.MAP_PACK_PRIVATE_KEY,
+        CONTENT_SIGNING_PRIVATE_KEY_FILE: process.env.MAP_PACK_PRIVATE_KEY_FILE,
+      },
     });
     let out = "", err = "";
     child.stdout.on("data", (d) => { out += d.toString(); });

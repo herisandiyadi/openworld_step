@@ -1,0 +1,24 @@
+[Unit]
+Description=OpenWorld City — Geo Map Generator (port 19100)
+Documentation=https://github.com/herisandiyadi/openworld_step
+After=network-online.target
+Wants=network-online.target
+
+[Service]
+Type=simple
+WorkingDirectory=/root/workspace/geo-map-pipeline
+EnvironmentFile=/etc/openworld/geo.env
+ExecStart=/root/.hermes/tools/node-26.7.0-linux-x64/bin/node services/geo-generator/src/server.mjs
+Restart=on-failure
+RestartSec=5
+StandardOutput=append:/var/log/openworld/geo-generator.log
+StandardError=append:/var/log/openworld/geo-generator.log
+
+# Hardening
+NoNewPrivileges=true
+PrivateTmp=true
+ProtectSystem=full
+ProtectHome=read-only
+
+[Install]
+WantedBy=multi-user.target
