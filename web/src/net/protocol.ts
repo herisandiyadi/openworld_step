@@ -1,4 +1,4 @@
-import { HALF_WORLD, WORLD_SIZE } from '../world/worldSpec';
+import { halfWorldFor, worldSizeFor } from '../world/worldSpec';
 import type { MoveMode } from '../state/gameStore';
 import type { Appearance } from '../state/profile';
 import { APPEARANCE_BYTES, decodeAppearanceOrDefault, encodeAppearanceInto } from './appearanceCodec';
@@ -227,14 +227,14 @@ export function isValidChatText(text: string): boolean {
 }
 
 export const inWorldBounds = (x: number, z: number): boolean =>
-  Number.isFinite(x) && Number.isFinite(z) && Math.abs(x) <= HALF_WORLD && Math.abs(z) <= HALF_WORLD;
+  Number.isFinite(x) && Number.isFinite(z) && Math.abs(x) <= halfWorldFor() && Math.abs(z) <= halfWorldFor();
 
 const clamp = (value: number, min: number, max: number): number => (value < min ? min : value > max ? max : value);
 
 /** x/z: 16 bit sepanjang lebar peta (512 m / 65535 ≈ 8 mm). */
 export const quantizeXZ = (value: number): number =>
-  Math.round(((clamp(value, -HALF_WORLD, HALF_WORLD) + HALF_WORLD) / WORLD_SIZE) * 0xffff);
-export const dequantizeXZ = (raw: number): number => (raw / 0xffff) * WORLD_SIZE - HALF_WORLD;
+  Math.round(((clamp(value, -halfWorldFor(), halfWorldFor()) + halfWorldFor()) / worldSizeFor()) * 0xffff);
+export const dequantizeXZ = (raw: number): number => (raw / 0xffff) * worldSizeFor() - halfWorldFor();
 /** y: 16 bit antara MIN_Y dan MAX_Y (4 mm). */
 export const quantizeY = (value: number): number =>
   Math.round(((clamp(value, MIN_Y, MAX_Y) - MIN_Y) / (MAX_Y - MIN_Y)) * 0xffff);

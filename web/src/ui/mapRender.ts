@@ -1,5 +1,5 @@
-import { FOG_CELL, FOG_GRID, isExplored } from '../game/exploration';
-import { type BusStop, HALF_WORLD, type NpcSpawn } from '../world/worldSpec';
+import { FOG_CELL, getFogGrid, isExplored } from '../game/exploration';
+import { type BusStop, halfWorldFor, type NpcSpawn } from '../world/worldSpec';
 import { loadWorldIndex, worldUrl } from '../world/worldState';
 
 export interface MapImage {
@@ -27,7 +27,7 @@ export function loadMapImage(): Promise<MapImage> {
 }
 
 /** World metres -> map pixels (+X right, +Z down: north-up). */
-export const worldToMap = (meters: number, pixelsPerMeter: number) => (meters + HALF_WORLD) * pixelsPerMeter;
+export const worldToMap = (meters: number, pixelsPerMeter: number) => (meters + halfWorldFor()) * pixelsPerMeter;
 
 /** Yellow NPC/quest marker. */
 export function drawNpcDot(context: CanvasRenderingContext2D, x: number, y: number, radius: number): void {
@@ -117,9 +117,9 @@ export function drawFog(context: CanvasRenderingContext2D, originX: number, orig
   const cell = FOG_CELL * scale;
   const { width, height } = context.canvas;
   const minI = Math.max(0, Math.floor(-originX / cell));
-  const maxI = Math.min(FOG_GRID - 1, Math.floor((width - originX) / cell));
+  const maxI = Math.min(getFogGrid() - 1, Math.floor((width - originX) / cell));
   const minJ = Math.max(0, Math.floor(-originY / cell));
-  const maxJ = Math.min(FOG_GRID - 1, Math.floor((height - originY) / cell));
+  const maxJ = Math.min(getFogGrid() - 1, Math.floor((height - originY) / cell));
   context.fillStyle = FOG_COLOR;
   for (let j = minJ; j <= maxJ; j++) {
     for (let i = minI; i <= maxI; i++) {

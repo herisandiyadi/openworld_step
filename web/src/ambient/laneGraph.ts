@@ -3,7 +3,7 @@
  * Murni TypeScript tanpa three.js supaya bisa di-unit-test dan dipindah ke web worker.
  * Satuan meter, +Y up. Lalu lintas Indonesia: lajur kiri, ofset 2 m dari garis tengah jalan.
  */
-import { CHUNK_SIZE, HALF_WORLD, WORLD_CHUNKS } from '../world/worldSpec';
+import { CHUNK_SIZE, halfWorldFor, getWorldDimensions } from '../world/worldSpec';
 
 /** Jarak lajur dari garis tengah jalan. */
 export const LANE_OFFSET = 2;
@@ -61,9 +61,9 @@ export interface LaneGraph {
 const SAMPLES = 6;
 
 const bucketOf = (x: number, z: number): number => {
-  const bx = Math.min(WORLD_CHUNKS - 1, Math.max(0, Math.floor((x + HALF_WORLD) / CHUNK_SIZE)));
-  const bz = Math.min(WORLD_CHUNKS - 1, Math.max(0, Math.floor((z + HALF_WORLD) / CHUNK_SIZE)));
-  return bz * WORLD_CHUNKS + bx;
+  const bx = Math.min(getWorldDimensions().worldChunks - 1, Math.max(0, Math.floor((x + halfWorldFor()) / CHUNK_SIZE)));
+  const bz = Math.min(getWorldDimensions().worldChunks - 1, Math.max(0, Math.floor((z + halfWorldFor()) / CHUNK_SIZE)));
+  return bz * getWorldDimensions().worldChunks + bx;
 };
 
 export function buildLaneGraph(data: LanesData): LaneGraph {
@@ -151,11 +151,11 @@ function projectOnEdge(graph: LaneGraph, index: number, x: number, z: number): {
 /** Edge terdekat dari sebuah titik. Mencari di 3x3 bucket dulu, lalu seluruh graf. */
 export function nearestEdge(graph: LaneGraph, x: number, z: number): { edge: number; s: number; distance: number } {
   const candidates: number[] = [];
-  const bx = Math.floor((x + HALF_WORLD) / CHUNK_SIZE);
-  const bz = Math.floor((z + HALF_WORLD) / CHUNK_SIZE);
+  const bx = Math.floor((x + halfWorldFor()) / CHUNK_SIZE);
+  const bz = Math.floor((z + halfWorldFor()) / CHUNK_SIZE);
   for (let dz = -1; dz <= 1; dz++) {
     for (let dx = -1; dx <= 1; dx++) {
-      const bucket = graph.grid.get((bz + dz) * WORLD_CHUNKS + bx + dx);
+      const bucket = graph.grid.get((bz + dz) * getWorldDimensions().worldChunks + bx + dx);
       if (bucket) candidates.push(...bucket);
     }
   }

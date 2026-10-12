@@ -4,7 +4,7 @@
  */
 import { edgeAt, edgePoint, type LaneGraph } from './laneGraph';
 import { createVehicle, type TrafficState, type Vehicle } from './trafficSim';
-import { CHUNK_SIZE, HALF_WORLD, WORLD_CHUNKS } from '../world/worldSpec';
+import { CHUNK_SIZE, halfWorldFor, getWorldDimensions } from '../world/worldSpec';
 
 export const SPAWN_MIN = 40;
 export const SPAWN_MAX = 110;
@@ -75,12 +75,12 @@ export function findSpawnSpot(
   // Sampel bucket grid di sekitar kamera, bukan seluruh graf: dunia 16x16 punya 4x edge dunia
   // lama, jadi sampling acak global jarang kena cincin spawn dan memindai semua edge itu lambat.
   const reach = Math.ceil(SPAWN_MAX / CHUNK_SIZE) + 1;
-  const bx = Math.floor((view.x + HALF_WORLD) / CHUNK_SIZE);
-  const bz = Math.floor((view.z + HALF_WORLD) / CHUNK_SIZE);
+  const bx = Math.floor((view.x + halfWorldFor()) / CHUNK_SIZE);
+  const bz = Math.floor((view.z + halfWorldFor()) / CHUNK_SIZE);
   const buckets: number[][] = [];
   for (let dz = -reach; dz <= reach; dz++) {
     for (let dx = -reach; dx <= reach; dx++) {
-      const bucket = graph.grid.get((bz + dz) * WORLD_CHUNKS + bx + dx);
+      const bucket = graph.grid.get((bz + dz) * getWorldDimensions().worldChunks + bx + dx);
       if (bucket && bucket.length > 0) buckets.push(bucket);
     }
   }
