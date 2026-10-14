@@ -6,12 +6,19 @@ import { useNetStore } from './netStore';
 import {
   ERR_ROOM,
   ERR_SERVER,
+  ERR_WORLD_VERSION,
   connectLocalHost,
+  connectLocalClient,
   connectOnline,
   currentMode,
   disconnect,
   httpBase,
+  localPlayerId,
   netSession,
+  onFishingState,
+  publishFishingState,
+  releaseFishingSpot,
+  reserveFishingSpot,
   roomCode,
   sendChat,
   tick,
@@ -20,7 +27,8 @@ import {
   type NetDeps,
 } from './netRuntime';
 import { encodeMessage, type PlayerInfo } from './protocol';
-import { ClientSession } from './session';
+import { ClientSession, HostSession } from './session';
+import { encodeFishingSync } from '../fishing/fishingSync';
 import type { WebSocketLike } from './wsTransport';
 
 /**
@@ -95,6 +103,7 @@ class FakeNearby {
 interface FetchCall {
   url: string;
   method: string | undefined;
+  headers: Record<string, string> | undefined;
 }
 
 /** `fetch` palsu: jawaban per urutan panggilan, atau Error untuk mensimulasikan jaringan mati. */
@@ -104,7 +113,7 @@ const fakeFetch = (
 ): FetchLike => {
   let index = 0;
   return (url, init) => {
-    calls.push({ url, method: init?.method });
+    calls.push({ url, method: init?.method, headers: init?.headers });
     const reply = replies[Math.min(index++, replies.length - 1)];
     if (reply instanceof Error) return Promise.reject(reply);
     if (!reply) return Promise.reject(new Error('Tidak ada jawaban palsu tersisa.'));
@@ -121,6 +130,7 @@ const reply = (status: number, body: unknown): FetchResponseLike => ({
 const onlineDeps = (fetchFn: FetchLike): NetDeps => ({
   fetch: fetchFn,
   createSocket: (url) => new FakeSocket(url),
+  getWorldVersion: () => Promise.resolve('3.0.0-u4-fishing'),
   ws: { pingIntervalMs: 0, maxAttempts: 1, baseDelayMs: 10 },
   now: () => 1000,
 });
@@ -132,6 +142,57 @@ const lastSocket = (): FakeSocket => {
 };
 
 const player = (id: number, username: string): PlayerInfo => ({ id, username, appearance: DEFAULT_APPEARANCE });
+
+describe('live fishing runtime API', () => {
+  it('exposes the local player id in every connected mode', async () => {
+    const hostDeps: NetDeps = { plugin: new FakeNearby(), now: () => 1000 };
+    await connectLocalHost({ username: 'Host', appearance: DEFAULT_APPEARANCE, deps: hostDeps });
+    expect(localPlayerId()).toBe(1);
+    disconnect();
+    expect(localPlayerId()).toBeNull();
+
+    const clientDeps: NetDeps = { plugin: new FakeNearby(), now: () => 1000 };
+    await connectLocalClient({ username: 'Klien', appearance: DEFAULT_APPEARANCE, deps: clientDeps });
+    expect(localPlayerId()).toBeNull(); // belum welcome dari host
+    disconnect();
+  });
+
+  it('reserves and releases a fishing spot in local-host and local-client modes', async () => {
+    const hostDeps: NetDeps = { plugin: new FakeNearby(), now: () => 1000 };
+    await connectLocalHost({ username: 'Host', appearance: DEFAULT_APPEARANCE, deps: hostDeps });
+    expect(reserveFishingSpot('lake-east', 1000)).toBe(true);
+    const host = netSession();
+    expect(host instanceof HostSession && host.fishingSpotOwner('lake-east')).toBe(1);
+    // Reserving again by the same owner refreshes the heartbeat.
+    expect(reserveFishingSpot('lake-east', 2000)).toBe(true);
+    releaseFishingSpot('lake-east');
+    expect(netSession() instanceof HostSession ? (netSession() as HostSession).fishingSpotOwner('lake-east') : null).toBeNull();
+    disconnect();
+
+    const clientDeps: NetDeps = { plugin: new FakeNearby(), now: () => 1000 };
+    await connectLocalClient({ username: 'Klien', appearance: DEFAULT_APPEARANCE, deps: clientDeps });
+    expect(reserveFishingSpot('lake-east', 1000)).toBe(true);
+    releaseFishingSpot('lake-east');
+    disconnect();
+  });
+
+  it('publishes and receives fishing state over HostSession/ClientSession in local-host mode', async () => {
+    const plugin = new FakeNearby();
+    await connectLocalHost({ username: 'Host', appearance: DEFAULT_APPEARANCE, deps: { plugin, now: () => 1000 } });
+    const received: { playerId: number; sequence: number; payload: Uint8Array }[] = [];
+    const off = onFishingState((playerId, sequence, payload) => received.push({ playerId, sequence, payload }));
+    const payload = encodeFishingSync({ phase: 'wait', spotIndex: 1, bobberX: 1, bobberZ: -1 });
+    expect(publishFishingState(payload, 3)).toBe(true);
+    expect(received).toHaveLength(1);
+    expect(received[0]?.playerId).toBe(1);
+    expect(received[0]?.sequence).toBe(3);
+    expect(received[0]?.payload).toEqual(payload);
+    off?.();
+    disconnect();
+    expect(publishFishingState(payload, 3)).toBe(false);
+    expect(onFishingState(() => undefined)).toBeNull();
+  });
+});
 
 afterEach(() => {
   disconnect();
@@ -155,7 +216,7 @@ describe('connectOnline', () => {
     expect(code).toBe('ABC234');
     expect(roomCode()).toBe('ABC234');
     expect(currentMode()).toBe('online');
-    expect(calls).toEqual([{ url: 'https://server.test/rooms', method: 'POST' }]);
+    expect(calls).toEqual([{ url: 'https://server.test/rooms', method: 'POST', headers: { 'x-world-version': '3.0.0-u4-fishing' } }]);
     expect(lastSocket().url).toBe('wss://server.test/ws?room=ABC234&token=tok-1');
     // Klien online tetap ClientSession: server yang berwenang.
     expect(netSession()).toBeInstanceOf(ClientSession);
@@ -174,7 +235,7 @@ describe('connectOnline', () => {
     });
 
     expect(code).toBe('ABC234');
-    expect(calls).toEqual([{ url: 'http://10.0.0.5:8080/rooms/ABC234/join', method: 'POST' }]);
+    expect(calls).toEqual([{ url: 'http://10.0.0.5:8080/rooms/ABC234/join', method: 'POST', headers: { 'x-world-version': '3.0.0-u4-fishing' } }]);
     const socket = lastSocket();
     // Hello diantre selama socket belum terbuka, lalu terkirim saat open.
     expect(socket.sent).toHaveLength(0);
@@ -259,6 +320,13 @@ describe('connectOnline', () => {
     await expect(
       connectOnline({ serverUrl: 'wss://server.test', roomCode: 'ABC234', username: 'Budi', appearance: DEFAULT_APPEARANCE, deps: full }),
     ).rejects.toThrow(ERR_ROOM);
+
+    // 409 world-version: pesan khusus "perbarui konten dulu".
+    const versionDeps = onlineDeps(fakeFetch([], [reply(409, { error: 'world-version', message: 'Perbarui konten dulu.' })]));
+    await expect(
+      connectOnline({ serverUrl: 'wss://server.test', roomCode: 'ABC234', username: 'Budi', appearance: DEFAULT_APPEARANCE, deps: versionDeps }),
+    ).rejects.toThrow(ERR_WORLD_VERSION);
+    expect(useNetStore.getState().error).toBe(ERR_WORLD_VERSION);
   });
 });
 

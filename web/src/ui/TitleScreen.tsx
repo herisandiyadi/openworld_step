@@ -3,6 +3,8 @@ import { useAiSettings } from '../state/aiSettings';
 import { useGameStore } from '../state/gameStore';
 import { applySave, deleteSave, loadSave, resetGame, type SaveData } from '../state/saveGame';
 import { usePlayerProfile } from '../state/profile';
+import { contentRuntime } from '../app/contentRuntime';
+import { initQuests } from '../game/questRuntime';
 
 /** First screen after launch: start (or continue) the game, or open the AI settings. */
 export function TitleScreen() {
@@ -28,6 +30,8 @@ export function TitleScreen() {
       void deleteSave();
     } else {
       applySave(save);
+      // Refresh quest availability from the loaded content pack (quests may unlock via requires chains).
+      if (contentRuntime.registry) initQuests(contentRuntime.registry);
     }
     setScreen('game');
   };

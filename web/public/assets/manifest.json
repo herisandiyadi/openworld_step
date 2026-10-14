@@ -299,7 +299,7 @@
       "triangles": 500,
       "drawCalls": 1,
       "materials": 1,
-      "bytes": 43900,
+      "bytes": 43904,
       "bones": 13,
       "animations": [
         {
@@ -365,10 +365,10 @@
         "player",
         "custom"
       ],
-      "triangles": 2302,
-      "drawCalls": 16,
-      "materials": 5,
-      "bytes": 110220,
+      "triangles": 2446,
+      "drawCalls": 17,
+      "materials": 6,
+      "bytes": 114360,
       "bones": 13,
       "animations": [
         {
@@ -403,6 +403,7 @@
       "nodes": [
         "char_hero_f",
         "skin",
+        "gold_chain",
         "hair_0",
         "hair_1",
         "hair_2",
@@ -453,10 +454,10 @@
         "player",
         "custom"
       ],
-      "triangles": 1748,
-      "drawCalls": 16,
-      "materials": 5,
-      "bytes": 98308,
+      "triangles": 1892,
+      "drawCalls": 17,
+      "materials": 6,
+      "bytes": 100928,
       "bones": 13,
       "animations": [
         {
@@ -491,6 +492,7 @@
       "nodes": [
         "char_hero_m",
         "skin",
+        "gold_chain",
         "hair_0",
         "hair_1",
         "hair_2",
@@ -545,7 +547,7 @@
       "triangles": 552,
       "drawCalls": 1,
       "materials": 1,
-      "bytes": 30728,
+      "bytes": 30736,
       "bones": 13,
       "animations": [
         {
@@ -604,7 +606,7 @@
       "triangles": 692,
       "drawCalls": 1,
       "materials": 1,
-      "bytes": 32760,
+      "bytes": 32764,
       "bones": 13,
       "animations": [
         {
@@ -818,7 +820,7 @@
       "triangles": 920,
       "drawCalls": 1,
       "materials": 1,
-      "bytes": 37252,
+      "bytes": 37268,
       "bones": 13,
       "animations": [
         {
@@ -1096,6 +1098,13 @@
           0.32
         ]
       },
+      "lods": [
+        {
+          "level": 1,
+          "path": "assets/prop_bench_01_lod1.glb",
+          "triangles": 84
+        }
+      ],
       "collider": {
         "type": "box",
         "center": [
@@ -1143,6 +1152,13 @@
           0.294
         ]
       },
+      "lods": [
+        {
+          "level": 1,
+          "path": "assets/prop_bench_02_lod1.glb",
+          "triangles": 72
+        }
+      ],
       "collider": {
         "type": "box",
         "center": [
@@ -1257,6 +1273,18 @@
           0.18
         ]
       },
+      "lods": [
+        {
+          "level": 1,
+          "path": "assets/prop_streetlamp_01_lod1.glb",
+          "triangles": 46
+        },
+        {
+          "level": 2,
+          "path": "assets/prop_streetlamp_01_lod2.glb",
+          "triangles": 42
+        }
+      ],
       "collider": {
         "type": "box",
         "center": [
@@ -1364,6 +1392,13 @@
           0.257
         ]
       },
+      "lods": [
+        {
+          "level": 1,
+          "path": "assets/prop_trashbin_01_lod1.glb",
+          "triangles": 66
+        }
+      ],
       "collider": {
         "type": "box",
         "center": [

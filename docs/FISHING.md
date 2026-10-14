@@ -1,8 +1,9 @@
 # Fitur Baru: Memancing, Tas Terbatas, Tempat Sampah, dan Jual Ikan
 
-Status: rencana, terpisah dari dokumen lain. Bergantung pada **toko dan ekonomi** (koin, `wallet.ts`,
-`inventory.ts`) di [`CONTENT_UPDATES.md`](CONTENT_UPDATES.md) bagian 6 / tahap U2b. Dokumen ini satu-satunya
-rujukan untuk fitur memancing.
+Status: implementasi tahap F3 berjalan; dokumen ini satu-satunya rujukan untuk fitur memancing. Bergantung
+pada **toko dan ekonomi** (koin, `wallet.ts`, `inventory.ts`) di [`CONTENT_UPDATES.md`](CONTENT_UPDATES.md)
+bagian 6 / tahap U2b. Mini-game utama kini **gauge timing horizontal**; seluruh bahasa "bar pancing vertikal /
+meter gulungan" dari versi rencana lama **ditarik** dan digantikan oleh bagian 3.1 (lihat juga 12.5).
 
 ## 1. Ringkasan
 
@@ -46,33 +47,52 @@ rujukan untuk fitur memancing.
    (slot sendiri, gaya MOBA seperti tombol lain).
 2. Tekan "Pancing": karakter menghadap air, animasi lempar (`anim_Cast`), pelampung jatuh di 4-7 m.
 3. **Menunggu** 3-12 detik (acak). Pelampung bergoyang kecil sesekali sebagai umpan palsu.
-4. **Umpan dimakan:** pelampung tenggelam, getar HP (jika diizinkan) + SFX. Pemain punya **1.2 detik** untuk
-   menekan tombol **"Tarik"**. Terlambat = ikan lepas.
-5. **Mini-game bar pancing tarik** (2-6 detik, lebih lama untuk ikan berat). Ini mode utama (diputuskan).
-   - Muncul di sisi kanan layar di atas tombol aksi: **bar vertikal** dengan
-     - **zona tarik hijau** yang bisa digerakkan pemain,
-     - **ikon ikan** yang naik-turun sendiri di dalam bar,
-     - **meter gulungan** di samping bar (0-100%).
-   - **Tahan tombol "Tarik"** = zona hijau naik dan senar digulung. **Lepas** = zona hijau turun.
-   - Selama ikon ikan berada di dalam zona hijau, meter gulungan naik. Di luar zona, meter turun pelan.
-   - **Tegangan senar:** menahan "Tarik" terus saat ikan di luar zona menaikkan tegangan. Indikator tegangan
-     berubah kuning lalu merah. Merah lebih dari 1 detik = senar putus, hasil lepas.
-   - Meter gulungan **100% = berhasil**. Meter 0% = ikan lepas.
-   - Gerak ikon mengikuti jenis dan berat: mujair pelan dan tenang, gurame dan patin cepat dengan sentakan acak.
-     Sampah (kaleng, sepatu, dll.) hampir diam, jadi mudah ditarik.
-   - Joran karbon memperlebar zona hijau 25%.
-   - Umpan balik: getar pendek saat ikan masuk/keluar zona (jika getar diizinkan), suara reel mengikuti
-     kecepatan gulungan, dan joran 3D melengkung sesuai tegangan.
-   - Bisa dimainkan dengan satu jempol. Tombol "Tarik" besar (≥ 72 px) di posisi tombol aksi utama, joystick
-     tidak dipakai selama mini-game.6. **Hasil:** kartu kecil muncul (nama, berat untuk ikan, perkiraan harga), lalu masuk tas. Tombol "Lepas" untuk
-   melepas ikan kembali ke danau.
+4. **Umpan dimakan:** pelampung tenggelam, getar HP (jika diizinkan) + SFX. Fase `bite` langsung memulai
+   gauge timing (langkah 5); `biteWindowMs` (1,2 detik) hanya dipertahankan untuk kompatibilitas wire/store.
+5. **Mini-game gauge timing horizontal** (batas waktu mengikuti tuning kesulitan pada butir di bawah).
+   Ini mode utama (revisi
+   12.5; bahasa bar pancing vertikal/meter gulungan lama **ditarik**). Gauge horizontal menampilkan
+   **target (zona hijau)** statis di satu posisi dan **jarum** yang menyapu bolak-balik; pemain menekan
+   **"Tarik"** tepat saat jarum berada di dalam target:
+   - Muncul di sisi kanan layar di atas tombol aksi: **gauge horizontal** dengan
+     - **zona target hijau** (posisi dan lebar tetap selama satu percobaan, di [0..1]),
+     - **jarum** yang menyapu dari kiri ke kanan lalu memantul di kedua ujung,
+     - **hitungan waktu tersisa** `durationMs` (nilai ditentukan kesulitan ikan dan mode aksesibilitas).
+   - **Satu ketukan "Tarik"** = satu percobaan. Jarum di dalam zona (inklusif, batas dihitung) = berhasil.
+     Di luar zona = gagal: **near miss → ikan lepas** (`escaped`); **miss jauh pada ikan sulit → senar
+     putus** (`line-break`, tegangan > 0,5).
+   - Kesulitan (1 mujair … 5 patin) mempersempit zona target (mis. lebar 0,28 pada tingkat 1) dan
+     mempercepat jarum. Sampah (kaleng, sepatu, dll.) selalu kesulitan 1, jadi paling mudah.
+   - Waktu habis tanpa ketukan = **ikan lepas** (`escaped`); percobaan tambahan setelah selesai ditolak
+     (state terminal tidak berubah).
+   - Konstanta tuning saat ini: durasi dasar 1.200 ms; mode mudah +900 ms; tiap kenaikan tingkat kesulitan
+     mengurangi 100 ms. Nilai ini menjadi gerbang test hingga dipindah ke konten/config.
+   - Joran karbon memperlebar zona target 25%.
+   - Umpan balik: getar pendek saat berhasil/gagal, SFX reel saat menarik, dan joran 3D melengkung
+     sesuai tegangan.
+   - Bisa dimainkan dengan satu jempol. Tombol "Tarik" besar (≥ 72 px) di posisi tombol aksi utama,
+     joystick tidak dipakai selama mini-game.
+6. **Hasil:** kartu kecil muncul (nama, berat untuk ikan, perkiraan harga), lalu masuk tas. Tombol "Lepas"
+   untuk melepas ikan kembali ke danau. Outcome: `caught` (disimpan ke tas), `escaped` (waktu habis / di
+   luar target), `line-broken` (senar putus), atau `cancelled` (pemain membatalkan; tidak mengubah tas).
 
-- Memancing bisa dibatalkan kapan saja dengan joystick atau tombol "Selesai". Kamera tetap bisa diputar.
-- **Mode mudah** (Pengaturan, aksesibilitas, **default mati**): bar tetap tampil, tapi zona hijau 2× lebih lebar,
-  ikon ikan bergerak lebih pelan, dan senar tidak bisa putus. Berat ikan maksimum dibatasi 70% supaya mode normal
-  tetap lebih bernilai.
-- Selama memancing tombol Naik/Turun kendaraan dan Duduk disembunyikan. "Tanya" tetap bisa dipakai (ngobrol
-  dengan sesama pemancing).
+**Gerbang lokomosi (movement lock):** selama sesi memancing aktif (`state.fishing !== null`) pemain
+**terkunci penuh di tempat**: pindah titik, naik/turun kendaraan, duduk, dan naik bus tidak tersedia —
+`Proximity` berhenti memindai target dan `ActionButtons` mengganti seluruh kluster aksi dengan satu tombol
+"Batal". `canStartFishing()` hanya mengizinkan mulai saat mode `walk`, tidak duduk, tidak di bus, tidak
+dijeda, dan peta tertutup. Kamera tetap bisa diputar; membatalkan ("Batal") melepas reservasi titik dan
+mengembalikan kontrol.
+
+- Memancing bisa dibatalkan kapan saja dengan tombol "Batal". Kamera tetap bisa diputar.
+- **Mode mudah** (Pengaturan → Kontrol, aksesibilitas, **default mati**): gauge tetap tampil, tapi zona
+  target lebih lebar, jarum lebih lambat, durasi lebih panjang, dan senar tidak bisa putus (semua miss
+  menjadi `escaped`). Berat ikan maksimum dibatasi 70% supaya mode normal tetap lebih bernilai.
+- **Getaran (haptics):** gigitan memakai `ImpactStyle.MEDIUM` (80 ms); ketukan yang berhasil/tangkapan
+  memakai medium 50 ms; denyut ringan (`ImpactStyle.LIGHT`, ~10 ms) disediakan untuk feedback ketukan.
+  Denyut ringan dibatasi maks. 1 per 50 ms agar input/frame loop tidak membanjiri motor. Di Android memakai
+  Capacitor Haptics; di web fallback `navigator.vibrate`; bila getar ditolak/tak didukung, permainan tetap
+  bisa dimainkan penuh.
+- Selama memancing tombol Naik/Turun kendaraan dan Duduk disembunyikan (lihat gerbang lokomosi di atas).
 
 ### 3.2 Peralatan
 
@@ -185,12 +205,20 @@ rujukan untuk fitur memancing.
 
 ## 8. Multiplayer
 
-- Mengikuti `MULTIPLAYER.md`: **tas, koin, dan hasil tangkapan per pemain** (disimpan di HP masing-masing).
-- Pemain lain melihat animasi memancing dan pelampung (state `fishing` ditambah ke mode animasi yang disinkron,
-  1 byte), serta gelembung singkat saat ada tangkapan ("Dapat nila 0.8 kg!" atau "Dapat sepatu bot...").
-- Titik pancing direservasi di host/server, jadi dua pemain tidak berdiri di titik yang sama.
-- Hasil acak dihitung di HP pemancing. Sama seperti ekonomi v1, ini bisa dicurangi oleh pemilik HP, tapi tidak
-  berdampak ke pemain lain karena tidak ada perdagangan antar pemain.
+- Mengikuti `MULTIPLAYER.md`: **tas, koin, hasil tangkapan, posisi target/jarum gauge, input ketukan, dan
+  hasil RNG tetap lokal milik pemancing** (tidak direplikasi dan disimpan di HP masing-masing).
+- Host/server menjadi otoritas **reservasi titik**: satu pemilik per `spotId`; klaim konflik ditolak; reservasi
+  dilepas saat hasil, batal, putus koneksi, atau heartbeat basi (TTL 5 detik).
+- Pemancing menerbitkan state visual ringkas berversi (`FISHING_SYNC_VERSION = 1`, payload 8 byte):
+  `phase` (`idle|cast|wait|bite|reel`), indeks titik, serta posisi pelampung X/Z (presisi 0,01 m). Sequence
+  yang stale/duplikat diabaikan, termasuk dengan wrap-around 16-bit; payload panjang/versi/fase di luar
+  kontrak ditolak.
+- Pemain lain hanya merender fase animasi yang sesuai (`anim_Cast`, `anim_FishIdle`, `anim_Reel`), joran,
+  senar, dan pelampung. Fase `result`/batal diterbitkan sebagai `idle` agar visual dibersihkan; gauge pribadi
+  tidak pernah tampil pada klien lain.
+- Gelembung hasil ("Dapat nila 0.8 kg!" atau "Dapat sepatu bot...") bersifat kosmetik setelah hasil lokal;
+  tidak memberi barang/koin kepada klien lain. Hasil acak lokal dapat dicurangi pemilik HP, tetapi tidak
+  berdampak lintas pemain karena tidak ada perdagangan antar pemain.
 
 ## 9. Aset Baru (Mode B, prosedural)
 
@@ -208,6 +236,14 @@ rujukan untuk fitur memancing.
 | `hero` (update) | - | Klip `anim_Cast`, `anim_FishIdle`, `anim_Reel`, `anim_Throw` (buang sampah) |
 | `npc_fishmonger` | ≤ 1.5k | Variasi `npc_vendor` (celemek, topi) |
 
+- **Kontrak animasi karakter/pose:** memasuki fase `cast` menjalankan pose cast satu kali selama 700 ms;
+  pose `casting` diinterpolasi ke `release` dengan `smoothCast`, sambil karakter menghadap air dan memegang
+  joran; fase `wait`, `bite`, dan `reel` mempertahankan pose `holding`. Jika klip rig tersedia, pemetaan yang
+  dituju adalah `anim_Cast`, `anim_FishIdle`, dan `anim_Reel`; fallback prosedural memakai `fishingPose.ts`.
+  Selesai/batal melepas joran dan kembali ke locomotion idle. Transisi tidak boleh menggeser root transform
+  pemain (movement lock tetap berlaku).
+- **SFX + getaran:** gigitan dan tangkapan memakai getar medium; denyut ringan saat menarik (lihat 3.1).
+
 - Ikon tas, ikon tempat sampah, dan ikon lapak ikan di minimap dibuat sebagai SVG di UI.
 - SFX prosedural baru: lempar, pelampung jatuh, gigitan, gulungan reel, senar putus, ikan menggelepar, buang sampah.
 
@@ -216,10 +252,19 @@ rujukan untuk fitur memancing.
 ```
 web/src/fishing/
   lootTable.ts       peluang hasil, jenis ikan, berat r², faktor jam/umpan/anti-farming (murni) + test
-  fishingMinigame.ts bar pancing: zona hijau, gerak ikon ikan per jenis, meter gulungan, tegangan, mode mudah (murni) + test
+  fishingMinigame.ts gauge timing horizontal: target, jarum, durasi, escaped/line-break, mode mudah (murni) + test
+  fishingHaptics.ts  Capacitor Haptics + fallback navigator.vibrate, throttle denyut ringan + test
+  fishingSync.ts     codec wire 8 byte fase/pelampung + urutan berversi (murni) + test
+  fishingMultiplayerBridge.ts  jembatan reservasi titik & publikasi state ke netRuntime + test
+  fishingSpots.ts    registrasi reservasi titik pancing di host (murni) + test
+  fishingPose.ts     pose joran per fase (casting/holding/idle) + smoothCast easing
+  fishingVisuals.ts  render joran 3D + garis senar + pelampung dari state sesi
   fishPrice.ts       harga per kg × berat, pasar jenuh harian + test
-  FishingController.tsx  state lempar/tunggu/gigit/tarik, pelampung, senar, animasi
-  FishingHud.tsx     tombol Tarik, bar pancing vertikal, meter gulungan, indikator tegangan, kartu hasil
+  FishingController.tsx  state cast/wait/bite/reel/result, outcome caught/escaped/line-broken/cancelled
+  FishingHud.tsx     tombol Tarik, gauge timing horizontal, kartu hasil, aksesibilitas ARIA ≥ 72 px
+web/src/game/
+  fishingActions.ts  integrasi store: canStartFishing, startFishing, updateFishing, cancel, reservasi
+  fishingLock.ts    freeze posisi/heading pemain saat sesi aktif + filter input locomotion
 web/src/economy/
   bag.ts             slot, tumpukan sampah, kapasitas tas, buang/jual/lepas + test
   BagPanel.tsx       panel tas
@@ -237,7 +282,7 @@ web/content/base/
 | --- | --- | --- |
 | F1. Danau dan air | Blok `lake` di sebelah taman, Taman Tepi Danau, surface `water`, collider tepi, navmesh, shader air, titik pancing, dermaga, peta/minimap | 3 hari |
 | F2. Tas terbatas | `bag.ts`, slot dan tumpukan, kapasitas, `BagPanel`, save `bag`, ikon HUD | 1.5 hari |
-| F3. Memancing | `FishingController`, lempar/tunggu/gigit, mini-game bar pancing tarik, mode mudah, tombol "Pancing" dan "Tarik", animasi | 3 hari |
+| F3. Memancing | `FishingController`, lempar/tunggu/gigit, gauge timing horizontal sekali-ketuk, mode mudah, movement lock, haptics, tombol "Pancing" dan "Tarik", animasi cast/hold/reel | 3 hari |
 | F4. Hasil tangkapan | `lootTable.ts`, 6 ikan, 4 sampah, berat, faktor jam/umpan, anti-farming, `fishing.json`, kartu hasil | 1 hari |
 | F5. Tempat sampah | Penempatan pinggir jalan/tepi danau/titik tertentu, tombol "Buang", hadiah kebersihan, ikon minimap | 1 hari |
 | F6. Jual ikan | Lapak + NPC Pak Darto + persona, `fishPrice.ts`, pasar jenuh, `FishStallScreen`, quest "Belajar mancing", tipe langkah `catch`/`dispose` | 2 hari |
@@ -252,9 +297,57 @@ web/content/base/
   bisa diubah lewat paket unduhan.
 - **Gerbang:**
   - F1: danau bersebelahan dengan taman, posisi NPC/kendaraan/halte/spawn tidak berubah, tidak ada pemain, kendaraan, warga, atau hewan yang masuk air, dan FPS di tepi danau tetap ≥ 30 di mid-range.
-  - F3: bar pancing bisa dimainkan dengan satu jempol tanpa bentrok dengan joystick, ikan langka terasa lebih sulit dari ikan umum, dan mode mudah berfungsi.
+  - F3: gauge timing bisa dimainkan dengan satu jempol tanpa bentrok dengan joystick, ikan langka terasa lebih sulit dari ikan umum, dan mode mudah berfungsi.
   - F4/F6: 10.000 simulasi tangkapan sesuai peluang (toleransi ±1%), harga sesuai rumus, pasar jenuh reset per hari.
   - F2/F5: tas tidak pernah melebihi kapasitas, sampah hanya keluar lewat tempat sampah, save/load tas utuh.
+  - F8: reservasi titik bersifat satu-pemilik dengan TTL 5 detik; frame sync berversi ditolak bila panjang/versi/fase di luar kontrak; state stale dari sequence lama tidak pernah menggantikan yang lebih baru (termasuk wrap-around 16-bit).
+
+## 11a. Skenario Penerimaan (Acceptance Scenarios)
+
+Skenario dijalankan otomatis bila memungkinkan (unit test `web/src/fishing/*.test.ts`) dan manual di desktop
+plus satu perangkat Android satu-jempol. Satu skenario = satu alasan gagal rilis.
+
+**Desktop (mouse/keyboard):**
+
+1. **Gauge timing akurat:** buka sesi memancing hingga gauge aktif (fase `bite`/`reel`); langkah simulasi
+   menggerakkan jarum bolak-balik tanpa input dan memantul di ujung [0..1]; ketukan saat jarum berada pada
+   batas target (inklusif) → `result/caught` dengan `attempts = 1` (fishingMinigame.test.ts,
+   FishingController.test.ts).
+2. **Hasil gagal deterministik:** near miss (+0,01 di luar target) → `escaped`; miss jauh pada ikan
+   kesulitan ≥ 4 → `line-broken` dengan SFX `line-break` (fishingMinigame.test.ts,
+   FishingController.test.ts).
+3. **Timeout = lepas:** biarkan `durationMs` habis tanpa ketukan → `result/escaped`, `remainingMs = 0`,
+   `loot` tidak dihasilkan, dan ketukan lanjutan diabaikan (state terminal tetap)
+   (fishingMinigame.test.ts, FishingController.test.ts).
+4. **Mode mudah:** aktifkan Pengaturan → Kontrol → Mode mudah; target lebih lebar, jarum lebih lambat,
+   durasi lebih panjang, dan miss jauh tidak pernah `line-broken` (fishingMinigame.test.ts,
+   FishingController.test.ts).
+5. **Joran karbon:** target 25% lebih lebar daripada joran bambu pada kesulitan sama; state input tidak
+   pernah termutasi (fishingMinigame.test.ts).
+6. **Gerbang lokomosi:** saat sesi memancing aktif, posisi/heading pemain dibekukan pada pose awal meski ada
+   input atau tulisan jaringan; vektor keyboard/joystick difilter jadi nol; setelah sesi berakhir, gerbang
+   melepas dan sesi berikutnya menangkap pose baru. Selain itu kluster aksi hanya menampilkan "Batal", dan
+   `canStartFishing()` menolak start saat tidak mode `walk`, duduk, di bus, dijeda, atau peta terbuka
+   (fishingLock.test.ts, fishingActions.test.ts, ActionButtons.tsx).
+7. **Haptics & aksesibilitas HUD:** tombol Tarik dan Batal mempunyai `aria-label` dan target sentuh ≥ 72 px;
+   vibrator memakai gaya MEDIUM untuk kejadian salien, LIGHT untuk denyut, dan throttle 50 ms; di web fallback
+   `navigator.vibrate` dipakai dan getar ditolak tidak mengganggu permainan (fishingHaptics.test.ts,
+   FishingHud.render.test.ts).
+
+**Android satu-jempol:**
+
+8. **Putar–tunggu–ketuk tanpa menggeser jempol:** mulai memancing dari tombol kluster aksi; setelah gigitan
+   gauge langsung menyapu dan layar hanya menuntut satu ketukan "Tap/Tarik"; joystick tidak dipakai dan
+   gerbang lokomosi menolak drag untuk memindahkan karakter.
+9. **Timeout gauge:** lewatkan `durationMs` tanpa ketukan → kartu hasil "Ikan lepas!" (`escaped`), tanpa
+   perubahan tas, dan reservasi titik dilepas (FishingController.test.ts, fishingActions.test.ts).
+10. **Loop multiplayer:** dua perangkat dalam satu sesi; pemain B tidak bisa menempati titik yang sedang
+    dipakai A; A membatalkan → titik langsung bisa diklaim B; frame fase A (`cast/wait/bite/reel`) tampil di
+    klien B dengan payload 8 byte yang sah; payload korup/versi salah diabaikan tanpa crash
+    (fishingMultiplayerBridge.test.ts, fishingSync.test.ts, fishingSpots.test.ts).
+11. **Alur penuh sekali ketukan:** lempar → tunggu (3-12 dtk) → gigitan (getar + SFX) + gauge → ketuk di
+    target → kartu hasil "Simpan" → ikan masuk tas dan slot terpakai bertambah; alternatif gagal
+    (escaped/line-broken/cancelled) menampilkan kartu "Tutup" tanpa mengubah tas.
 
 ## 12. Keputusan (dikonfirmasi 2026-10-02)
 
@@ -262,5 +355,6 @@ web/content/base/
 2. Tas awal **8 slot**, upgrade 14 dan 20 lewat toko.
 3. Hadiah **+1 koin per sampah** yang dibuang, maksimal 30 per hari.
 4. Ikan **tidak membusuk** di v1.
-5. Mini-game **bar pancing tarik** sebagai mode utama. Mode mudah tetap ada di Pengaturan untuk aksesibilitas,
-   default mati.
+5. **Mini-game gauge timing horizontal sekali-ketuk** (revisi 2026-10, menggantikan keputusan lama "bar
+   pancing tarik" — bar vertikal/meter gulungan **ditarik**). Mode mudah tetap ada di Pengaturan → Kontrol
+   untuk aksesibilitas, default mati.

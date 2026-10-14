@@ -12,13 +12,17 @@ import {
   type Object3D,
 } from 'three';
 import { installWindowShader } from '../render/windowShader';
+import type { QualityTier } from '../state/qualityTiers';
+import { smallPropVisible } from '../optimization/culling';
 import { replaceChunkStreetLamps, removeChunkStreetLamps } from '../render/streetLampRegistry';
 import type { BuiltChunk, ChunkLoadRequest, ChunkWorkerResponse } from './chunkProtocol';
 import type { PropId } from './propSpec';
-import { type ChunkCoord, chunkDistance, planStreaming, withinRadius } from './streaming';
-import { chunkCoord, chunkKey, inWorld, LOAD_RADIUS, UNLOAD_RADIUS } from './worldSpec';
+import { type ChunkCoord, planStreaming, withinRadius } from './streaming';
+import { CHUNK_SIZE, chunkCoord, chunkKey, inWorld, LOAD_RADIUS, sampleChunkHeight, UNLOAD_RADIUS } from './worldSpec';
+import { loadNavigationTile, unloadNavigationTile } from './navigation';
 import { streamingPolicyFor } from '../optimization/streamingPolicy';
 import { rebuildCollision, worldState } from './worldState';
+import { createPoiMarkerAssets, createPoiMarkerGroup, type PoiMarkerAssets } from './poiMarkers';
 
 export interface PropPart {
   geometry: BufferGeometry;
@@ -45,13 +49,24 @@ interface ChunkView {
   coord: ChunkCoord;
   group: Group;
   props: Group;
+  poiMarkers: Group | null;
   /** Objects tap-to-move may raycast (terrain + buildings). */
   pickables: Object3D[];
   dispose: () => void;
 }
 
-/** Props are drawn only near the player (cheap distance LOD); terrain + buildings out to LOAD_RADIUS. */
-const PROP_RADIUS = 1;
+/**
+ * Props are drawn only near the player (cheap distance LOD); terrain + buildings out to LOAD_RADIUS.
+ * Distance is measured in metres from the player to the chunk centre and compared against the tier
+ * threshold in culling.ts (smallPropVisible), replacing the old Chebyshev ring (PROP_RADIUS=1 chunk).
+ * Medium (60 m) is the closest tier to the old 64 m ring, so the medium look is preserved.
+ */
+const DEFAULT_QUALITY: QualityTier = 'medium';
+
+/** Metres from the player to a chunk's centre (the chunk spans CHUNK_SIZE around that centre). */
+function chunkCentreDistance(coord: ChunkCoord, x: number, z: number): number {
+  return Math.hypot(coord.cx * CHUNK_SIZE - x, coord.cz * CHUNK_SIZE - z);
+}
 
 /**
  * Streams chunk JSON through a worker, applies at most one built chunk per frame, and disposes
@@ -68,6 +83,9 @@ export class ChunkStreamer {
   private queue: { key: string }[] = [];
   private readonly ready: BuiltChunk[] = [];
   private center: ChunkCoord = { cx: Number.NaN, cz: Number.NaN };
+  /** Last player position passed to update(); used to visibility-test chunks applied outside the ring walk. */
+  private playerX = 0;
+  private playerZ = 0;
   private readyFired = false;
   private readonly streamingPolicy = streamingPolicyFor('medium');
   private readonly terrainMaterial = new MeshStandardMaterial({ vertexColors: true, roughness: 0.92, metalness: 0 });
@@ -75,12 +93,19 @@ export class ChunkStreamer {
   private readonly unitBox = new BoxGeometry(1, 1, 1);
   private readonly scratch = new Matrix4();
   private readonly placement = new Matrix4();
+  private readonly poiMarkerAssets: PoiMarkerAssets = createPoiMarkerAssets();
 
   constructor(
     private readonly parts: PropParts,
     private readonly chunkUrl: (key: string) => string,
     private readonly onInitialReady: () => void,
     private readonly onError: (message: string) => void,
+    /**
+     * Explicit render quality tier for prop distance LOD. Optional so existing callers/tests keep
+     * working (defaults to medium, ≈ the old 1-chunk behaviour). The tier is read once at
+     * construction; World.tsx passes it from the settings store and applies changes on next mount.
+     */
+    private readonly quality: QualityTier = DEFAULT_QUALITY,
   ) {
     this.root.name = 'world_chunks';
     installWindowShader(this.buildingMaterial);
@@ -98,6 +123,8 @@ export class ChunkStreamer {
   }
 
   update(x: number, z: number): void {
+    this.playerX = x;
+    this.playerZ = z;
     const cx = chunkCoord(x);
     const cz = chunkCoord(z);
     let changed = false;
@@ -107,7 +134,11 @@ export class ChunkStreamer {
       for (const key of plan.unload) this.unload(key);
       this.queue = plan.load;
       changed = true;
-      for (const view of this.views.values()) view.props.visible = chunkDistance(view.coord, this.center) <= PROP_RADIUS;
+      for (const view of this.views.values()) {
+        const nearby = smallPropVisible(chunkCentreDistance(view.coord, x, z), this.quality);
+        view.props.visible = nearby;
+        if (view.poiMarkers) view.poiMarkers.visible = nearby;
+      }
     }
 
     while (this.pending.size < this.streamingPolicy.maxInFlight && this.queue.length > 0) {
@@ -154,6 +185,7 @@ export class ChunkStreamer {
     this.terrainMaterial.dispose();
     this.buildingMaterial.dispose();
     this.unitBox.dispose();
+    this.poiMarkerAssets.dispose();
   }
 
   private initialAreaLoaded(): boolean {
@@ -229,8 +261,18 @@ export class ChunkStreamer {
       }
     }
     const coord = { cx: chunk.cx, cz: chunk.cz };
-    props.visible = chunkDistance(coord, this.center) <= PROP_RADIUS;
+    props.visible = smallPropVisible(chunkCentreDistance(coord, this.playerX, this.playerZ), this.quality);
     group.add(props);
+
+    const poiWithY = {
+      fishingSpots: chunk.fishingSpots.map((p) => ({ ...p, y: sampleChunkHeight(chunk, p.x, p.z) })),
+      trashBins: chunk.trashBins.map((p) => ({ ...p, y: sampleChunkHeight(chunk, p.x, p.z) })),
+      fishStalls: chunk.fishStalls.map((p) => ({ ...p, y: sampleChunkHeight(chunk, p.x, p.z) })),
+    };
+    const poiMarkerResult = createPoiMarkerGroup(poiWithY, this.poiMarkerAssets);
+    poiMarkerResult.group.visible = smallPropVisible(chunkCentreDistance(coord, this.playerX, this.playerZ), this.quality);
+    group.add(poiMarkerResult.group);
+
     this.root.add(group);
     group.updateMatrixWorld(true);
 
@@ -241,15 +283,22 @@ export class ChunkStreamer {
       district: chunk.district,
       heights: chunk.heights,
       surface: chunk.surface,
+      fishingSpots: chunk.fishingSpots,
+      trashBins: chunk.trashBins,
+      fishStalls: chunk.fishStalls,
       colliders: chunk.colliders,
     });
+    // Kick off the per-tile navmesh fetch in the background (non-blocking).
+    loadNavigationTile(chunk.cx, chunk.cz).catch(() => {/* tile not available, fallback to straight-line */});
     this.views.set(chunk.key, {
       key: chunk.key,
       coord,
       group,
       props,
+      poiMarkers: poiMarkerResult.group,
       pickables,
       dispose: () => {
+        poiMarkerResult.dispose();
         for (const item of disposables) item.dispose();
       },
     });
@@ -264,6 +313,7 @@ export class ChunkStreamer {
     removeChunkStreetLamps(key);
     this.views.delete(key);
     worldState.chunks.delete(key);
+    unloadNavigationTile(...(key.split('_').map(Number) as [number, number]));
     this.stats.unloads += 1;
   }
 }

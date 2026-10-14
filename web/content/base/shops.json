@@ -1,0 +1,69 @@
+[
+  {
+    "id": "shop_sepeda",
+    "name": "Toko Sepeda Kang Rudi",
+    "region": "residential",
+    "x": -150,
+    "z": 120,
+    "npcId": "npc_rudi",
+    "items": [
+      "bike_city",
+      "skateboard",
+      "paint_bike_green",
+      "paint_bike_yellow",
+      "handlebar_tape",
+      "rack_cargo",
+      "ticket_bus_day",
+      "ticket_bus_trip"
+    ]
+  },
+  {
+    "id": "shop_motor",
+    "name": "Dealer Motor Pak Agus",
+    "region": "industrial",
+    "x": 210,
+    "z": -40,
+    "npcId": "npc_agus",
+    "items": [
+      "scooter_standard",
+      "paint_scooter_blue",
+      "paint_scooter_red",
+      "horn_klakson",
+      "lamp_led"
+    ]
+  },
+  {
+    "id": "shop_boutique",
+    "name": "Butik Mbak Yanti",
+    "region": "downtown",
+    "x": 90,
+    "z": -90,
+    "npcId": "npc_yanti",
+    "items": [
+      "hat_cap_red",
+      "hat_cap_navy",
+      "shirt_stripe",
+      "shirt_plain_white",
+      "jacket_denim",
+      "pants_cargo",
+      "shoes_sneaker_white",
+      "backpack_school",
+      "helmet_full"
+    ]
+  },
+  {
+    "id": "shop_lapak_ikan",
+    "name": "Lapak Ikan Pak Darto",
+    "region": "residential",
+    "x": -60,
+    "z": 200,
+    "npcId": "npc_darto",
+    "items": [
+      "fishing_rod_carbon",
+      "bait_worm",
+      "bait_pellet",
+      "bag_ransel",
+      "bag_carrier"
+    ]
+  }
+]

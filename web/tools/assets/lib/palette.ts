@@ -15,17 +15,18 @@ export function linearToSrgbByte(c: number): number {
 
 /** Shared limited palette so every asset stays visually consistent. */
 export const PALETTE = {
-  skin: hex('#e9b48f'),
+  // Urban hero palette from Notion §11.3 (sRGB source values, stored as linear RGB).
+  skin: hex('#78361b'),
   skinTan: hex('#b97e56'),
-  hair: hex('#2b211c'),
+  hair: hex('#030302'),
   eye: hex('#1b1b22'),
   white: hex('#f3f1ea'),
-  hoodie: hex('#2f6fdb'),
-  hoodieDark: hex('#2456ad'),
-  jeans: hex('#34405a'),
+  hoodie: hex('#d1c4a8'),
+  hoodieDark: hex('#9e937d'),
+  jeans: hex('#0b0d11'),
   pantsDark: hex('#3a3430'),
-  shoe: hex('#f3f1ea'),
-  sole: hex('#2a2a2e'),
+  shoe: hex('#e0dbd1'),
+  sole: hex('#f2f0e6'),
   backpack: hex('#e2582b'),
   apron: hex('#8a5a3b'),
   cap: hex('#1f1f24'),

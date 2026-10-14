@@ -1,0 +1,280 @@
+[
+  {
+    "id": "q_kenalan",
+    "title": "Kenalan dengan warga",
+    "giver": "npc_budi",
+    "requires": [],
+    "repeatable": false,
+    "steps": [
+      {
+        "type": "talk",
+        "npc": "npc_budi",
+        "text": "Bicara dengan Pak Budi"
+      },
+      {
+        "type": "talk",
+        "npc": "npc_sari",
+        "text": "Bicara dengan Bu Sari"
+      },
+      {
+        "type": "talk",
+        "npc": "npc_rina",
+        "text": "Bicara dengan Mbak Rina"
+      },
+      {
+        "type": "talk",
+        "npc": "npc_dewi",
+        "text": "Bicara dengan Bu Dewi"
+      },
+      {
+        "type": "talk",
+        "npc": "npc_joko",
+        "text": "Bicara dengan Mas Joko"
+      }
+    ],
+    "rewards": {
+      "coins": 20,
+      "items": []
+    }
+  },
+  {
+    "id": "q_antar_paket",
+    "title": "Antar Paket Bu Sari",
+    "giver": "npc_sari",
+    "requires": [
+      "q_kenalan"
+    ],
+    "repeatable": false,
+    "steps": [
+      {
+        "type": "talk",
+        "npc": "npc_sari",
+        "text": "Ambil paket dari Bu Sari"
+      },
+      {
+        "type": "reach",
+        "x": 69,
+        "z": -54,
+        "radius": 6,
+        "text": "Bawa ke toko Mbak Rina di Pusat Kota"
+      },
+      {
+        "type": "talk",
+        "npc": "npc_rina",
+        "text": "Serahkan paket ke Mbak Rina"
+      }
+    ],
+    "rewards": {
+      "coins": 50,
+      "items": [
+        "paint_scooter_blue"
+      ]
+    }
+  },
+  {
+    "id": "q_eksplorasi_industri",
+    "title": "Jelajahi Kawasan Industri",
+    "giver": "npc_budi",
+    "requires": [
+      "q_kenalan"
+    ],
+    "repeatable": false,
+    "steps": [
+      {
+        "type": "visit_district",
+        "region": "industrial",
+        "text": "Kunjungi Kawasan Industri untuk pertama kali"
+      },
+      {
+        "type": "talk",
+        "npc": "npc_joko",
+        "text": "Bicara dengan Mas Joko di Kawasan Industri"
+      },
+      {
+        "type": "talk",
+        "npc": "npc_agus",
+        "text": "Temui Pak Agus si mekanik"
+      }
+    ],
+    "rewards": {
+      "coins": 40,
+      "items": [
+        "rack_cargo"
+      ]
+    }
+  },
+  {
+    "id": "q_bengkel_kilat",
+    "title": "Kiriman Suku Cadang",
+    "giver": "npc_agus",
+    "requires": [
+      "q_eksplorasi_industri"
+    ],
+    "repeatable": true,
+    "steps": [
+      {
+        "type": "talk",
+        "npc": "npc_agus",
+        "text": "Ambil pesanan suku cadang dari Pak Agus"
+      },
+      {
+        "type": "reach",
+        "x": 190,
+        "z": 60,
+        "radius": 6,
+        "text": "Antar ke gudang Mas Wahyu"
+      },
+      {
+        "type": "talk",
+        "npc": "npc_wahyu",
+        "text": "Serahkan suku cadang ke Mas Wahyu"
+      }
+    ],
+    "rewards": {
+      "coins": 25,
+      "items": []
+    }
+  },
+  {
+    "id": "q_kurir_pabrik",
+    "title": "Kurir Pabrik",
+    "giver": "npc_wahyu",
+    "requires": [
+      "q_eksplorasi_industri"
+    ],
+    "repeatable": true,
+    "steps": [
+      {
+        "type": "talk",
+        "npc": "npc_wahyu",
+        "text": "Ambil paket kiriman dari Mas Wahyu"
+      },
+      {
+        "type": "reach",
+        "x": 40,
+        "z": 90,
+        "radius": 8,
+        "text": "Antar ke pusat kota (dekat Bang Hasan)"
+      },
+      {
+        "type": "talk",
+        "npc": "npc_hasan",
+        "text": "Serahkan paket ke Bang Hasan"
+      }
+    ],
+    "rewards": {
+      "coins": 30,
+      "items": []
+    }
+  },
+  {
+    "id": "q_ojek_cepat",
+    "title": "Ojek Cepat",
+    "giver": "npc_tini",
+    "requires": [
+      "q_kenalan"
+    ],
+    "repeatable": true,
+    "steps": [
+      {
+        "type": "talk",
+        "npc": "npc_tini",
+        "text": "Terima orderan ojek dari Bu Tini"
+      },
+      {
+        "type": "ride",
+        "vehicle": "scooter_standard",
+        "text": "Naiki skuter dan antar Bu Tini ke Perumahan",
+        "destination": {
+          "x": -123,
+          "z": 74,
+          "radius": 10
+        },
+        "timeLimitSeconds": 120
+      }
+    ],
+    "rewards": {
+      "coins": 20,
+      "items": []
+    }
+  },
+  {
+    "id": "q_belajar_mancing",
+    "title": "Belajar Mancing",
+    "giver": "npc_darto",
+    "requires": [
+      "q_kenalan"
+    ],
+    "repeatable": false,
+    "steps": [
+      {
+        "type": "talk",
+        "npc": "npc_darto",
+        "text": "Bicara dengan Pak Darto, penjual ikan"
+      },
+      {
+        "type": "collect",
+        "item": "fishing_rod_bamboo",
+        "count": 1,
+        "text": "Ambil joran bambu gratis dari Pak Darto"
+      },
+      {
+        "type": "catch",
+        "count": 1,
+        "text": "Tangkap 1 ikan apa saja di danau"
+      },
+      {
+        "type": "talk",
+        "npc": "npc_darto",
+        "text": "Jual ikan pertamamu ke Pak Darto"
+      },
+      {
+        "type": "dispose",
+        "count": 1,
+        "text": "Buang 1 sampah di tong sampah terdekat"
+      }
+    ],
+    "rewards": {
+      "coins": 35,
+      "items": [
+        "bait_worm",
+        "bait_worm"
+      ]
+    }
+  },
+  {
+    "id": "q_mancing_mahir",
+    "title": "Mancing Mahir",
+    "giver": "npc_darto",
+    "requires": [
+      "q_belajar_mancing"
+    ],
+    "repeatable": false,
+    "steps": [
+      {
+        "type": "catch",
+        "species": "ikan_mas",
+        "count": 1,
+        "minWeight": 1.0,
+        "text": "Tangkap 1 ikan mas ≥ 1 kg"
+      },
+      {
+        "type": "catch",
+        "species": "gurame",
+        "count": 1,
+        "text": "Tangkap 1 gurame (ukuran berapa pun)"
+      },
+      {
+        "type": "talk",
+        "npc": "npc_darto",
+        "text": "Lapor hasil tangkapanmu ke Pak Darto"
+      }
+    ],
+    "rewards": {
+      "coins": 80,
+      "items": [
+        "fishing_rod_carbon"
+      ]
+    }
+  }
+]

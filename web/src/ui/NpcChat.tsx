@@ -9,6 +9,7 @@ import { usePlayerProfile } from '../state/profile';
 import { useGameStore } from '../state/gameStore';
 import { worldState } from '../world/worldState';
 import { audio } from '../audio/audioEngine';
+import { routeQuestEvent } from '../game/questRuntime';
 
 const MAX_INPUT = 500;
 /** Conversation per named NPC survives closing the panel for the rest of the session (warga: di save game). */
@@ -82,10 +83,13 @@ export function NpcChat() {
       setMessages(withReply);
       audio.message();
       // Quest "kenalan" hanya untuk 5 NPC bernama; warga masuk statistik "diajak ngobrol".
-      if (resident) recordResidentChat(npcId, withReply);
-      else {
+      if (resident) {
+        recordResidentChat(npcId, withReply);
+        // Event talk masuk quest engine (content pack) — warga ambient tetap hanya statistik.
+      } else {
         histories.set(npcId, withReply);
         addMet(npcId);
+        routeQuestEvent({ type: 'talk', npc: npcId });
       }
     } catch (chatError) {
       if (controller.signal.aborted) return;

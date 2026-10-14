@@ -5,6 +5,7 @@ import {
   boxInFrustum,
   isOccluded,
   propCullDistance,
+  propsVisibleAtDistance,
   selectOccluders,
   smallPropVisible,
 } from './culling';
@@ -58,6 +59,38 @@ describe('distance culling props kecil', () => {
 
   it('jarak tidak valid dianggap tidak terlihat', () => {
     expect(smallPropVisible(Number.NaN, 'high')).toBe(false);
+  });
+});
+
+describe('prop visibility by chunk distance (meter conversion)', () => {
+  // CHUNK_SIZE = 64 m. Meter thresholds: low=35, medium=60, high=90.
+  // 1 chunk = 64 m. Chunk distance is Chebyshev (max(|dcx|, |dcz|)).
+
+  it('medium: prop tepat pada ambang 60m terlihat, 60.01m dibuang', () => {
+    expect(smallPropVisible(60, 'medium')).toBe(true);
+    expect(smallPropVisible(60.01, 'medium')).toBe(false);
+  });
+
+  it('propsVisibleAtDistance boundary at tier thresholds in meters', () => {
+    // low: 35m / 64 ≈ 0 chunks → 0 chunks = visible, 1 chunk = 64m > 35m → invisible
+    expect(propsVisibleAtDistance(0, 'low')).toBe(true);
+    expect(propsVisibleAtDistance(1, 'low')).toBe(false);
+    // medium: 60m / 64 ≈ 0 chunks → 0 chunks = visible, 1 chunk = 64m > 60m → invisible
+    expect(propsVisibleAtDistance(0, 'medium')).toBe(true);
+    expect(propsVisibleAtDistance(1, 'medium')).toBe(false);
+    // high: 90m / 64 ≈ 1 chunk → 1 chunk = 64m ≤ 90m → visible
+    expect(propsVisibleAtDistance(1, 'high')).toBe(true);
+    // 2 chunks = 128m > 90m → invisible
+    expect(propsVisibleAtDistance(2, 'high')).toBe(false);
+  });
+
+  it('propsVisibleAtDistance NaN or invalid chunk distance is not visible', () => {
+    expect(propsVisibleAtDistance(Number.NaN, 'high')).toBe(false);
+  });
+
+  it('high tier allows farther chunks than medium', () => {
+    expect(propsVisibleAtDistance(1, 'high')).toBe(true);
+    expect(propsVisibleAtDistance(1, 'medium')).toBe(false);
   });
 });
 

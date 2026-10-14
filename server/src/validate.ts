@@ -45,7 +45,10 @@ export const STRIKE_DECAY_PER_SEC = 5;
 export const STRIKE_LIMIT = 100;
 
 /** Pesan yang boleh dikirim klien ke server. Sisanya host-only. */
-const CLIENT_TYPES: ReadonlySet<NetMessage['type']> = new Set(['hello', 'state', 'appearance', 'chat', 'vehicleClaim', 'ping']);
+const CLIENT_TYPES: ReadonlySet<NetMessage['type']> = new Set([
+  'hello', 'state', 'appearance', 'chat', 'vehicleClaim', 'ping',
+  'fishingReserve', 'fishingRelease', 'fishingState',
+]);
 
 export type RejectReason =
   | DecodeError
@@ -63,6 +66,7 @@ export type RejectReason =
   | 'vehicle-unknown'
   | 'vehicle-far'
   | 'not-owner'
+  | 'spot-taken'
   | 'unexpected';
 
 export type ValidateResult = { ok: true; message: NetMessage } | { ok: false; reason: RejectReason };

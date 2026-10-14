@@ -4,7 +4,7 @@
  */
 import { playerLine, systemPrompt } from '../ai/promptFacts';
 import { mulberry32 } from '../world/worldGen';
-import { DISTRICT_NAMES, type DistrictId, districtOf, WORLD_CHUNKS } from '../world/worldSpec';
+import { DISTRICT_NAMES, type DistrictId, legacyDistrictOf, LEGACY_WORLD_CHUNKS } from '../world/worldSpec';
 import { hourOf } from './density';
 
 export const RESIDENT_COUNT = 60;
@@ -70,8 +70,9 @@ const pick = <T>(list: readonly T[], random: () => number): T => list[Math.floor
 
 function chunksOf(district: DistrictId): Place[] {
   const out: Place[] = [];
-  for (let cz = 0; cz < WORLD_CHUNKS; cz++) {
-    for (let cx = 0; cx < WORLD_CHUNKS; cx++) if (districtOf(cx, cz) === district) out.push({ district, cx, cz });
+  // Legacy 8×8 grid (residents.json was baked with these coordinates).
+  for (let cz = 0; cz < LEGACY_WORLD_CHUNKS; cz++) {
+    for (let cx = 0; cx < LEGACY_WORLD_CHUNKS; cx++) if (legacyDistrictOf(cx, cz) === district) out.push({ district, cx, cz });
   }
   return out;
 }

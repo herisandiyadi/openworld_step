@@ -15,6 +15,8 @@ import {
   quantizeXZ,
   sanitizeText,
   STATE_ENTRY_BYTES,
+  FISHING_STATE_BYTES,
+  FISHING_SPOT_ID_BYTES_MAX,
   type NetMessage,
   type PlayerSnapshot,
 } from './protocol';
@@ -60,6 +62,14 @@ describe('protocol encode/decode', () => {
     { type: 'playerLeave', playerId: 5 },
     { type: 'ping', nonce: 0xfffffffe },
     { type: 'pong', nonce: 42 },
+    { type: 'fishingReserve', playerId: 0, spotId: 'lake-east' },
+    { type: 'fishingRelease', playerId: 7, spotId: 'lake-east' },
+    {
+      type: 'fishingState',
+      playerId: 7,
+      sequence: 42,
+      payload: new Uint8Array([1, 3, 0, 4, 0, 125, 255, 206]),
+    },
   ];
 
   it.each(samples.map((message) => [message.type, message] as const))('round-trip %s', (_type, message) => {
@@ -138,6 +148,35 @@ describe('protocol validasi', () => {
     // Tepat 200 karakter masih boleh.
     const ok = encodeMessage({ type: 'chat', channel: 'session', fromId: 0, msgId: 0, timeMs: 0, text: 'b'.repeat(CHAT_TEXT_MAX) });
     expect(decodeMessage(ok).ok).toBe(true);
+  });
+
+  it('menolak payload fishing yang malformed atau oversized', () => {
+    const state = encodeMessage({
+      type: 'fishingState',
+      playerId: 0,
+      sequence: 1,
+      payload: new Uint8Array(FISHING_STATE_BYTES),
+    });
+    expect(decodeMessage(state.subarray(0, state.length - 1))).toEqual({ ok: false, error: 'length' });
+    const oversizedState = new Uint8Array(state.length + 1);
+    oversizedState.set(state);
+    expect(decodeMessage(oversizedState)).toEqual({ ok: false, error: 'length' });
+
+    expect(() =>
+      encodeMessage({
+        type: 'fishingState',
+        playerId: 0,
+        sequence: 1,
+        payload: new Uint8Array(FISHING_STATE_BYTES + 1),
+      }),
+    ).toThrow(RangeError);
+    expect(() =>
+      encodeMessage({ type: 'fishingReserve', playerId: 0, spotId: 'x'.repeat(FISHING_SPOT_ID_BYTES_MAX + 1) }),
+    ).toThrow(RangeError);
+
+    const reserve = encodeMessage({ type: 'fishingReserve', playerId: 0, spotId: 'lake-east' });
+    reserve[HEADER_BYTES + 2] = FISHING_SPOT_ID_BYTES_MAX + 1;
+    expect(decodeMessage(reserve)).toEqual({ ok: false, error: 'text' });
   });
 
   it('merapikan karakter kontrol dan menolak teks kosong', () => {

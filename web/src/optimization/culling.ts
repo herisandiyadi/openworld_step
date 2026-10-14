@@ -6,6 +6,7 @@
  * Konvensi plane mengikuti three.js: titik p ada di dalam bila nx*px + ny*py + nz*pz + d >= 0.
  */
 import type { QualityTier } from '../state/qualityTiers';
+import { CHUNK_SIZE } from '../world/worldSpec';
 
 export interface Box {
   minX: number;
@@ -52,6 +53,13 @@ export const propCullDistance = (tier: QualityTier): number => PROP_CULL_DISTANC
 /** Prop kecil terlihat bila jaraknya masih di dalam ambang tier (batas tepat masih terlihat). */
 export const smallPropVisible = (distance: number, tier: QualityTier): boolean =>
   Number.isFinite(distance) && distance <= PROP_CULL_DISTANCE[tier];
+
+/**
+ * Backwards-compatible helper for callers that still reason in chunk rings.
+ * Runtime streaming uses exact metre distance to chunk centres instead.
+ */
+export const propsVisibleAtDistance = (chunkDistance: number, tier: QualityTier): boolean =>
+  smallPropVisible(chunkDistance * CHUNK_SIZE, tier);
 
 export interface OccluderPolicy {
   /** Tinggi minimum (m) agar sebuah bangunan layak jadi occluder. */

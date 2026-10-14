@@ -1,10 +1,12 @@
 import type { PluginListenerHandle } from '@capacitor/core';
 import { type FormEvent, type ReactElement, useCallback, useEffect, useId, useRef, useState } from 'react';
 import { Nearby, type NearbyEventMap, type NearbyEventName } from '../net/nearbyPlugin';
-import { connectLocalClient, connectLocalHost, connectOnline, currentMode, disconnect, roomCode } from '../net/netRuntime';
+import { connectLocalClient, connectLocalHost, connectOnline, currentMode, disconnect, localPlayerId, roomCode } from '../net/netRuntime';
 import { useNetStore } from '../net/netStore';
 import { isServerConfigured, useNetSettings } from '../state/netSettings';
 import { DEFAULT_APPEARANCE, usePlayerProfile, type Appearance } from '../state/profile';
+import { createLiveFishingMultiplayerBridge, type FishingMultiplayerBridge } from '../fishing/fishingMultiplayerBridge';
+import { setFishingMultiplayerBridge } from '../game/fishingActions';
 import './multiplayerMenu.css';
 
 /* ------------------------------------------------------------------------------------------------
@@ -199,6 +201,7 @@ export function MultiplayerMenu({ onBack, onStart, onOpenSettings }: Multiplayer
   const [copyNote, setCopyNote] = useState<string | null>(null);
 
   const handles = useRef<PluginListenerHandle[]>([]);
+  const fishingBridge = useRef<FishingMultiplayerBridge | null>(null);
   const knownRemotes = useRef<Map<number, string>>(new Map());
   const ids = { code: useId(), status: useId(), notices: useId() };
 
@@ -249,7 +252,23 @@ export function MultiplayerMenu({ onBack, onStart, onOpenSettings }: Multiplayer
     if (state.nearby !== 'granted') throw new Error('Izin Bluetooth dan lokasi belum diberikan, sesi lokal tidak bisa dimulai.');
   }, []);
 
+  useEffect(() => {
+    const id = localPlayerId();
+    if (status !== 'connected' || id === null) return;
+    fishingBridge.current?.close?.();
+    fishingBridge.current = createLiveFishingMultiplayerBridge();
+    setFishingMultiplayerBridge(fishingBridge.current);
+    return () => {
+      fishingBridge.current?.close?.();
+      fishingBridge.current = null;
+      setFishingMultiplayerBridge(null);
+    };
+  }, [status]);
+
   const resetSession = useCallback((): void => {
+    fishingBridge.current?.close?.();
+    fishingBridge.current = null;
+    setFishingMultiplayerBridge(null);
     dropListeners();
     void Nearby.stopAll().catch(() => undefined);
     disconnect();

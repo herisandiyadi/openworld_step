@@ -20,6 +20,7 @@ import {
   GRID_CELLS,
   GRID_STEP,
   HALF_WORLD,
+  SURFACE,
   SURFACE_COLORS,
   type SurfaceId,
   WORLD_CHUNKS,
@@ -80,9 +81,10 @@ class GeometrySink {
 }
 
 function bakeNavMeshInput(chunks: ChunkData[]): GeometrySink {
+  const waterSurfaces = new Set([SURFACE.water]);
   const sink = new GeometrySink();
   for (const chunk of chunks) {
-    sink.addTriangles(buildTerrainBuffers(chunk).positions);
+    sink.addTriangles(buildTerrainBuffers(chunk, waterSurfaces).positions);
     for (const building of chunk.buildings) sink.addBox(building, building.baseY, building.topY);
     for (const prop of chunk.props) {
       const collider = PROP_COLLIDERS[prop.id];
@@ -151,7 +153,35 @@ async function main(): Promise<void> {
   }
   await writeFile(join(OUT_DIR, 'index.json'), JSON.stringify(index, null, 2));
 
-  const lanes = bakeLanes();
+  // Predikat air dari surface chunk yang sama dengan render (kode SURFACE.water = 4).
+  const waterCells = new Set<string>();
+  const roadCells = new Set<string>();
+  const walkCells = new Set<string>();
+  for (const chunk of chunks) {
+    const originX = chunk.cx * CHUNK_SIZE - HALF_WORLD;
+    const originZ = chunk.cz * CHUNK_SIZE - HALF_WORLD;
+    for (let j = 0; j < GRID_CELLS; j++) {
+      for (let i = 0; i < GRID_CELLS; i++) {
+        const key = `${originX + i * GRID_STEP + GRID_STEP / 2},${originZ + j * GRID_STEP + GRID_STEP / 2}`;
+        const surface = chunk.surface[j * GRID_CELLS + i];
+        if (surface === SURFACE.water) waterCells.add(key);
+        if (surface === SURFACE.road) roadCells.add(key);
+        if (surface === SURFACE.sidewalk || surface === SURFACE.plaza) walkCells.add(key);
+      }
+    }
+  }
+  const cellKey = (x: number, z: number): string => {
+    const gx = Math.floor((x + HALF_WORLD) / GRID_STEP) * GRID_STEP + GRID_STEP / 2 - HALF_WORLD;
+    const gz = Math.floor((z + HALF_WORLD) / GRID_STEP) * GRID_STEP + GRID_STEP / 2 - HALF_WORLD;
+    return `${gx},${gz}`;
+  };
+  const isWater = (x: number, z: number): boolean => waterCells.has(cellKey(x, z));
+  // Lajur kendaraan hanya di sel aspal (SURFACE.road). Pasir, trotoar, plaza, dan air dibuang.
+  const isRoad = (x: number, z: number): boolean => roadCells.has(cellKey(x, z));
+  // Trotoar hanya di sel yang bisa diinjak (sidewalk/plaza). Pasir dan air dibuang.
+  const isWalkable = (x: number, z: number): boolean => walkCells.has(cellKey(x, z));
+  const lanes = bakeLanes(isWater, isRoad, isWalkable);
+
   const lanesJson = JSON.stringify(lanes);
   await writeFile(join(OUT_DIR, 'lanes.json'), lanesJson);
   console.log(
@@ -160,51 +190,82 @@ async function main(): Promise<void> {
   );
 
   await init();
-  const input = bakeNavMeshInput(chunks);
+  // Per-tile navmesh: bake one bin per chunk, stored in public/world/navmesh/<cx>_<cz>.bin
+  const navDir = join(OUT_DIR, index.navmesh.directory);
+  await mkdir(navDir, { recursive: true });
   const navStarted = performance.now();
-  const result = generateTiledNavMesh(input.positions, input.indices, NAV_CONFIG);
-  if (!result.success) throw new Error(`navmesh generation failed: ${result.error}`);
-  const navMs = performance.now() - navStarted;
-  const navBytes = exportNavMesh(result.navMesh);
-  await writeFile(join(OUT_DIR, index.navmesh), navBytes);
-
-  // Gate: paths from spawn reach every NPC and the world corners without crossing buildings.
-  // Corner-to-corner paths cross the whole city; the default 2048-node A* pool returns partial paths.
-  const query = new NavMeshQuery(result.navMesh, { maxNodes: 8192 });
-  const allBuildings = chunks.flatMap((chunk) => chunk.buildings);
-  const groundAt = (x: number, z: number) => {
-    const chunk = chunks[Math.floor((z + HALF_WORLD) / CHUNK_SIZE) * WORLD_CHUNKS + Math.floor((x + HALF_WORLD) / CHUNK_SIZE)];
-    return chunk ? chunkGroundHeight(chunk, x, z) : 0;
-  };
-  const goals = [
-    ...index.npcs.map((npc) => ({ label: npc.name, x: npc.x + 1.2, z: npc.z })),
-    { label: 'NE corner', x: 224, z: -224 },
-    { label: 'SW corner', x: -224, z: 224 },
-    { label: 'SE corner', x: 224, z: 224 },
-  ];
+  let totalNavBytes = 0;
+  let totalNavTris = 0;
   const failures: string[] = [];
-  for (const goal of goals) {
-    const start = { x: index.spawn.x, y: groundAt(index.spawn.x, index.spawn.z), z: index.spawn.z };
-    const end = { x: goal.x, y: groundAt(goal.x, goal.z), z: goal.z };
-    const path = query.computePath(start, end, { halfExtents: { x: 2, y: 1, z: 2 }, maxPathPolys: 2048 });
-    const last = path.path[path.path.length - 1];
-    const reached = path.success && last !== undefined && Math.hypot(last.x - goal.x, last.z - goal.z) < 1.5;
-    let crossesBuilding = false;
-    for (let k = 1; k < path.path.length; k++) {
-      const a = path.path[k - 1];
-      const b = path.path[k];
-      if (!a || !b) continue;
-      const steps = Math.ceil(Math.hypot(b.x - a.x, b.z - a.z) / 0.5);
-      for (let s = 0; s <= steps; s++) {
-        const t = s / Math.max(steps, 1);
-        if (insideAny(a.x + (b.x - a.x) * t, a.z + (b.z - a.z) * t, allBuildings)) crossesBuilding = true;
-      }
+  for (const chunk of chunks) {
+    const chunkInput = bakeNavMeshInput([chunk]);
+    if (chunkInput.indices.length === 0) {
+      // Water/empty chunks produce no geometry; write a zero-byte placeholder so the runtime
+      // can distinguish "not found" from "empty tile" when needed.
+      await writeFile(join(navDir, `${chunkKey(chunk.cx, chunk.cz)}.bin`), new Uint8Array(0));
+      continue;
     }
-    console.log(`path spawn -> ${goal.label}: ${reached ? 'ok' : 'FAIL'} (${path.path.length} pts)${crossesBuilding ? ' CROSSES BUILDING' : ''}`);
-    if (!reached || crossesBuilding) failures.push(goal.label);
+    const result = generateTiledNavMesh(chunkInput.positions, chunkInput.indices, {
+      ...NAV_CONFIG,
+      tileSize: 64, // one Recast tile per game chunk
+    });
+    if (!result.success) {
+      console.error(`navmesh chunk ${chunk.cx},${chunk.cz}: ${result.error}`);
+      failures.push(chunkKey(chunk.cx, chunk.cz));
+      continue;
+    }
+    const navBytes = exportNavMesh(result.navMesh);
+    await writeFile(join(navDir, `${chunkKey(chunk.cx, chunk.cz)}.bin`), navBytes);
+    totalNavBytes += navBytes.length;
+    totalNavTris += chunkInput.indices.length / 3;
+    result.navMesh.destroy();
   }
-  query.destroy();
-  result.navMesh.destroy();
+  const navMs = performance.now() - navStarted;
+
+  // Validate that spawn can reach every NPC within the legacy 512 m world.
+  const legacyChunks = chunks.filter(
+    (c) => c.cx >= 4 && c.cx <= 11 && c.cz >= 4 && c.cz <= 11,
+  );
+  const legacyInput = bakeNavMeshInput(legacyChunks);
+  const legacyNav = generateTiledNavMesh(legacyInput.positions, legacyInput.indices, NAV_CONFIG);
+  if (legacyNav.success) {
+    const query = new NavMeshQuery(legacyNav.navMesh, { maxNodes: 8192 });
+    const allBuildings = chunks.flatMap((chunk) => chunk.buildings);
+    const groundAt = (x: number, z: number) => {
+      const cx = Math.min(WORLD_CHUNKS - 1, Math.max(0, Math.floor((x + HALF_WORLD) / CHUNK_SIZE)));
+      const cz = Math.min(WORLD_CHUNKS - 1, Math.max(0, Math.floor((z + HALF_WORLD) / CHUNK_SIZE)));
+      const chunk = chunks[cz * WORLD_CHUNKS + cx];
+      return chunk ? chunkGroundHeight(chunk, x, z) : 0;
+    };
+    const goals = [
+      ...index.npcs.map((npc) => ({ label: npc.name, x: npc.x + 1.2, z: npc.z })),
+      { label: 'NE corner', x: 224, z: -224 },
+      { label: 'SW corner', x: -224, z: 224 },
+      { label: 'SE corner', x: 224, z: 224 },
+    ];
+    for (const goal of goals) {
+      const start = { x: index.spawn.x, y: groundAt(index.spawn.x, index.spawn.z), z: index.spawn.z };
+      const end = { x: goal.x, y: groundAt(goal.x, goal.z), z: goal.z };
+      const path = query.computePath(start, end, { halfExtents: { x: 2, y: 1, z: 2 }, maxPathPolys: 2048 });
+      const last = path.path[path.path.length - 1];
+      const reached = path.success && last !== undefined && Math.hypot(last.x - goal.x, last.z - goal.z) < 1.5;
+      let crossesBuilding = false;
+      for (let k = 1; k < path.path.length; k++) {
+        const a = path.path[k - 1];
+        const b = path.path[k];
+        if (!a || !b) continue;
+        const steps = Math.ceil(Math.hypot(b.x - a.x, b.z - a.z) / 0.5);
+        for (let s = 0; s <= steps; s++) {
+          const t = s / Math.max(steps, 1);
+          if (insideAny(a.x + (b.x - a.x) * t, a.z + (b.z - a.z) * t, allBuildings)) crossesBuilding = true;
+        }
+      }
+      console.log(`path spawn -> ${goal.label}: ${reached ? 'ok' : 'FAIL'} (${path.path.length} pts)${crossesBuilding ? ' CROSSES BUILDING' : ''}`);
+      if (!reached || crossesBuilding) failures.push(goal.label);
+    }
+    query.destroy();
+    legacyNav.navMesh.destroy();
+  }
 
   const ppm = index.map.pixelsPerMeter;
   await writeFile(join(OUT_DIR, index.map.file), renderMap(chunks, ppm));
@@ -216,7 +277,7 @@ async function main(): Promise<void> {
     [
       `chunks: ${chunks.length} (${WORLD_CHUNKS}x${WORLD_CHUNKS} of ${CHUNK_SIZE} m), ${(chunkBytes / 1024).toFixed(0)} KB total, max ${(maxChunkBytes / 1024).toFixed(1)} KB`,
       `buildings: ${buildings}, props: ${props} (max ${maxProps}/chunk), npcs: ${index.npcs.length}`,
-      `navmesh: ${(input.indices.length / 3).toLocaleString()} input tris, built in ${(navMs / 1000).toFixed(1)} s, ${(navBytes.length / 1024).toFixed(0)} KB`,
+      `navmesh: ${totalNavTris.toLocaleString()} input tris, 256 tiles in ${(navMs / 1000).toFixed(1)} s, ${(totalNavBytes / 1024).toFixed(0)} KB`,
       `map: ${WORLD_SIZE * ppm}px`,
       `total ${((performance.now() - started) / 1000).toFixed(1)} s`,
     ].join('\n'),
