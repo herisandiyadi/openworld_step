@@ -58,6 +58,18 @@ label{font-size:13px;color:var(--muted);display:block;margin:10px 0 4px}
       <div><label>Output Dir</label><span id="detailOutput"></span></div>
     </div>
     <div class="row" style="margin-top:12px"><button id="btnRefresh" disabled>Refresh</button><span id="refreshStatus" class="small"></span></div>
+
+    <div id="mapWrap" style="display:none;margin-top:16px">
+      <label>Peta Hasil Generate <span id="mapMeta" class="small"></span></label>
+      <div style="border:1px solid var(--border);border-radius:8px;overflow:hidden;background:#06080d;position:relative;max-width:640px;aspect-ratio:1/1">
+        <img id="mapImg" alt="Peta hasil generate" style="width:100%;height:100%;display:block;image-rendering:pixelated">
+        <div id="mapEmpty" class="small" style="position:absolute;inset:0;display:none;align-items:center;justify-content:center;text-align:center;padding:16px"></div>
+      </div>
+      <div class="row" style="margin-top:8px">
+        <a id="mapOpen" href="#" target="_blank" rel="noopener" style="font-size:13px">Buka ukuran penuh (2048×2048)</a>
+      </div>
+    </div>
+
     <label style="margin-top:16px">Build Log</label>
     <pre id="log"></pre>
   </section>
@@ -125,6 +137,46 @@ function renderDetail(j) {
   document.getElementById('detailOutput').textContent = j.outputDir || '-';
   document.getElementById('log').textContent = j.buildLog || j.error || '(belum ada log)';
   document.getElementById('btnRefresh').disabled = false;
+  loadMapPreview(j.id, j.status);
+}
+
+async function loadMapPreview(jobId, status) {
+  const wrap = document.getElementById('mapWrap');
+  const img = document.getElementById('mapImg');
+  const empty = document.getElementById('mapEmpty');
+  const meta = document.getElementById('mapMeta');
+  const open = document.getElementById('mapOpen');
+  wrap.style.display = 'block';
+  img.style.display = 'none'; empty.style.display = 'none';
+  meta.textContent = ''; open.style.display = 'none';
+
+  if (status && status !== 'completed') {
+    empty.textContent = 'Peta tersedia setelah job selesai (status: ' + status + ').';
+    empty.style.display = 'flex';
+    return;
+  }
+  try {
+    const r = await fetch(API + '/jobs/' + jobId + '/meta');
+    const m = await r.json();
+    if (!m.hasMap) {
+      empty.textContent = 'Belum ada map.png untuk job ini.';
+      empty.style.display = 'flex';
+      return;
+    }
+    const url = API + '/jobs/' + jobId + '/map.png';
+    img.onload = () => { img.style.display = 'block'; open.style.display = 'inline'; };
+    img.onerror = () => { empty.textContent = 'Gagal memuat map.png.'; empty.style.display = 'flex'; };
+    img.src = url;
+    open.href = url;
+    const parts = [];
+    if (m.worldVersion) parts.push(m.worldVersion);
+    if (m.worldChunks) parts.push(m.worldChunks + '×' + m.worldChunks + ' chunks');
+    if (m.worldSize) parts.push(m.worldSize + ' m');
+    meta.textContent = parts.length ? '· ' + parts.join(' · ') : '';
+  } catch (e) {
+    empty.textContent = 'Gagal memuat meta peta: ' + e.message;
+    empty.style.display = 'flex';
+  }
 }
 
 document.getElementById('btnCreate').addEventListener('click', async () => {

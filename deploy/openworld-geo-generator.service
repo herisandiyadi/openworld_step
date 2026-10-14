@@ -19,6 +19,12 @@ NoNewPrivileges=true
 PrivateTmp=true
 ProtectSystem=full
 ProtectHome=read-only
+# Writable paths: cache jobs + output world (relatif cwd) + log
+ReadWritePaths=/root/workspace/geo-map-pipeline/services/geo-generator/cache
+ReadWritePaths=/root/workspace/geo-map-pipeline/web/public
+ReadWritePaths=/root/workspace/geo-map-pipeline/web/node_modules/.vite-temp
+ReadWritePaths=/root/workspace/geo-map-pipeline/web/node_modules/.vite
+ReadWritePaths=/var/log/openworld
 
 [Install]
 WantedBy=multi-user.target

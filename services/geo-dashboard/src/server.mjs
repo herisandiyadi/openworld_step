@@ -8,7 +8,7 @@
 import http from "node:http";
 import { readFile } from "node:fs/promises";
 import { createHash, timingSafeEqual } from "node:crypto";
-import { join, dirname } from "node:path";
+import { join, dirname, normalize } from "node:path";
 import { fileURLToPath } from "node:url";
 
 const HERE = dirname(fileURLToPath(import.meta.url));
@@ -18,6 +18,9 @@ const HOST = process.env.DASH_HOST || "127.0.0.1";
 const GENERATOR = process.env.GEO_GENERATOR_URL || "http://127.0.0.1:19100";
 const ADMIN_TOKEN = process.env.GEO_ADMIN_TOKEN || "";
 const PUBLIC = join(ROOT, "public");
+// outputDir job relatif terhadap web/ (generator spawn dengan cwd=web/).
+const WEB_ROOT = process.env.GEO_WEB_ROOT || "/root/workspace/geo-map-pipeline/web";
+const WORLD_DIR_RE = /^public\/world-([a-z0-9_-]+)$/i;
 
 // Basic Auth (opsional; wajib dipasang bila port diekspos ke jaringan/tunnel).
 const DASH_USER = process.env.DASH_USER || "";
@@ -58,6 +61,19 @@ const json = (res, status, body) => {
   res.end(JSON.stringify(body));
 };
 
+/**
+ * Validasi outputDir job -> path relatif aman di bawah WEB_ROOT.
+ * Hanya menerima pola "public/world-<slug>"; mencegah path traversal.
+ * @returns {string|null} path relatif ternormalisasi, atau null bila tidak valid.
+ */
+function safeWorldDir(outputDir) {
+  if (typeof outputDir !== "string") return null;
+  const norm = normalize(outputDir).replace(/\\/g, "/");
+  if (!WORLD_DIR_RE.test(norm)) return null;
+  if (norm.includes("..")) return null;
+  return norm;
+}
+
 const server = http.createServer(async (req, res) => {
   const url = new URL(req.url || "/", `http://${req.headers.host || "localhost"}`);
   try {
@@ -84,6 +100,46 @@ const server = http.createServer(async (req, res) => {
       const body = await r.text();
       res.writeHead(r.status, { "Content-Type": "application/json" });
       return res.end(body);
+    }
+
+    // Preview map hasil generate: /api/jobs/:id/map.png (disajikan dari outputDir job).
+    const mapM = url.pathname.match(/^\/api\/jobs\/([\w-]+)\/map\.png$/);
+    if (req.method === "GET" && mapM) {
+      const jr = await fetch(`${GENERATOR}/jobs/${mapM[1]}`, { headers: { Authorization: `Bearer ${ADMIN_TOKEN}` } });
+      if (!jr.ok) return json(res, 404, { error: "job not found" });
+      const job = await jr.json();
+      const dir = safeWorldDir(job.outputDir);
+      if (!dir) return json(res, 404, { error: "output dir tidak valid / belum siap" });
+      try {
+        const png = await readFile(join(WEB_ROOT, dir, "map.png"));
+        res.writeHead(200, { "Content-Type": "image/png", "Cache-Control": "no-store" });
+        return res.end(png);
+      } catch {
+        return json(res, 404, { error: "map.png belum ada untuk job ini" });
+      }
+    }
+
+    // Meta peta hasil generate: /api/jobs/:id/meta (index.json -> dimensi world + preview flag).
+    const metaM = url.pathname.match(/^\/api\/jobs\/([\w-]+)\/meta$/);
+    if (req.method === "GET" && metaM) {
+      const jr = await fetch(`${GENERATOR}/jobs/${metaM[1]}`, { headers: { Authorization: `Bearer ${ADMIN_TOKEN}` } });
+      if (!jr.ok) return json(res, 404, { error: "job not found" });
+      const job = await jr.json();
+      const dir = safeWorldDir(job.outputDir);
+      if (!dir) return json(res, 200, { job: job.id, ready: false, outputDir: job.outputDir || null });
+      let meta = null;
+      let hasMap = false;
+      try { meta = JSON.parse(await readFile(join(WEB_ROOT, dir, "index.json"), "utf8")); } catch { meta = null; }
+      try { await readFile(join(WEB_ROOT, dir, "map.png")); hasMap = true; } catch { hasMap = false; }
+      return json(res, 200, {
+        job: job.id,
+        ready: Boolean(meta && hasMap),
+        hasMap,
+        worldVersion: meta?.worldVersion ?? null,
+        worldChunks: meta?.worldChunks ?? null,
+        worldSize: meta?.worldSize ?? null,
+        mapUrl: hasMap ? `/api/jobs/${job.id}/map.png` : null,
+      });
     }
 
     // Proxy baca status job (GET) — tidak butuh token di browser.

@@ -20,6 +20,8 @@ NoNewPrivileges=true
 PrivateTmp=true
 ProtectSystem=full
 ProtectHome=read-only
+# Baca map.png dari output world
+ReadWritePaths=/var/log/openworld
 
 [Install]
 WantedBy=multi-user.target
