@@ -55,14 +55,17 @@ function bezierLength(a: LaneNode, c: LaneNode, b: LaneNode): number {
 }
 
 /**
- * `isWater(x, z)`: true di atas permukaan air (surface kode 4). Trotoar yang menyentuh air dibuang.
- * `isRoad(x, z)`: true hanya di atas aspal (surface kode 1). Lajur kendaraan (mobil/motor/bus ambient)
- * yang menyentuh titik non-aspal (pasir, air, trotoar, plaza) dibuang, supaya kendaraan AI hanya
- * melintas di jalanan hitam. Hero pemain tidak diatur di sini. Tanpa predikat: tidak ada yang dibuang.
+ * `isWalkable(x, z)`: true hanya di permukaan yang boleh dilewati pejalan kaki (trotoar `sidewalk`
+ * dan zebra cross memakai surface yang sama; bukan pasir, bukan air). Dermaga tetap boleh: pemain
+ * dan pejalan kaki berjalan di atas modul dermaga yang terpasang di atas pasir.
+ *
+ * Lajur kendaraan dibatasi ke aspal; trotoar dibatasi ke permukaan berjalan. Hero pemain dan
+ * agen yang diarahkan skrip tidak diatur di sini.
  */
 export function bakeLanes(
   isWater: (x: number, z: number) => boolean = () => false,
   isRoad: (x: number, z: number) => boolean = () => true,
+  isWalkable: (x: number, z: number) => boolean = () => true,
 ): LanesData {
   const nodes: LaneNode[] = [];
   const nodeIds = new Map<string, number>();
@@ -182,14 +185,19 @@ export function bakeLanes(
     }
   }
 
-  // Lajur kendaraan: hanya di aspal (surface road). Trotoar: cukup tidak menyentuh air.
+  // Lajur kendaraan: hanya di aspal. Trotoar: hanya di permukaan berjalan (bukan pasir/air).
   const wet = (node: LaneNode) => isWater(node.x, node.z);
   const offRoad = (node: LaneNode) => !isRoad(node.x, node.z);
+  const offWalk = (node: LaneNode) => !isWalkable(node.x, node.z);
   const keepEdges = edges.filter((e) => {
     const a = nodes[e.a] as LaneNode;
     const b = nodes[e.b] as LaneNode;
     return !wet(a) && !wet(b) && !offRoad(a) && !offRoad(b);
   });
-  const keepWalk = walkEdges.filter((e) => !wet(walkNodes[e.a] as LaneNode) && !wet(walkNodes[e.b] as LaneNode));
+  const keepWalk = walkEdges.filter((e) => {
+    const a = walkNodes[e.a] as LaneNode;
+    const b = walkNodes[e.b] as LaneNode;
+    return !wet(a) && !wet(b) && !offWalk(a) && !offWalk(b);
+  });
   return { version: WORLD_DATA_VERSION, nodes, edges: keepEdges, intersections, walkNodes, walkEdges: keepWalk };
 }

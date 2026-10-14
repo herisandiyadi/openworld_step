@@ -156,6 +156,7 @@ async function main(): Promise<void> {
   // Predikat air dari surface chunk yang sama dengan render (kode SURFACE.water = 4).
   const waterCells = new Set<string>();
   const roadCells = new Set<string>();
+  const walkCells = new Set<string>();
   for (const chunk of chunks) {
     const originX = chunk.cx * CHUNK_SIZE - HALF_WORLD;
     const originZ = chunk.cz * CHUNK_SIZE - HALF_WORLD;
@@ -165,6 +166,7 @@ async function main(): Promise<void> {
         const surface = chunk.surface[j * GRID_CELLS + i];
         if (surface === SURFACE.water) waterCells.add(key);
         if (surface === SURFACE.road) roadCells.add(key);
+        if (surface === SURFACE.sidewalk || surface === SURFACE.plaza) walkCells.add(key);
       }
     }
   }
@@ -176,7 +178,9 @@ async function main(): Promise<void> {
   const isWater = (x: number, z: number): boolean => waterCells.has(cellKey(x, z));
   // Lajur kendaraan hanya di sel aspal (SURFACE.road). Pasir, trotoar, plaza, dan air dibuang.
   const isRoad = (x: number, z: number): boolean => roadCells.has(cellKey(x, z));
-  const lanes = bakeLanes(isWater, isRoad);
+  // Trotoar hanya di sel yang bisa diinjak (sidewalk/plaza). Pasir dan air dibuang.
+  const isWalkable = (x: number, z: number): boolean => walkCells.has(cellKey(x, z));
+  const lanes = bakeLanes(isWater, isRoad, isWalkable);
 
   const lanesJson = JSON.stringify(lanes);
   await writeFile(join(OUT_DIR, 'lanes.json'), lanesJson);
