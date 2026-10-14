@@ -1,8 +1,13 @@
 // Admin dashboard service: trigger generate + lihat status job.
 // Port terpisah (19101). Token admin disimpan server-side, tidak pernah dikirim ke browser.
 // Zero dependency: Node built-in only.
+//
+// Akses: dilindungi HTTP Basic Auth saat DASH_USER + DASH_PASS_HASH di-set.
+//   DASH_PASS_HASH = sha256 hex dari password. Tanpa hash, service hanya boleh bind ke
+//   loopback (DASH_HOST=127.0.0.1) — kalau di-tunnel, auth wajib aktif.
 import http from "node:http";
 import { readFile } from "node:fs/promises";
+import { createHash, timingSafeEqual } from "node:crypto";
 import { join, dirname } from "node:path";
 import { fileURLToPath } from "node:url";
 
@@ -14,6 +19,40 @@ const GENERATOR = process.env.GEO_GENERATOR_URL || "http://127.0.0.1:19100";
 const ADMIN_TOKEN = process.env.GEO_ADMIN_TOKEN || "";
 const PUBLIC = join(ROOT, "public");
 
+// Basic Auth (opsional; wajib dipasang bila port diekspos ke jaringan/tunnel).
+const DASH_USER = process.env.DASH_USER || "";
+const DASH_PASS_HASH = (process.env.DASH_PASS_HASH || "").toLowerCase();
+const AUTH_ON = Boolean(DASH_USER && DASH_PASS_HASH);
+
+const sha256hex = (s) => createHash("sha256").update(s, "utf8").digest("hex");
+
+/** Bandingkan dua hex-string dengan waktu konstan (panjang berbeda -> false). */
+function safeHexEqual(a, b) {
+  if (typeof a !== "string" || typeof b !== "string") return false;
+  if (a.length !== b.length) return false;
+  const ba = Buffer.from(a, "utf8");
+  const bb = Buffer.from(b, "utf8");
+  return timingSafeEqual(ba, bb);
+}
+
+/** true = request terautentikasi (atau auth memang dimatikan). */
+function authorized(req) {
+  if (!AUTH_ON) return true;
+  const hdr = req.headers.authorization || "";
+  if (!hdr.startsWith("Basic ")) return false;
+  let decoded = "";
+  try {
+    decoded = Buffer.from(hdr.slice(6), "base64").toString("utf8");
+  } catch {
+    return false;
+  }
+  const idx = decoded.indexOf(":");
+  if (idx < 0) return false;
+  const user = decoded.slice(0, idx);
+  const pass = decoded.slice(idx + 1);
+  return user === DASH_USER && safeHexEqual(sha256hex(pass), DASH_PASS_HASH);
+}
+
 const json = (res, status, body) => {
   res.writeHead(status, { "Content-Type": "application/json", "Cache-Control": "no-store" });
   res.end(JSON.stringify(body));
@@ -23,7 +62,15 @@ const server = http.createServer(async (req, res) => {
   const url = new URL(req.url || "/", `http://${req.headers.host || "localhost"}`);
   try {
     if (req.method === "GET" && url.pathname === "/health") {
-      return json(res, 200, { ok: true, service: "geo-dashboard", port: PORT, generator: GENERATOR });
+      return json(res, 200, { ok: true, service: "geo-dashboard", port: PORT, generator: GENERATOR, auth: AUTH_ON });
+    }
+    if (!authorized(req)) {
+      res.writeHead(401, {
+        "WWW-Authenticate": 'Basic realm="OpenWorld Geo Admin", charset="UTF-8"',
+        "Content-Type": "text/plain; charset=utf-8",
+        "Cache-Control": "no-store",
+      });
+      return res.end("401 Unauthorized\n");
     }
     if (req.method === "GET" && (url.pathname === "/" || url.pathname === "/index.html")) {
       const html = await readFile(join(PUBLIC, "index.html"));
@@ -69,4 +116,9 @@ const server = http.createServer(async (req, res) => {
   }
 });
 
-server.listen(PORT, HOST, () => console.log(`geo-dashboard listening on http://${HOST}:${PORT} -> ${GENERATOR}`));
+server.listen(PORT, HOST, () => {
+  console.log(`geo-dashboard listening on http://${HOST}:${PORT} -> ${GENERATOR} (auth: ${AUTH_ON ? "on" : "off"})`);
+  if (!AUTH_ON && HOST !== "127.0.0.1" && HOST !== "localhost") {
+    console.warn("[dashboard] PERINGATAN: bind non-loopback tanpa DASH_USER/DASH_PASS_HASH — jangan diekspos ke jaringan.");
+  }
+});

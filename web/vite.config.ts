@@ -36,6 +36,8 @@ function soakReport(): Plugin {
 export default defineConfig({
   plugins: [react(), soakReport()],
   base: './',
+  // Dev-only: izinkan akses via tunnel (cloudflared/ngrok). Tidak berpengaruh ke build.
+  server: { allowedHosts: true },
   worker: {
     format: 'es',
   },
