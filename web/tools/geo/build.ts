@@ -108,7 +108,7 @@ async function main(): Promise<void> {
   const args = parseArgs(process.argv.slice(2));
   const started = performance.now();
   const xml = await readFile(resolve(args.xml), 'utf8');
-  const { chunks, index, worldSize, halfWorld, stats } = buildGeoWorld({
+  const { chunks, index, worldSize, halfWorld, stats, lanes } = buildGeoWorld({
     xml,
     bbox: args.bbox,
     name: args.name,
@@ -159,8 +159,9 @@ async function main(): Promise<void> {
   await writeFile(join(outDir, index.map.file), renderMap(chunks, worldSize, halfWorld));
   // Lanes: OSM tidak dipakai untuk lalu lintas (keputusan #5, lihat Notion). Tulis graf kosong
   // yang valid sesuai skema LanesData supaya game tidak menerima HTML fallback saat fetch.
-  const emptyLanes = { version: 3, nodes: [], edges: [], intersections: [], walkNodes: [], walkEdges: [] };
-  await writeFile(join(outDir, 'lanes.json'), JSON.stringify(emptyLanes));
+  // Lanes dari OSM: graf jalan (kendaraan) + graf trotoar (pejalan kaki). Tanpa ini
+  // PedestrianLayer berhenti karena walkEdges kosong dan kota terasa mati.
+  await writeFile(join(outDir, 'lanes.json'), JSON.stringify(lanes));
 
   console.log(
     [

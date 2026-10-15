@@ -8,7 +8,7 @@ import { dayClock, playerState } from '../game/runtime';
 import { useGraphicsSettings } from '../state/graphicsSettings';
 import { GreetingBubbles, type GreetWalker } from './GreetingBubbles';
 import { mulberry32 } from '../world/worldGen';
-import { groundHeightAt, worldUrl } from '../world/worldState';
+import { fetchWorldFile, groundHeightAt } from '../world/worldState';
 import { chunkCoord, districtOf, legacyDistrict } from '../world/worldSpec';
 import type { LanesData } from './laneGraph';
 import { densityAt } from './density';
@@ -127,7 +127,7 @@ export function PedestrianLayer() {
 
   useEffect(() => {
     let alive = true;
-    fetch(worldUrl('lanes.json'))
+    fetchWorldFile('lanes.json')
       .then((response) => (response.ok ? (response.json() as Promise<LanesData>) : Promise.reject(new Error(`lanes: HTTP ${response.status}`))))
       .then((lanes) => {
         if (!alive) return;

@@ -9,7 +9,7 @@ import { pushOutOfBoxes } from '../game/movement';
 import { dayClock, MODE_RADIUS, playerState } from '../game/runtime';
 import { useGameStore } from '../state/gameStore';
 import type { BusStop } from '../world/worldSpec';
-import { groundHeightAt, worldUrl } from '../world/worldState';
+import { fetchWorldFile, groundHeightAt } from '../world/worldState';
 import { BUS_PAUSE, busPose, createBus, planBusRoute, stepBus } from './busRoute';
 import { BUS_SEAT, busLocalToWorld, nextRouteStop, RIDE_SPEED, rideEtaSeconds, rideNextStopId, rideOnBoard, rideProgress, startBusRide, stepBusRide } from './busRide';
 import { travelTo } from '../game/actions';
@@ -48,7 +48,7 @@ const TINT = new Color();
 let lanesPromise: Promise<LaneGraph> | null = null;
 /** lanes.json dimuat sekali; promise-nya stabil supaya bisa dipakai React use(). */
 function loadLaneGraph(): Promise<LaneGraph> {
-  lanesPromise ??= fetch(worldUrl('lanes.json'))
+  lanesPromise ??= fetchWorldFile('lanes.json')
     .then((response) => {
       if (!response.ok) throw new Error(`lanes.json: HTTP ${response.status}`);
       return response.json() as Promise<LanesData>;

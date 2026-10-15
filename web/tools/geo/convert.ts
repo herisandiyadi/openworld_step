@@ -6,6 +6,7 @@ import {
   CHUNK_SIZE,
   type Building,
   type ChunkData,
+  type PropPlacement,
   chunkKey,
   GRID_CELLS,
   GRID_STEP,
@@ -16,6 +17,8 @@ import {
   WORLD_DATA_VERSION,
 } from '../../src/world/worldSpec';
 import { footprintToBuilding } from './buildings';
+import { buildLanesFromOsm, type LanesOut } from './lanes';
+import type { PropId as PropKind } from '../../src/world/propSpec';
 import { parseOsmXml, type OsmData } from './osm';
 
 export interface GeoBbox { w: number; s: number; e: number; n: number; }
@@ -46,6 +49,21 @@ export function roadHalfFor(highway: string): number {
   return 2;
 }
 
+
+/**
+ * Pemetaan tag node OSM -> prop yang bisa dirender game.
+ * Hanya prop yang punya asset di PROP_IDS yang dikembalikan; sisanya diabaikan
+ * supaya chunk tidak memuat id yang tidak dikenal renderer.
+ */
+export function propKindFor(tags: Record<string, string>): PropKind | null {
+  if (tags.natural === 'tree' || tags.natural === 'shrub') return 'prop_tree_01';
+  if (tags.highway === 'street_lamp' || tags.lamp_type) return 'prop_streetlamp_01';
+  if (tags.amenity === 'bench') return 'prop_bench_01';
+  if (tags.amenity === 'waste_basket' || tags.amenity === 'trash') return 'prop_trashbin_01';
+  if (tags.highway === 'bus_stop' || tags.amenity === 'bus_station') return 'prop_busstop_01';
+  return null;
+}
+
 const ROAD_LIKE = new Set(Object.keys(ROAD_HALF));
 const METERS_PER_DEG_LAT = 111_320;
 
@@ -58,6 +76,8 @@ export interface GeoWorld {
   worldSize: number;
   halfWorld: number;
   stats: { buildings: number; roadWays: number; waterWays: number; greenWays: number; outside: number };
+  /** Graf lalu lintas + trotoar dari OSM (untuk NPC & kendaraan). */
+  lanes: LanesOut;
 }
 
 function polygonArea(points: [number, number][]): number {
@@ -235,7 +255,9 @@ export function buildGeoWorld(opts: ConvertOptions): GeoWorld {
   const data = parseOsmXml(opts.xml);
   const { toX, toZ } = geoProjection(opts.bbox);
   const raster = convertOsmToWorld(opts);
-  return assembleGeoWorld(raster, opts, data, toX, toZ);
+  const world = assembleGeoWorld(raster, opts, data, toX, toZ);
+  world.lanes = buildLanesFromOsm(data, toX, toZ, world.halfWorld);
+  return world;
 }
 /** Pass bangunan + assembly chunk + index. Panggil setelah raster selesai. */
 export function assembleGeoWorld(
@@ -273,11 +295,30 @@ export function assembleGeoWorld(
     if (building) buildings.push(building);
   }
   raster.stats.buildings = buildings.length;
-
   // --- Titik spawn: sel walkable terdekat dari pusat ---
   const cells = worldSize / GRID_STEP;
   const cellSurface = (i: number, j: number) => raster.surface[j * cells + i] as number;
   const walkable = (v: number) => v === SURFACE.road || v === SURFACE.sidewalk || v === SURFACE.plaza || v === SURFACE.grass;
+
+  // --- Layer 5: props dari node OSM (pohon, lampu jalan, bangku) ---
+  // OSM menaruh ini sebagai node bertag, bukan way. Tanpa pass ini dunia hanya berisi
+  // bangunan + aspal: tidak ada pohon, lampu, atau bangku seperti di peta asli.
+  const props: PropPlacement[] = [];
+  for (const [id, node] of data.nodes) {
+    const kind = propKindFor(node.tags);
+    if (!kind) continue;
+    const x = toX(node.lon);
+    const z = toZ(node.lat);
+    if (Math.abs(x) > halfWorld || Math.abs(z) > halfWorld) continue;
+    // Hindari pohon yang jatuh di badan jalan (OSM kadang menaruh tree_row di tengah).
+    const gi = Math.floor((x + halfWorld) / GRID_STEP);
+    const gj = Math.floor((z + halfWorld) / GRID_STEP);
+    if (gi >= 0 && gj >= 0 && gi < cells && gj < cells && cellSurface(gi, gj) === SURFACE.road) continue;
+    // Yaw deterministik dari id node supaya penempatan stabil antar-generate.
+    const yaw = (Number(id.slice(-4)) % 8) * (Math.PI / 4);
+    props.push({ id: kind, x, y: 0, z, yaw });
+  }
+
   let spawn = { x: 0, z: 0 };
   outer: for (let r = 0; r < cells / 2; r++) {
     for (let j = cells / 2 - r; j <= cells / 2 + r; j++) {
@@ -333,6 +374,12 @@ export function assembleGeoWorld(
         if (bcx >= originX && bcx < originX + chunkSize && bcz >= originZ && bcz < originZ + chunkSize) {
           chunk.buildings.push(building);
           chunk.colliders.push({ minX: building.minX, maxX: building.maxX, minZ: building.minZ, maxZ: building.maxZ });
+        }
+      }
+      // Distribusikan props ke chunk pemiliknya (pohon, lampu, bangku dari OSM).
+      for (const prop of props) {
+        if (prop.x >= originX && prop.x < originX + chunkSize && prop.z >= originZ && prop.z < originZ + chunkSize) {
+          chunk.props.push(prop);
         }
       }
       if (waterMaxI >= 0) {

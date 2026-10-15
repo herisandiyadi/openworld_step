@@ -14,6 +14,8 @@ import {
   createDefaultContentUpdateDependencies,
 } from './contentUpdatesRuntime';
 import { contentRuntime } from './contentRuntime';
+import { setActiveWorldLoader } from '../world/worldState';
+import type { ContentUpdateManager } from '../content/updates';
 import baseManifest from '../../content/base/manifest.json';
 import baseNpcs from '../../content/base/npcs.json';
 import baseQuests from '../../content/base/quests.json';
@@ -123,6 +125,11 @@ export async function bootContentRuntime(): Promise<BootedPack> {
   const manager = contentUpdatesRuntime.manager;
   if (!manager) return bundledPack;
 
+  // Sambungkan world ke paket unduhan: file world (index, chunks, navmesh, lanes, map.png)
+  // dibaca dari storage paket bila aktif, dengan fallback ke server. Tanpa ini, "Unduh peta"
+  // tidak berpengaruh sama sekali -- game selalu memuat public/world/ dari server.
+  installWorldLoader(manager);
+
   // Prefer the active (downloaded) pack; fall back to bundled on any failure.
   return bootstrapContentRuntime(
     {
@@ -131,6 +138,47 @@ export async function bootContentRuntime(): Promise<BootedPack> {
     },
     bundledPack,
   );
+}
+
+/**
+ * Baca file world dari paket unduhan. Paket memuat isi direktori dataset (index.json,
+ * chunks/*.json, navmesh/*.bin, lanes.json, map.png) tanpa prefix "world/", jadi satu kali
+ * fallback dicoba dengan dan tanpa prefix tersebut.
+ */
+function installWorldLoader(manager: ContentUpdateManager): void {
+  const read = (path: string): Promise<Uint8Array> =>
+    manager
+      .readFile(path)
+      .catch(() => manager.readFile(`world/${path}`));
+
+  setActiveWorldLoader(() => {
+    // Loader dipakai lewat fetchWorldFile; isi Response dirakit dari bytes paket.
+    return null;
+  });
+
+  // Ambil alih fetch untuk URL world (dipakai worker chunk/streamer yang tidak lewat helper).
+  const originalFetch = globalThis.fetch.bind(globalThis);
+  const worldPrefix = new URL(`${import.meta.env.BASE_URL}world/`, document.baseURI).href;
+  globalThis.fetch = async (input: RequestInfo | URL, init?: RequestInit): Promise<Response> => {
+    const href = typeof input === 'string' ? input : input instanceof URL ? input.href : input.url;
+    if (href.startsWith(worldPrefix)) {
+      const path = decodeURIComponent(href.slice(worldPrefix.length).split('?')[0] ?? '');
+      if (path && !path.includes('..')) {
+        try {
+          const bytes = await read(path);
+          const type = path.endsWith('.json')
+            ? 'application/json'
+            : path.endsWith('.png')
+              ? 'image/png'
+              : 'application/octet-stream';
+          return new Response(bytes.slice().buffer as ArrayBuffer, { status: 200, headers: { 'content-type': type } });
+        } catch {
+          // Tidak ada di paket: biarkan fetch server di bawah.
+        }
+      }
+    }
+    return originalFetch(input, init);
+  };
 }
 
 let bootPromise: Promise<BootedPack> | null = null;

@@ -74,11 +74,39 @@ export function rebuildCollision(cx: number, cz: number): void {
 export const worldUrl = (path: string): string =>
   new URL(`${import.meta.env.BASE_URL}world/${path}`, document.baseURI).href;
 
+/**
+ * World yang sudah diunduh user tersimpan di storage paket (IndexedDB), bukan di server.
+ * Tanpa ini, "Unduh peta" tidak berpengaruh: game selalu memuat public/world/ dari server,
+ * jadi peta yang baru diunduh tidak pernah muncul.
+ *
+ * Loader dipasang sekali oleh app saat boot. Bila paket unduhan aktif, file world dibaca
+ * dari storage; kalau tidak ada (belum unduh / offline gagal), jatuh ke fetch server.
+ */
+type WorldFileLoader = (path: string) => Promise<Response> | null;
+
+let activeWorldLoader: WorldFileLoader | null = null;
+
+/** Dipasang app saat boot; mengembalikan null bila paket unduhan tidak aktif. */
+export function setActiveWorldLoader(loader: WorldFileLoader | null): void {
+  activeWorldLoader = loader;
+  indexPromise = null; // paksa index dibaca ulang dari sumber baru
+}
+
+/** Ambil satu file world: dari paket unduhan bila ada, jika tidak dari server. */
+export async function fetchWorldFile(path: string): Promise<Response> {
+  const fromPack = activeWorldLoader?.(path);
+  if (fromPack) {
+    const response = await fromPack;
+    if (response.ok) return response;
+  }
+  return fetch(worldUrl(path));
+}
+
 let indexPromise: Promise<WorldIndex> | null = null;
 
 /** Fetches public/world/index.json once; the promise is stable so React's use() can suspend on it. */
 export function loadWorldIndex(): Promise<WorldIndex> {
-  indexPromise ??= fetch(worldUrl('index.json'))
+  indexPromise ??= fetchWorldFile('index.json')
     .then((response) => {
       if (!response.ok) throw new Error(`world index: HTTP ${response.status}`);
       return response.json() as Promise<WorldIndex>;

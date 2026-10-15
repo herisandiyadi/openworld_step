@@ -1,6 +1,6 @@
 import { importNavMesh, init, NavMeshQuery, type NavMesh } from 'recast-navigation';
 import type { Vec2 } from '../game/movement';
-import { groundHeightAt, worldUrl } from './worldState';
+import { fetchWorldFile, groundHeightAt } from './worldState';
 import { chunkCoord, chunkKey } from './worldSpec';
 
 /**
@@ -41,7 +41,7 @@ export function loadNavigationTile(cx: number, cz: number): Promise<void> {
   if (existing) return existing;
   const request = (async () => {
     await ensureInit();
-    const response = await fetch(worldUrl(tileFile(cx, cz)));
+    const response = await fetchWorldFile(tileFile(cx, cz));
     if (!response.ok) throw new Error(`navmesh tile ${key}: HTTP ${response.status}`);
     const { navMesh } = importNavMesh(new Uint8Array(await response.arrayBuffer()));
     tiles.set(key, { navMesh, query: new NavMeshQuery(navMesh) });

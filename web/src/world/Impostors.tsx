@@ -3,7 +3,7 @@ import { useFrame } from '@react-three/fiber';
 import { BoxGeometry, Group, InstancedMesh, Matrix4, MeshBasicMaterial } from 'three';
 import { playerState } from '../game/runtime';
 import { chunkCoord, chunkKey, type ChunkData, inWorld, LOAD_RADIUS } from './worldSpec';
-import { worldUrl } from './worldState';
+import { fetchWorldFile } from './worldState';
 
 /** Cincin chunk tepat di luar radius muat; lebih jauh dari itu sudah tertutup fog penuh (140 m). */
 const RING = LOAD_RADIUS + 1;
@@ -49,7 +49,7 @@ export function Impostors() {
         const key = chunkKey(cx + dx, cz + dz);
         if (meshes.current.has(key)) continue;
         meshes.current.set(key, null);
-        fetch(worldUrl(`chunks/${key}.json`))
+        fetchWorldFile(`chunks/${key}.json`)
           .then((response) => {
             if (!response.ok) throw new Error(`HTTP ${response.status}`);
             return response.json() as Promise<ChunkData>;
