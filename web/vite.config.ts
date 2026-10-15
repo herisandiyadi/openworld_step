@@ -28,7 +28,7 @@ function worldDir(): Plugin {
       server.middlewares.use((req, res, next) => {
         const url = req.url || '';
         if (!url.startsWith('/world/')) return next();
-        const rel = normalize(decodeURIComponent(url.split('?')[0].replace(/^\/world\//, '')));
+        const rel = normalize(decodeURIComponent((url.split('?')[0] ?? '').replace(/^\/world\//, '')));
         const file = resolve(join(root, 'world', rel));
         // Tolak path traversal: hasil resolve harus tetap di dalam public/world.
         if (file !== join(root, 'world') && !file.startsWith(join(root, 'world') + sep)) {
