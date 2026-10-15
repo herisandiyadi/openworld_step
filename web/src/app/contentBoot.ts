@@ -25,6 +25,33 @@ import baseFishing from '../../content/base/fishing.json';
 
 export type BootedPack = ReturnType<typeof loadContentPack>;
 
+/**
+ * Versi world yang didukung runtime. 2 = world prosedural legacy, 3 = peta hasil
+ * geo-generator (Blok M/Little Tokyo). Tanpa 3, manifest peta selalu ditolak sebagai
+ * "Unsupported world version".
+ */
+const SUPPORTED_WORLD_VERSIONS = [2, 3];
+
+/** Absolute URL default manifest peta yang di-serve bareng app. */
+const DEFAULT_LATEST_URL = '/maps-manifest/latest.json';
+
+/**
+ * URL manifest content/map.
+ * Selalu URL absolut (fetch relatif tanpa base bikin "Invalid base URL"), dan tidak pernah
+ * menunjuk host contoh -- dulu default-nya https://example.com/... sehingga tiap unduh peta
+ * gagal "Failed to fetch" dan menutupi penyebab sebenarnya.
+ */
+function resolveLatestUrl(): string {
+  const configured = import.meta.env.VITE_CONTENT_LATEST_URL as string | undefined;
+  const raw = configured && configured.trim() !== '' ? configured : DEFAULT_LATEST_URL;
+  const base = typeof document !== 'undefined' ? document.baseURI : 'http://localhost/';
+  try {
+    return new URL(raw, base).toString();
+  } catch {
+    return new URL(DEFAULT_LATEST_URL, base).toString();
+  }
+}
+
 const bundledPack = loadContentPack({
   manifest: baseManifest,
   npcs: baseNpcs,
@@ -73,9 +100,12 @@ export async function bootContentRuntime(): Promise<BootedPack> {
     initContentUpdateManager({
       bundledManifest: baseManifest,
       bundled: bundledSource(),
-      latestUrl: import.meta.env.VITE_CONTENT_LATEST_URL ?? 'https://example.com/content/latest.json',
+      // Endpoint manifest peta dari geo-generator (bukan placeholder). Kalau kosong, JANGAN
+      // pakai host contoh: fetch akan selalu gagal dan menutupi error peta yang sebenarnya.
+      // Urutan: env -> latest.json yang di-serve bareng app -> baru menyerah (tanpa manager).
+      latestUrl: resolveLatestUrl(),
       appVersion: '0.1.0',
-      supportedWorldVersions: [2],
+      supportedWorldVersions: SUPPORTED_WORLD_VERSIONS,
       ...createDefaultContentUpdateDependencies(),
     });
   } catch (error) {

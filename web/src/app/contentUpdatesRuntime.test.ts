@@ -5,6 +5,7 @@
 
 import { describe, it, expect, beforeEach } from 'vitest';
 import {
+  browserConnectionType,
   contentUpdatesRuntime,
   initContentUpdateManager,
   checkAndStageContentUpdate,
@@ -308,5 +309,46 @@ describe('contentUpdatesRuntime offline graceful behavior', () => {
 
     const result = await contentUpdatesRuntime.manager!.checkAndStageLatest();
     expect(result.status).toBe('invalid'); // Network error surfaces as invalid
+  });
+});
+
+/**
+ * Regresi: Chrome desktop melaporkan effectiveType '4g' untuk SEMUA koneksi (Wi-Fi, kabel).
+ * Heuristik lama memakai effectiveType sehingga tiap pengguna desktop dianggap seluler dan
+ * unduhan peta selalu tertahan "Menunggu Wi-Fi untuk unduh peta".
+ */
+describe('browserConnectionType', () => {
+  const stubNavigator = (value: unknown): void => {
+    Object.defineProperty(globalThis, 'navigator', { value, configurable: true });
+  };
+
+  it('Wi-Fi dianggap wifi, bukan cellular', () => {
+    stubNavigator({ onLine: true, connection: { type: 'wifi', effectiveType: '4g' } });
+    expect(browserConnectionType()).toBe('wifi');
+  });
+
+  it("effectiveType '4g' tanpa type tidak dianggap seluler (kasus Chrome desktop)", () => {
+    stubNavigator({ onLine: true, connection: { effectiveType: '4g' } });
+    expect(browserConnectionType()).toBe('unknown');
+  });
+
+  it('type ethernet dianggap wifi, bukan seluler', () => {
+    stubNavigator({ onLine: true, connection: { type: 'ethernet', effectiveType: '4g' } });
+    expect(browserConnectionType()).toBe('wifi');
+  });
+
+  it('type cellular tetap cellular', () => {
+    stubNavigator({ onLine: true, connection: { type: 'cellular' } });
+    expect(browserConnectionType()).toBe('cellular');
+  });
+
+  it('offline -> none', () => {
+    stubNavigator({ onLine: false, connection: { type: 'wifi' } });
+    expect(browserConnectionType()).toBe('none');
+  });
+
+  it('tanpa Network Information API -> unknown', () => {
+    stubNavigator({ onLine: true });
+    expect(browserConnectionType()).toBe('unknown');
   });
 });

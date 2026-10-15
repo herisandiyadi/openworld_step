@@ -11,3 +11,7 @@ android/local.properties
 android/corp-cacerts.jks
 
 soak-report.json
+
+# Config lokal dev (VITE_* termasuk public key verifikasi paket peta)
+.env.local
+.env.*.local

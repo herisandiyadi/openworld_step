@@ -59,8 +59,9 @@ async function resolveLatest(): Promise<MapUpdateState> {
   if (!response.ok) throw new Error(`HTTP ${response.status}`);
   const latest = (await response.json()) as { manifestUrl: string; contentBaseUrl?: string };
 
-  // latest.manifestUrl sudah absolute atau relative ke domain root; resolve ke document.baseURI
-  const manifestUrl = new URL(latest.manifestUrl, typeof document !== 'undefined' ? document.baseURI : MAP_LATEST_URL).toString();
+  // latest.manifestUrl relatif terhadap latest.json (bukan root app). Memakai document.baseURI
+  // sebagai base menghasilkan /little_tokyo/manifest.json -> fallback HTML -> JSON parse gagal.
+  const manifestUrl = new URL(latest.manifestUrl, MAP_LATEST_URL).toString();
   const manifestResponse = await fetch(manifestUrl, { cache: 'no-store' });
   if (!manifestResponse.ok) throw new Error(`manifest HTTP ${manifestResponse.status}`);
   const manifest = (await manifestResponse.json()) as {

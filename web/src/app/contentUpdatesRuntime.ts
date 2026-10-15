@@ -11,6 +11,7 @@ import {
   ContentUpdateManager,
   FetchContentNetwork,
   LocalStorageContentStorage,
+  IndexedDbContentStorage,
   type BundledContentSource,
   type ContentConnectionType,
   type ContentUpdateOptions,
@@ -141,20 +142,25 @@ export interface ContentAdapterEnvironment {
   browserConnectionType?: () => ContentConnectionType;
 }
 
-/** Real browser connectivity heuristic used when running outside Capacitor. */
+/**
+ * Real browser connectivity heuristic used when running outside Capacitor.
+ *
+ * Catatan penting: Chrome desktop melaporkan effectiveType '4g' untuk SEMUA koneksi
+ * (termasuk Wi-Fi dan kabel), jadi effectiveType tidak boleh dipakai sendiri -- kalau
+ * dipakai, setiap pengguna desktop dianggap seluler dan unduhan peta selalu tertahan
+ * ("Menunggu Wi-Fi"). effectiveType hanya dipercaya saat `type` memang seluler/kosong.
+ */
 export function browserConnectionType(): ContentConnectionType {
   if (typeof navigator === 'undefined') return 'unknown';
   if (!navigator.onLine) return 'none';
   const connection = (navigator as Navigator & { connection?: { type?: string; effectiveType?: string } }).connection;
-  if (
-    connection?.type === 'cellular' ||
-    connection?.effectiveType === '2g' ||
-    connection?.effectiveType === '3g' ||
-    connection?.effectiveType === '4g'
-  ) {
-    return 'cellular';
+  if (!connection) return 'unknown';
+  if (connection.type === 'wifi') return 'wifi';
+  if (connection.type === 'cellular' || connection.type === 'ethernet') {
+    return connection.type === 'cellular' ? 'cellular' : 'wifi';
   }
-  return connection?.type === 'wifi' ? 'wifi' : 'unknown';
+  // type tidak tersedia (banyak browser desktop): anggap jaringan biasa, bukan seluler.
+  return 'unknown';
 }
 
 export function createDefaultContentUpdateDependencies(
@@ -163,7 +169,9 @@ export function createDefaultContentUpdateDependencies(
   const native = (environment.isNativePlatform ?? (() => Capacitor.isNativePlatform()))();
   const storage: ContentUpdateOptions['storage'] = native
     ? new CapacitorFilesystemContentStorage(environment.filesystem ?? Filesystem, Directory.Data)
-    : new LocalStorageContentStorage(environment.browserStorage ?? (typeof window !== 'undefined' ? window.localStorage : undefined));
+    : typeof indexedDB !== 'undefined'
+      ? new IndexedDbContentStorage()
+      : new LocalStorageContentStorage(environment.browserStorage ?? (typeof window !== 'undefined' ? window.localStorage : undefined));
   const connectivity: ContentUpdateOptions['connectivity'] = native
     ? new CapacitorNetworkConnectivity(environment.networkPlugin ?? Network)
     : { getConnectionType: async () => (environment.browserConnectionType ?? browserConnectionType)() };

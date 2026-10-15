@@ -90,23 +90,20 @@ export async function buildMapPack(worldName, { keyId, privateKey, appVersion = 
   await mkdir(packDir, { recursive: true });
   await writeFile(join(packDir, 'manifest.json'), JSON.stringify(manifest, null, 2));
 
-  // Also write latest.json pointer for this pack
-  // contentBaseUrl serves files from same directory (pack files are already in world-<name>/ via public)
-  // But content system expects all files under a pack root. We'll use PUBLIC_ROOT as base and full paths.
-  await writeFile(
-    join(PUBLIC_ROOT, 'maps-manifest', `${worldName}.json`),
-    JSON.stringify({
-      manifestUrl: `maps-manifest/${worldName}/manifest.json`,
-      contentBaseUrl: `../`, // resolve dari maps-manifest/<name>/manifest.json -> public/
-    }, null, 2),
+  // Pointer latest.json + <world>.json. manifestUrl relatif terhadap DIREKTORI pointer ini
+  // (keduanya ada di public/maps-manifest/), bukan terhadap root app: menulis
+  // "maps-manifest/<name>/manifest.json" menghasilkan prefix ganda saat di-resolve
+  // (mis. /maps-manifest/maps-manifest/<name>/manifest.json -> fallback HTML -> JSON parse gagal).
+  const pointer = JSON.stringify(
+    {
+      manifestUrl: `${worldName}/manifest.json`,
+      contentBaseUrl: `../`, // dari maps-manifest/<name>/manifest.json -> public/
+    },
+    null,
+    2,
   );
-  await writeFile(
-    join(PUBLIC_ROOT, 'maps-manifest', 'latest.json'),
-    JSON.stringify({
-      manifestUrl: `maps-manifest/${worldName}/manifest.json`,
-      contentBaseUrl: `../`,
-    }, null, 2),
-  );
+  await writeFile(join(PUBLIC_ROOT, 'maps-manifest', `${worldName}.json`), pointer);
+  await writeFile(join(PUBLIC_ROOT, 'maps-manifest', 'latest.json'), pointer);
 
   return { manifest, packDir };
 }

@@ -4,7 +4,7 @@ import { useGameStore } from '../state/gameStore';
 import { drawFog, drawNpcDot, drawNpcEdgeMarker, drawPlayerArrow, drawRemoteDot, loadMapImage } from './mapRender';
 import { useNetStore } from '../net/netStore';
 import { currentMode } from '../net/netRuntime';
-import { HALF_WORLD } from '../world/worldSpec';
+import { halfWorldFor } from '../world/worldSpec';
 import { cameraState } from '../camera/followCamera';
 
 const MINIMAP_CSS_SIZE = 132;
@@ -54,7 +54,7 @@ export function Minimap() {
           const sourceX = (playerState.x + map.image.width / map.ppm / 2) * map.ppm - sourceSize / 2;
           const sourceY = (playerState.z + map.image.height / map.ppm / 2) * map.ppm - sourceSize / 2;
           context.drawImage(map.image, sourceX, sourceY, sourceSize, sourceSize, 0, 0, size, size);
-          drawFog(context, size / 2 - (playerState.x + HALF_WORLD) * scale, size / 2 - (playerState.z + HALF_WORLD) * scale, scale);
+          drawFog(context, size / 2 - (playerState.x + halfWorldFor()) * scale, size / 2 - (playerState.z + halfWorldFor()) * scale, scale);
           // The minimap is round: NPCs beyond its radius are pinned to the rim as direction chevrons.
           const rim = size / 2 - 9 * dpr;
           for (const npc of map.npcs) {

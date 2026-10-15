@@ -54,6 +54,68 @@ export class LocalStorageContentStorage implements ContentStorage {
   }
 }
 
+/**
+ * Browser storage backed by IndexedDB.
+ *
+ * localStorage dibatasi ~5 MB dan paket peta nyata jauh lebih besar (Blok M ~2.000 file,
+ * belasan MB), jadi penyimpanan itu gagal di tengah unduhan dengan
+ * "Setting the value of ... exceeded the quota". IndexedDB punya kuota ratusan MB.
+ * Blob disimpan apa adanya -- tidak ada konversi base64 yang membengkakkan ukuran 33%.
+ */
+export class IndexedDbContentStorage implements ContentStorage {
+  private dbPromise: Promise<IDBDatabase> | null = null;
+  private static readonly STORE = 'files';
+
+  private open(): Promise<IDBDatabase> {
+    this.dbPromise ??= new Promise<IDBDatabase>((resolve, reject) => {
+      const request = indexedDB.open('openworld-content', 1);
+      request.onupgradeneeded = () => {
+        const db = request.result;
+        if (!db.objectStoreNames.contains(IndexedDbContentStorage.STORE)) db.createObjectStore(IndexedDbContentStorage.STORE);
+      };
+      request.onsuccess = () => resolve(request.result);
+      request.onerror = () => reject(request.error ?? new Error('indexedDB open failed'));
+    });
+    return this.dbPromise;
+  }
+
+  private async tx<T>(mode: IDBTransactionMode, run: (store: IDBObjectStore) => IDBRequest<T>): Promise<T> {
+    const db = await this.open();
+    return new Promise<T>((resolve, reject) => {
+      const request = run(db.transaction(IndexedDbContentStorage.STORE, mode).objectStore(IndexedDbContentStorage.STORE));
+      request.onsuccess = () => resolve(request.result);
+      request.onerror = () => reject(request.error ?? new Error('indexedDB request failed'));
+    });
+  }
+
+  async read(path: string): Promise<Uint8Array | null> {
+    const value = await this.tx<unknown>('readonly', (store) => store.get(path) as IDBRequest<unknown>);
+    if (value == null) return null;
+    if (value instanceof Uint8Array) return value;
+    if (value instanceof ArrayBuffer) return new Uint8Array(value);
+    if (value instanceof Blob) return new Uint8Array(await value.arrayBuffer());
+    return null;
+  }
+
+  async write(path: string, data: Uint8Array): Promise<void> {
+    // Salin buffer: Uint8Array hasil baca jaringan bisa jadi view atas buffer besar.
+    const copy = data.slice();
+    await this.tx('readwrite', (store) => store.put(copy, path));
+  }
+
+  async remove(path: string): Promise<void> {
+    const keys = await this.tx<IDBValidKey[]>('readonly', (store) =>
+      store.getAllKeys() as IDBRequest<IDBValidKey[]>,
+    );
+    const targets = keys.filter((key) => typeof key === 'string' && (key === path || key.startsWith(`${path}/`)));
+    if (targets.length === 0) return;
+    await this.tx('readwrite', (store) => {
+      for (const key of targets) store.delete(key);
+      return store.count(); // request penanda agar transaksi menunggu semua delete
+    });
+  }
+}
+
 /** Fetch implementation for HTTPS/static content servers. */
 export class FetchContentNetwork implements ContentNetwork {
   async getJson(url: string): Promise<unknown> {
@@ -189,6 +251,8 @@ export class ContentUpdateManager {
     let stageRoot: string | undefined;
     try {
       const latestValue = LatestSchema.parse(await this.options.network.getJson(this.options.latestUrl));
+      // manifestUrl relatif terhadap FILE latest.json (konvensi URL standar).
+      // latest.json ada di maps-manifest/, jadi nilai "little_tokyo/manifest.json" resolve benar.
       const manifestUrl = new URL(latestValue.manifestUrl, this.options.latestUrl).toString();
       const manifest = ManifestSchema.parse(await this.options.network.getJson(manifestUrl));
       await verifyManifestSignature(manifest, this.options.publicKeys);
