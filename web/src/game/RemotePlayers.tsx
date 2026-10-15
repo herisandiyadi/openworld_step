@@ -10,6 +10,7 @@ import {
 import { ClipPlayer, useCharacter } from './character';
 import { applyAppearance, heroAssetId } from './HeroAppearance';
 import {
+  castsShadowAt,
   LABEL_VISIBLE_DISTANCE,
   MAX_VISIBLE_REMOTES,
   REMOTE_FOG_FAR,
@@ -102,6 +103,8 @@ function RemotePlayerView({ playerId }: { playerId: PlayerId }): ReactElement | 
   // Throttle animasi pemain jauh: sisa waktu yang belum diumpankan ke mixer, dan penghitung frame.
   const animAccum = useRef(0);
   const animFrame = useRef(0);
+  // Status castShadow terakhir yang diterapkan; supaya traverse() hanya jalan saat berubah.
+  const castShadow = useRef(true);
 
   // Mesh gabungan hanya dibangun ulang saat penampilan pemain ini berubah (bukan tiap render).
   const built = useRef('');
@@ -111,6 +114,10 @@ function RemotePlayerView({ playerId }: { playerId: PlayerId }): ReactElement | 
     if (built.current === next) return;
     built.current = next;
     applyAppearance(scene, appearance);
+    // applyAppearance membangun mesh baru dengan castShadow=true. Paksa status shadow dihitung
+    // ulang frame berikutnya, kalau tidak pemain jauh akan kembali jadi shadow caster sampai
+    // jaraknya berubah.
+    castShadow.current = true;
   }, [scene, key, appearance]);
 
   // Label dibuat sekali per username dan dibuang saat pemain keluar.
@@ -171,6 +178,18 @@ function RemotePlayerView({ playerId }: { playerId: PlayerId }): ReactElement | 
         mixer.update(animAccum.current);
         animAccum.current = 0;
       }
+    }
+
+    // Shadow: bayangan hanya dirender di dalam frustum 40x40 m sekitar pemain lokal, jadi pemain
+    // di luar itu tidak akan pernah terlihat bayangannya. castShadow dimatikan supaya GPU tidak
+    // menguji+menolak mereka tiap frame. Hanya ditulis saat statusnya berubah, bukan tiap frame.
+    const shouldCast = castsShadowAt(distance);
+    if (shouldCast !== castShadow.current) {
+      castShadow.current = shouldCast;
+      scene.traverse((object) => {
+        const mesh = object as { castShadow?: boolean; isMesh?: boolean };
+        if (mesh.isMesh) mesh.castShadow = shouldCast;
+      });
     }
 
     if (label) label.sprite.visible = distance <= LABEL_VISIBLE_DISTANCE;

@@ -27,6 +27,22 @@ export const LABEL_VISIBLE_DISTANCE = 45;
 export const REMOTE_ANIM_FULL_DISTANCE = 40;
 
 /**
+ * Setengah lebar frustum shadow kamera (m). Harus sama dengan shadow-camera-left/right/top/bottom
+ * di PlayerController.tsx (+-20). Bayangan hanya dirender di dalam kotak 40x40 m ini.
+ */
+export const SHADOW_HALF_EXTENT = 20;
+
+/**
+ * Benar kalau pemain pada jarak ini masih mungkin masuk frustum shadow (bayangannya terlihat).
+ * Di luar ini `castShadow` hanya membuat GPU menguji objek lalu menolaknya — beban tanpa hasil.
+ * Dipakai untuk mematikan castShadow pemain jauh.
+ */
+export function castsShadowAt(distance: number, halfExtent: number = SHADOW_HALF_EXTENT): boolean {
+  if (!Number.isFinite(distance)) return false;
+  return distance <= halfExtent;
+}
+
+/**
  * Interval update mixer (dalam frame) untuk pemain pada jarak tertentu.
  * 1 = tiap frame (dekat, animasi halus). Nilai >1 = update tiap N frame (jauh, hemat CPU).
  */
