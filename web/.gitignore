@@ -15,3 +15,10 @@ soak-report.json
 # Config lokal dev (VITE_* termasuk public key verifikasi paket peta)
 .env.local
 .env.*.local
+
+# Artefak generate: world aktif (public/world ditukar oleh aktivasi) dan dataset geo dari
+# converter. Keduanya hasil `npm run geo`/aktivasi, bukan sumber -- kalau ter-track,
+# setiap `git checkout` mengembalikan world ke versi lama dan peta yang diaktifkan hilang.
+public/world/
+public/world-*/
+public/maps-manifest/

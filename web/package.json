@@ -10,6 +10,8 @@
     "typecheck": "tsc --noEmit && tsc --noEmit -p tools",
     "assets": "vite-node tools/assets/build.ts",
     "world": "vite-node tools/world/build.ts",
+    "geo": "vite-node tools/geo/build.ts",
+    "geo:pack": "vite-node tools/geo/map-pack.mjs",
     "content:check": "vite-node tools/content/check.ts",
     "content:pack": "vite-node tools/content/pack.ts",
     "test:content": "vitest run src/content src/content-runtime",
