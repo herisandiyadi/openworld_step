@@ -35,7 +35,13 @@ function worldDir(): Plugin {
           res.statusCode = 403;
           return res.end('forbidden');
         }
-        if (!existsSync(file) || !statSync(file).isFile()) return next();
+        if (!existsSync(file) || !statSync(file).isFile()) {
+          // Aset world yang tidak ada = 404 nyata. Jangan diteruskan ke fallback SPA:
+          // game akan menerima HTML dan gagal JSON.parse seolah-olah itu data.
+          res.statusCode = 404;
+          res.setHeader('Content-Type', 'application/json');
+          return res.end(JSON.stringify({ error: 'not found', path: rel }));
+        }
         res.setHeader('Content-Type', MIME[extname(file).toLowerCase()] ?? 'application/octet-stream');
         res.setHeader('Cache-Control', 'no-store');
         createReadStream(file).pipe(res);
