@@ -12,7 +12,12 @@ export type QualityTier = 'low' | 'medium' | 'high';
 export type BloomMode = 'off' | 'half' | 'full';
 
 export interface TierSettings {
-  /** Batas atas devicePixelRatio canvas. */
+  /**
+   * Batas atas devicePixelRatio canvas.
+   * PENTING: nilai ini TIDAK dipakai renderer. DPR yang benar-benar jalan berasal dari
+   * QUALITY_PRESETS di state/gameStore.ts (low 1 / medium 1.25 / high 1.5), dibaca App.tsx.
+   * Field ini hanya catatan historis — jangan mengubahnya untuk mengubah DPR.
+   */
   maxDpr: number;
   /** Shadow map untuk satu-satunya directional light (budget: 1 caster). */
   shadows: boolean;

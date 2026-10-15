@@ -2,6 +2,13 @@
  * Pemilihan strategi anti-aliasing — VISUAL_UPGRADE_TASKS §2 "Anti-aliasing".
  * Aturan keras: MSAA dan FXAA penuh TIDAK BOLEH aktif bersamaan (cost ganda).
  * Fungsi murni, tanpa three/WebGL, supaya bisa diuji dengan capability stub.
+ *
+ * CATATAN PENTING (per 2026-10): hasil fungsi ini BELUM diterapkan ke renderer.
+ * App.tsx membuat canvas dengan `gl={{ antialias: false }}` dan tidak ada WebGLRenderTarget
+ * yang memakai `.samples`, jadi msaaSamples/fxaa berhenti di resolveTier() dan tidak berpengaruh
+ * ke tampilan maupun performa. Jangan menganggap ini penghematan/perbaikan performa sampai
+ * nilainya benar-benar dipasang ke renderer. Lihat angka fill-rate Mali-G52 sebelum menyalakannya:
+ * MSAA 4x pada DPR 1.5 di layar 1080x2400 memakan ~23 MPix/frame (fill-bound ~35 fps).
  */
 import type { QualityTier } from '../state/qualityTiers';
 import { QUALITY_TIERS } from '../state/qualityTiers';
