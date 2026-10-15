@@ -2,9 +2,9 @@
 // Zero dependency: Node built-in only. Semua endpoint tulis butuh token admin.
 import http from "node:http";
 import { createHash, randomBytes, timingSafeEqual } from "node:crypto";
-import { mkdir, readFile, writeFile, rename } from "node:fs/promises";
+import { mkdir, readFile, writeFile, rename, cp, rm, access } from "node:fs/promises";
 import { spawn } from "node:child_process";
-import { join, dirname } from "node:path";
+import { join, dirname, normalize } from "node:path";
 import { fileURLToPath } from "node:url";
 
 const HERE = dirname(fileURLToPath(import.meta.url));
@@ -17,6 +17,18 @@ const OSM_API = "https://api.openstreetmap.org/api/0.6/map";
 const MAX_BBOX_DEG2 = 0.0005; // ~2.3 km x 2.3 km per job; batas agar server tidak kebanjiran data
 const JOBS_FILE = join(CACHE, "jobs.json");
 const jobs = new Map();
+// World aktif yang dibaca game (hardcoded di src/world/worldState.ts: public/world/).
+const WEB_ROOT = process.env.GEO_WEB_ROOT || join(ROOT, "..", "..", "web");
+const ACTIVE_WORLD_DIR = join(WEB_ROOT, "public", "world");
+const WORLD_DIR_RE = /^public\/world-([a-z0-9_-]+)$/i;
+
+/** Validasi outputDir job -> path relatif aman "public/world-<slug>". */
+function safeWorldDir(outputDir) {
+  if (typeof outputDir !== "string") return null;
+  const norm = normalize(outputDir).replace(/\\/g, "/");
+  if (!WORLD_DIR_RE.test(norm) || norm.includes("..")) return null;
+  return norm;
+}
 
 async function loadJobs() {
   try {
@@ -145,6 +157,42 @@ async function readBody(req) {
   return chunks.length ? JSON.parse(Buffer.concat(chunks).toString("utf8")) : {};
 }
 
+/**
+ * Jadikan output dunia milik job sebagai world aktif yang dibaca game.
+ * Menyalin public/world-<slug>/ -> public/world/ secara atomik:
+ * bangun di world.next/ lalu tukar, supaya game tidak pernah membaca world setengah jadi.
+ * @returns {Promise<{activated:boolean, from?:string, to?:string, worldVersion?:string, worldChunks?:number}>}
+ */
+async function activateWorld(job) {
+  const dir = safeWorldDir(job.outputDir);
+  if (!dir) throw new Error("job belum punya output dunia yang valid (status harus completed)");
+  const src = join(WEB_ROOT, dir);
+  await access(join(src, "index.json")); // throw kalau output tidak lengkap
+
+  const staging = join(WEB_ROOT, "public", "world.next");
+  const backup = join(WEB_ROOT, "public", "world.prev");
+  await rm(staging, { recursive: true, force: true });
+  await cp(src, staging, { recursive: true });
+  await access(join(staging, "index.json")); // pastikan salinan utuh sebelum tukar
+
+  await rm(backup, { recursive: true, force: true });
+  try {
+    await rename(ACTIVE_WORLD_DIR, backup); // simpan world lama sebagai rollback
+  } catch { /* belum ada world aktif: tidak masalah */ }
+  await rename(staging, ACTIVE_WORLD_DIR);
+  await rm(backup, { recursive: true, force: true });
+
+  const index = JSON.parse(await readFile(join(ACTIVE_WORLD_DIR, "index.json"), "utf8"));
+  return {
+    activated: true,
+    from: dir,
+    to: "public/world",
+    worldVersion: index.worldVersion,
+    worldChunks: index.worldChunks,
+    worldSize: index.worldSize,
+  };
+}
+
 await loadJobs();
 const server = http.createServer(async (req, res) => {
   const url = new URL(req.url || "/", `http://${req.headers.host || "localhost"}`);
@@ -174,6 +222,24 @@ const server = http.createServer(async (req, res) => {
     if (req.method === "GET" && m) {
       const job = jobs.get(m[1]);
       return job ? json(res, 200, job) : json(res, 404, { error: "not found" });
+    }
+
+    // Aktifkan output job sebagai world yang dibaca game (public/world/).
+    const act = url.pathname.match(/^\/jobs\/([\w-]+)\/activate$/);
+    if (req.method === "POST" && act) {
+      const job = jobs.get(act[1]);
+      if (!job) return json(res, 404, { error: "not found" });
+      if (job.status !== "completed") return json(res, 409, { error: `job status: ${job.status}` });
+      try {
+        const result = await activateWorld(job);
+        job.activatedAt = new Date().toISOString();
+        job.active = true;
+        await saveJobs();
+        console.log(`[activate] ${job.id} (${job.name}) -> public/world`);
+        return json(res, 200, { ok: true, job: job.id, name: job.name, ...result });
+      } catch (err) {
+        return json(res, 400, { error: String(err.message || err) });
+      }
     }
     return json(res, 404, { error: "not found" });
   } catch (err) {

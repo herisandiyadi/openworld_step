@@ -68,6 +68,11 @@ label{font-size:13px;color:var(--muted);display:block;margin:10px 0 4px}
       <div class="row" style="margin-top:8px">
         <a id="mapOpen" href="#" target="_blank" rel="noopener" style="font-size:13px">Buka ukuran penuh (2048×2048)</a>
       </div>
+      <div class="row" style="margin-top:12px;padding-top:12px;border-top:1px solid var(--border)">
+        <button id="btnActivate">Pakai sebagai world aktif</button>
+        <span id="activateStatus" class="small"></span>
+      </div>
+      <p class="small" style="margin:6px 0 0">Menyalin peta ini ke <code>public/world/</code> — world yang dibaca game. Game perlu reload untuk memakai peta ini.</p>
     </div>
 
     <label style="margin-top:16px">Build Log</label>
@@ -208,6 +213,26 @@ document.getElementById('btnCreate').addEventListener('click', async () => {
 
 document.getElementById('btnRefresh').addEventListener('click', () => {
   if (currentJobId) poll(currentJobId);
+});
+
+document.getElementById('btnActivate').addEventListener('click', async () => {
+  if (!currentJobId) return;
+  const btn = document.getElementById('btnActivate');
+  const st = document.getElementById('activateStatus');
+  const name = document.getElementById('detailName').textContent;
+  if (!confirm('Jadikan "' + name + '" sebagai world aktif?\n\nPeta ini disalin ke public/world/ dan game akan memakainya setelah reload.')) return;
+  btn.disabled = true; st.textContent = 'mengaktifkan…';
+  try {
+    const r = await fetch(API + '/jobs/' + currentJobId + '/activate', { method: 'POST' });
+    const j = await r.json();
+    if (!r.ok) throw new Error(j.error || 'HTTP ' + r.status);
+    st.textContent = 'aktif: ' + j.worldVersion + ' · ' + j.worldChunks + '×' + j.worldChunks + ' chunks';
+    st.style.color = 'var(--accent)';
+  } catch (e) {
+    st.textContent = 'gagal: ' + e.message;
+    st.style.color = 'var(--err)';
+    btn.disabled = false;
+  }
 });
 
 // prefetch defaults

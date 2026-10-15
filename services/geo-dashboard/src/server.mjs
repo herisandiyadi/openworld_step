@@ -142,6 +142,18 @@ const server = http.createServer(async (req, res) => {
       });
     }
 
+    // Aktifkan job sebagai world aktif (POST) — token ditempel server-side.
+    const actM = url.pathname.match(/^\/api\/jobs\/([\w-]+)\/activate$/);
+    if (req.method === "POST" && actM) {
+      const r = await fetch(`${GENERATOR}/jobs/${actM[1]}/activate`, {
+        method: "POST",
+        headers: { Authorization: `Bearer ${ADMIN_TOKEN}` },
+      });
+      const body = await r.text();
+      res.writeHead(r.status, { "Content-Type": "application/json", "Cache-Control": "no-store" });
+      return res.end(body);
+    }
+
     // Proxy baca status job (GET) — tidak butuh token di browser.
     const m = url.pathname.match(/^\/api\/jobs\/([\w-]+)$/);
     if (req.method === "GET" && m) {
