@@ -3,9 +3,11 @@
  * Verifies activation on launch, check/stage/rollback operations, and graceful offline behavior.
  */
 
-import { describe, it, expect, beforeEach } from 'vitest';
+import { describe, it, expect, beforeEach, vi } from 'vitest';
 import {
   browserConnectionType,
+  getAllowCellularDownloads,
+  setAllowCellularDownloads,
   contentUpdatesRuntime,
   initContentUpdateManager,
   checkAndStageContentUpdate,
@@ -350,5 +352,38 @@ describe('browserConnectionType', () => {
   it('tanpa Network Information API -> unknown', () => {
     stubNavigator({ onLine: true });
     expect(browserConnectionType()).toBe('unknown');
+  });
+});
+
+/**
+ * Regresi: unduhan harus bisa jalan tanpa Wi-Fi. Dulu default-nya MENAHAN unduhan di
+ * seluler, jadi user tanpa Wi-Fi buntu total ("Menunggu Wi-Fi") padahal tombol unduh
+ * dipicu manual. Sekarang default mengizinkan; hanya nilai 'false' eksplisit yang menahan.
+ */
+vi.mock('@capacitor/preferences', () => {
+  const store = new Map<string, string>();
+  return {
+    Preferences: {
+      get: async ({ key }: { key: string }) => ({ value: store.get(key) }),
+      set: async ({ key, value }: { key: string; value: string }) => { store.set(key, value); },
+      remove: async ({ key }: { key: string }) => { store.delete(key); },
+    },
+  };
+});
+
+describe('preferensi unduh seluler (tanpa Wi-Fi)', () => {
+  it('belum diset -> diizinkan (bisa unduh tanpa Wi-Fi)', async () => {
+    expect(await getAllowCellularDownloads()).toBe(true);
+  });
+
+  it('diset false -> ditahan sampai Wi-Fi', async () => {
+    await setAllowCellularDownloads(false);
+    expect(await getAllowCellularDownloads()).toBe(false);
+  });
+
+  it('diset true -> diizinkan lagi', async () => {
+    await setAllowCellularDownloads(false);
+    await setAllowCellularDownloads(true);
+    expect(await getAllowCellularDownloads()).toBe(true);
   });
 });

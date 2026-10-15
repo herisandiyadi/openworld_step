@@ -159,6 +159,13 @@ export interface ContentUpdateOptions extends ContentCompatibility {
   preferences: ContentDownloadPreferences;
   publicKeys: ContentPublicKeyProvider;
   bundled: BundledContentSource;
+  /** Jumlah unduhan paralel saat staging. Default 12; 1 = serial. */
+  maxParallelDownloads?: number;
+  /**
+   * Dipanggil setiap file selesai diunduh/disalin saat staging.
+   * completed naik monoton; total = jumlah file paket. Dipakai UI untuk progress bar.
+   */
+  onProgress?: (progress: { completed: number; total: number; bytes: number }) => void;
 }
 
 export interface DifferentialPlan {
@@ -275,13 +282,28 @@ export class ContentUpdateManager {
       await this.options.storage.remove(stageRoot);
       const baseUrl = new URL(latestValue.contentBaseUrl ?? './', this.options.latestUrl);
       const downloadPaths = new Set(plan.files.map((file) => file.path));
-      for (const file of manifest.files) {
-        const data = downloadPaths.has(file.path)
-          ? await this.options.network.getBytes(new URL(file.path, baseUrl).toString())
-          : await current.readFile(file.path);
-        await verifyContentFile(file, data);
-        await this.options.storage.write(`${stageRoot}/${file.path}`, data);
-      }
+      // Unduh paralel: paket peta bisa 2.000+ file, dan unduhan serial lewat tunnel butuh
+      // belasan menit (satu round-trip per file). Batas 12 menjaga beban server dan memori
+      // tetap wajar sambil memotong waktu unduh ke sekitar sepersepuluhnya.
+      const queue = [...manifest.files];
+      const total = manifest.files.length;
+      const progress = { completed: 0, total, bytes: 0 };
+      const worker = async (): Promise<void> => {
+        for (;;) {
+          const file = queue.shift();
+          if (!file) return;
+          const data = downloadPaths.has(file.path)
+            ? await this.options.network.getBytes(new URL(file.path, baseUrl).toString())
+            : await current.readFile(file.path);
+          await verifyContentFile(file, data);
+          await this.options.storage.write(`${stageRoot}/${file.path}`, data);
+          progress.completed += 1;
+          progress.bytes += data.byteLength;
+          this.options.onProgress?.({ ...progress });
+        }
+      };
+      const concurrency = Math.max(1, Math.min(12, this.options.maxParallelDownloads ?? 12));
+      await Promise.all(Array.from({ length: concurrency }, worker));
       await this.options.storage.write(
         `${stageRoot}/manifest.json`,
         textEncoder.encode(JSON.stringify(manifest)),

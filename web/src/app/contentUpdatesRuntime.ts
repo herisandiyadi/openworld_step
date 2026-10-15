@@ -29,6 +29,10 @@ export interface ContentUpdateStatus {
   state: 'idle' | 'checking' | 'downloading' | 'staged' | 'waiting-for-wifi' | 'up-to-date' | 'error';
   message?: string;
   downloadSize?: number;
+  /** Progres saat 'downloading': file selesai dari total, dan byte terkumpul. */
+  completed?: number;
+  total?: number;
+  bytes?: number;
 }
 
 export const contentUpdatesRuntime: {
@@ -53,6 +57,7 @@ export interface InitContentUpdateManagerOptions {
   connectivity: ContentUpdateOptions['connectivity'];
   preferences: ContentUpdateOptions['preferences'];
   publicKeys: ContentPublicKeyProvider;
+  onProgress?: (progress: { completed: number; total: number; bytes: number }) => void;
 }
 
 const statusListeners = new Set<(status: ContentUpdateStatus) => void>();
@@ -90,6 +95,7 @@ export function initContentUpdateManager(options: InitContentUpdateManagerOption
     preferences: options.preferences,
     publicKeys: options.publicKeys,
     bundled,
+    onProgress: options.onProgress,
   });
   setStatus({ state: 'idle' });
 }
@@ -101,8 +107,21 @@ export async function activateStagedContentOnLaunch(): Promise<boolean> {
 
 export async function checkAndStageContentUpdate(): Promise<Awaited<ReturnType<ContentUpdateManager['checkAndStageLatest']>>> {
   const manager = requireManager();
-  setStatus({ state: 'checking' });
-  const result = await manager.checkAndStageLatest();
+  setStatus({ state: 'checking', message: 'Memeriksa pembaruan...' });
+  // Tandai 'downloading' sebelum fase unduh: paket map besar (21 MB, ~2.000 file) butuh
+  // puluhan detik, dan sebelumnya UI diam di "Memeriksa..." sepanjang waktu itu sehingga
+  // terlihat menggantung/patah.
+  const slowTimer = setTimeout(() => {
+    if (contentUpdatesRuntime.status.state === 'checking') {
+      setStatus({ state: 'downloading', message: 'Mengunduh paket peta...' });
+    }
+  }, 800);
+  let result: Awaited<ReturnType<ContentUpdateManager['checkAndStageLatest']>>;
+  try {
+    result = await manager.checkAndStageLatest();
+  } finally {
+    clearTimeout(slowTimer);
+  }
   if (result.status === 'staged') {
     setStatus({ state: 'staged', downloadSize: result.plan.downloadSize, message: 'Paket siap dipakai pada peluncuran berikutnya.' });
   } else if (result.status === 'waiting-for-wifi') {
@@ -165,7 +184,7 @@ export function browserConnectionType(): ContentConnectionType {
 
 export function createDefaultContentUpdateDependencies(
   environment: ContentAdapterEnvironment = {},
-): Pick<InitContentUpdateManagerOptions, 'storage' | 'network' | 'connectivity' | 'preferences' | 'publicKeys'> {
+): Pick<InitContentUpdateManagerOptions, 'storage' | 'network' | 'connectivity' | 'preferences' | 'publicKeys' | 'onProgress'> {
   const native = (environment.isNativePlatform ?? (() => Capacitor.isNativePlatform()))();
   const storage: ContentUpdateOptions['storage'] = native
     ? new CapacitorFilesystemContentStorage(environment.filesystem ?? Filesystem, Directory.Data)
@@ -181,12 +200,27 @@ export function createDefaultContentUpdateDependencies(
     network: new FetchContentNetwork(),
     connectivity,
     preferences: {
+      // Unduhan peta diizinkan di jaringan apa pun (termasuk seluler/tanpa Wi-Fi).
+      // Paket peta dipicu manual oleh user lewat tombol "Unduh peta", jadi tidak ada
+      // unduhan tak sengaja di kuota: menahan sampai Wi-Fi hanya bikin user buntu saat
+      // Wi-Fi mati atau tethering. Setelan tersimpan tetap dihormati bila ada.
       allowCellularDownloads: async () => {
         const { value } = await Preferences.get({ key: CELLULAR_KEY });
-        return value === 'true';
+        if (value === 'false') return false;
+        return true;
       },
     },
     publicKeys: createPublicKeyProvider(import.meta.env.VITE_CONTENT_PUBLIC_KEYS),
+    onProgress: (progress: { completed: number; total: number; bytes: number }) => {
+      // Teruskan progres ke status agar UI bisa menampilkan progress bar saat mengunduh.
+      setStatus({
+        state: 'downloading',
+        message: 'Mengunduh paket peta...',
+        completed: progress.completed,
+        total: progress.total,
+        bytes: progress.bytes,
+      });
+    },
   };
 }
 
@@ -196,7 +230,8 @@ export async function setAllowCellularDownloads(allowed: boolean): Promise<void>
 
 export async function getAllowCellularDownloads(): Promise<boolean> {
   const { value } = await Preferences.get({ key: CELLULAR_KEY });
-  return value === 'true';
+  // Default izin (lihat preferences.allowCellularDownloads): hanya 'false' yang menahan.
+  return value !== 'false';
 }
 
 function createPublicKeyProvider(raw: string | undefined): ContentPublicKeyProvider {

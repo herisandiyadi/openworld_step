@@ -87,9 +87,15 @@ export function ContentUpdatePanel({
         )}
       </div>
 
-      <label style={{ display: 'flex', alignItems: 'center', marginTop: '1rem', fontSize: '0.9rem', cursor: 'pointer' }}>
-        <input type="checkbox" checked={allowCellular} onChange={onToggleCellular} style={{ marginRight: '0.5rem' }} />
-        Izinkan unduh melalui seluler
+      <label style={{ display: 'flex', alignItems: 'flex-start', marginTop: '1rem', fontSize: '0.9rem', cursor: 'pointer' }}>
+        <input type="checkbox" checked={allowCellular} onChange={onToggleCellular} style={{ marginRight: '0.5rem', marginTop: '0.2rem' }} />
+        <span>
+          Unduh peta tanpa Wi-Fi (pakai data seluler)
+          <br />
+          <span style={{ color: '#aaa', fontSize: '0.82rem' }}>
+            Nonaktifkan untuk menahan unduhan sampai tersambung Wi-Fi. Paket peta bisa belasan MB.
+          </span>
+        </span>
       </label>
     </div>
   );

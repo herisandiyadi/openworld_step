@@ -93,6 +93,59 @@ export function TitleScreen() {
             </button>
           </div>
         )}
+        {(mapState.phase === 'checking' || mapState.phase === 'downloading') && (
+          <div className="menu-status" aria-live="polite" style={{ color: '#4a9eff', width: 'min(320px, 80vw)' }}>
+            {mapState.phase === 'checking' ? (
+              <p style={{ margin: '0 0 0.4rem 0' }}>Memeriksa peta...</p>
+            ) : (
+              <>
+                <p style={{ margin: '0 0 0.4rem 0' }}>
+                  {mapState.total
+                    ? `Mengunduh peta... ${mapState.completed ?? 0} / ${mapState.total} file`
+                    : 'Mengunduh peta...'}
+                </p>
+                <div
+                  role="progressbar"
+                  aria-valuemin={0}
+                  aria-valuemax={100}
+                  aria-valuenow={
+                    mapState.total ? Math.round(((mapState.completed ?? 0) / mapState.total) * 100) : undefined
+                  }
+                  style={{ height: '8px', background: '#1e293b', borderRadius: '999px', overflow: 'hidden' }}
+                >
+                  <div
+                    style={{
+                      height: '100%',
+                      width: mapState.total
+                        ? `${Math.min(100, ((mapState.completed ?? 0) / mapState.total) * 100)}%`
+                        : '12%',
+                      background: '#4a9eff',
+                      borderRadius: '999px',
+                      transition: 'width 200ms linear',
+                    }}
+                  />
+                </div>
+                {mapState.bytes !== undefined && (
+                  <p style={{ margin: '0.35rem 0 0 0', fontSize: '0.8rem', color: '#94a3b8' }}>
+                    {((mapState.bytes ?? 0) / 1024 / 1024).toFixed(1)} MB terunduh
+                  </p>
+                )}
+              </>
+            )}
+          </div>
+        )}
+        {mapState.phase === 'up-to-date' && (
+          <div className="menu-status" style={{ color: '#94a3b8' }} aria-live="polite">
+            Peta sudah terbaru.
+            <button
+              type="button"
+              className="overlay-button secondary menu-button"
+              onClick={() => void stageMapUpdate()}
+            >
+              Unduh ulang peta
+            </button>
+          </div>
+        )}
         {mapState.phase === 'staged' && (
           <p className="menu-status" aria-live="polite" style={{ color: '#4ade80' }}>
             Peta {((mapState.downloadSize ?? 0) / 1024 / 1024).toFixed(1)} MB siap dipakai pada peluncuran berikutnya.

@@ -42,7 +42,7 @@ export function SettingsScreen() {
   const [status, setStatus] = useState<ConnectionResult | null>(null);
   const [busy, setBusy] = useState(false);
   const [contentVersion, setContentVersion] = useState('...');
-  const [allowCellular, setAllowCellular] = useState(false);
+  const [allowCellular, setAllowCellular] = useState(true);
   const [updateStatus, setUpdateStatus] = useState(contentUpdatesRuntime.status);
   const ids = { url: useId(), key: useId(), model: useId(), status: useId(), brightness: useId() };
 
