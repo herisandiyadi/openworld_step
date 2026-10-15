@@ -43,6 +43,18 @@ export const APPEARANCE_FIELDS = [
 ] as const;
 
 /**
+ * Kunci penampilan: sidik string dari SEMUA field yang memengaruhi mesh gabungan.
+ * Dipakai untuk memutuskan kapan mesh perlu dibangun ulang — membandingkan objek Appearance
+ * langsung akan selalu tidak sama (referensi baru tiap render) dan memicu merge berulang.
+ * Dibangun dari APPEARANCE_FIELDS supaya tidak ada daftar kedua yang bisa jadi tidak sinkron.
+ */
+export function appearanceKey(appearance: Appearance): string {
+  let key = appearance.gender;
+  for (const field of APPEARANCE_FIELDS) key += `|${appearance[field]}`;
+  return key;
+}
+
+/**
  * Memaksa nilai ke rentang valid; field yang salah/absen kembali ke default. Dipakai untuk profil v1
  * (tanpa appearance) dan profil lama yang belum punya skinTone/hairStyle/accessory: field baru
  * diisi default, jadi profil tersimpan tetap bisa dimuat tanpa crash.

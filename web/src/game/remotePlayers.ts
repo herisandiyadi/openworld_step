@@ -18,6 +18,25 @@ export const MAX_VISIBLE_REMOTES = 20;
 /** Jarak label nama masih terbaca; lebih jauh label dimatikan (sprite tetap ada, hanya disembunyikan). */
 export const LABEL_VISIBLE_DISTANCE = 45;
 
+/**
+ * Di luar jarak ini, animasi pemain jauh di-throttle: mixer hanya di-update tiap N frame.
+ * Alasannya biaya CPU, bukan visual — 20 skinned mesh x mixer.update tiap frame membebani GPU/CPU
+ * kelas menengah, sementara pada jarak >40 m perubahan pose <2 px dan tak terlihat. Posisi badan
+ * tetap diinterpolasi tiap frame, jadi tidak ada patah gerak; hanya animasi kakinya yang melambat.
+ */
+export const REMOTE_ANIM_FULL_DISTANCE = 40;
+
+/**
+ * Interval update mixer (dalam frame) untuk pemain pada jarak tertentu.
+ * 1 = tiap frame (dekat, animasi halus). Nilai >1 = update tiap N frame (jauh, hemat CPU).
+ */
+export function remoteAnimInterval(distance: number, fullDistance: number = REMOTE_ANIM_FULL_DISTANCE): number {
+  if (!Number.isFinite(distance) || distance <= fullDistance) return 1;
+  // Bertahap: 40-70 m -> tiap 2 frame, 70-100 m -> tiap 3, >100 m -> tiap 4.
+  const steps = Math.floor((distance - fullDistance) / 30) + 2;
+  return Math.min(steps, 4);
+}
+
 export interface RemoteCandidate {
   id: PlayerId;
   x: number;

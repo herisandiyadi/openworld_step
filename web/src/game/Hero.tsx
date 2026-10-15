@@ -5,7 +5,7 @@ import { ClipPlayer, useCharacter } from './character';
 import { animState, playerMotion } from './runtime';
 import { ANIM, BIKE } from './vehicleSpec';
 import { applyAppearance, heroAssetId } from './HeroAppearance';
-import { DEFAULT_APPEARANCE, usePlayerProfile } from '../state/profile';
+import { DEFAULT_APPEARANCE, appearanceKey, usePlayerProfile } from '../state/profile';
 import { cameraState, HERO_HIDE_DISTANCE } from '../camera/followCamera';
 import { castPhases, smoothCast } from '../fishing/fishingPose';
 import type { MoveMode } from '../state/gameStore';
@@ -52,7 +52,15 @@ export function Hero({
   const player = useMemo(() => new ClipPlayer(), []);
   const clipNames = useMemo(() => Array.from(actions.keys()), [actions]);
   const hasCastClip = !shouldUseFishingFallback(clipNames);
-  useEffect(() => applyAppearance(scene, appearance), [scene, appearance]);
+  // Guard: merge ulang hanya saat penampilan BENAR-BENAR berubah. Tanpa ini, tiap render yang
+  // menghasilkan objek appearance baru akan membuang + membangun ulang geometry (GC churn di HP).
+  const built = useRef('');
+  useEffect(() => {
+    const next = `${scene.uuid}|${appearanceKey(appearance)}`;
+    if (built.current === next) return;
+    built.current = next;
+    applyAppearance(scene, appearance);
+  }, [scene, appearance]);
   const castStartedAt = useRef<number | null>(null);
   const wasFishing = useRef(false);
   const chest = scene.getObjectByName('bone_chest') as Bone | undefined;

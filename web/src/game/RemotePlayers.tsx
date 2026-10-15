@@ -14,13 +14,14 @@ import {
   MAX_VISIBLE_REMOTES,
   REMOTE_FOG_FAR,
   type RemoteCandidate,
+  remoteAnimInterval,
   selectVisibleRemotes,
 } from './remotePlayers';
 import { useNetStore } from '../net/netStore';
 import { netSession } from '../net/netRuntime';
 import { ClientSession, INTERPOLATION_DELAY_MS, lerpAngle } from '../net/session';
 import type { AnimId, PlayerId, PlayerSnapshot } from '../net/protocol';
-import { DEFAULT_APPEARANCE, type Appearance } from '../state/profile';
+import { DEFAULT_APPEARANCE, appearanceKey } from '../state/profile';
 
 /**
  * Menggambar pemain lain di dunia 3D (MULTIPLAYER.md 4): posisi dari interpolasi sesi,
@@ -37,10 +38,6 @@ const LABEL_WIDTH = 1.6;
 
 /** Jarak tiap pemain yang digambar frame ini, diisi komponen induk sebelum anak-anaknya. */
 const frameDistances = new Map<PlayerId, number>();
-
-/** Kunci penampilan: mesh hanya dibangun ulang kalau string ini berubah. */
-const appearanceKey = (a: Appearance): string =>
-  `${a.gender}|${a.skinTone}|${a.hairStyle}|${a.hairColor}|${a.expression}|${a.shirtColor}|${a.shirtStyle}|${a.pantsColor}|${a.pantsStyle}|${a.accessory}`;
 
 /** Klip GLB untuk tiap animasi yang dikirim lewat protokol. */
 const CLIP_OF: Record<AnimId, string> = {
@@ -102,6 +99,9 @@ function RemotePlayerView({ playerId }: { playerId: PlayerId }): ReactElement | 
   const { scene, mixer, actions } = useCharacter(heroAssetId(appearance ?? DEFAULT_APPEARANCE));
   const groupRef = useRef<Group>(null);
   const clip = useMemo(() => new ClipPlayer(), []);
+  // Throttle animasi pemain jauh: sisa waktu yang belum diumpankan ke mixer, dan penghitung frame.
+  const animAccum = useRef(0);
+  const animFrame = useRef(0);
 
   // Mesh gabungan hanya dibangun ulang saat penampilan pemain ini berubah (bukan tiap render).
   const built = useRef('');
@@ -156,7 +156,22 @@ function RemotePlayerView({ playerId }: { playerId: PlayerId }): ReactElement | 
     const anim = 'anim' in pose ? pose.anim : 'idle';
     const action = actions.get(CLIP_OF[anim]) ?? actions.get('anim_Idle');
     if (action) clip.play(action);
-    mixer.update(dt);
+
+    // Pemain jauh: mixer di-update tiap N frame, bukan tiap frame (hemat CPU). Delta diakumulasi
+    // supaya kecepatan animasi tetap sama — yang berkurang hanya frekuensi sampling, bukan waktu.
+    // Tanpa akumulasi ini, animasi jauh akan berjalan seperti slow-motion.
+    const interval = remoteAnimInterval(distance);
+    if (interval <= 1) {
+      mixer.update(dt);
+      animAccum.current = 0;
+    } else {
+      animAccum.current += dt;
+      animFrame.current = (animFrame.current + 1) % interval;
+      if (animFrame.current === 0) {
+        mixer.update(animAccum.current);
+        animAccum.current = 0;
+      }
+    }
 
     if (label) label.sprite.visible = distance <= LABEL_VISIBLE_DISTANCE;
   });
