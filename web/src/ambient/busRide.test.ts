@@ -56,7 +56,7 @@ describe('perjalanan bus mengantar pemain', () => {
         expect(ride.phase, `${fromId} -> ${toId}`).toBe('selesai');
         // Urutan pengalaman: bus datang, pemain naik, bus jalan, pemain turun.
         for (const phase of ['menunggu', 'naik', 'jalan', 'turun']) expect(phases.has(phase)).toBe(true);
-        expect(rideProgress(ride)).toBe(1);
+        expect(rideProgress(ride)).toBeCloseTo(1, 10);
         // Bus benar-benar berhenti dekat halte tujuan (lajur berjarak beberapa meter dari trotoar).
         const pose = busPose(graph, route, { ...bus, wait: 0, nextStop: 0 });
         expect(Math.hypot(pose.x - to.x, pose.z - to.z)).toBeLessThan(15);

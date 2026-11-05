@@ -19,7 +19,8 @@ import { isNight } from './density';
 import { PedestrianLayer, pedRuntime } from './PedestrianLayer';
 import { pedPose } from './pedestrianSim';
 import { buildLaneGraph, type LaneGraph, type LanesData } from './laneGraph';
-import { updateSpawns, VEHICLE_POOL } from './spawner';
+import { updateSpawns } from './spawner';
+import { hasInstanceRoom, vehicleBatchCapacity } from './vehicleBatch';
 import { useGraphicsSettings } from '../state/graphicsSettings';
 import { LAMP_NODES, type LampState, lampAt, pedestrianGate, signalBlocks, signalClock, signalisedIntersections } from './trafficLights';
 import { createTraffic, FAR_DISTANCE, lerpPose, playerGap, stepTrafficTiered, TICK_HZ_NEAR, type Vehicle, VEHICLE_LENGTH, vehiclePose } from './trafficSim';
@@ -111,12 +112,14 @@ function buildBatch(root: Object3D, slots: number): { parts: Part[]; wheelRadius
   return { parts, wheelRadius };
 }
 
-/** Tambah satu kendaraan ke batch-nya; `spin` = sudut putar roda (rad). */
-function addVehicle(parts: Part[], x: number, y: number, z: number, dirX: number, dirZ: number, spin: number): void {
+/** Tambah satu kendaraan ke batch-nya; `spin` = sudut putar roda (rad).
+ * @param capacity - dari vehicleBatchCapacity(isBus=false, quality); di luar rentang tidak ditulis. */
+function addVehicle(parts: Part[], x: number, y: number, z: number, dirX: number, dirZ: number, spin: number, capacity: number): void {
   // Model menghadap -Z, sama dengan konvensi heading pemain.
   BASE.compose(POS.set(x, y, z), QUAT.setFromAxisAngle(UP, Math.atan2(-dirX, -dirZ)), ONE);
   SPIN.makeRotationX(spin);
   for (const part of parts) {
+    if (!hasInstanceRoom(part.mesh.count, capacity)) continue;
     for (const copy of part.copies) {
       SCRATCH.multiplyMatrices(BASE, copy.node);
       if (part.wheel) SCRATCH.multiply(SPIN);
@@ -174,7 +177,16 @@ export function AmbientLayer({ busStops }: { busStops: readonly BusStop[] }) {
   const camera = useThree((state) => state.camera) as PerspectiveCamera;
 
   const batches = useMemo(
-    () => VEHICLE_IDS.map((_, index) => buildBatch(gltfs[index]?.scene ?? new Object3D(), index === BUS ? 1 : VEHICLE_POOL.high)),
+    () => {
+      // Buffer capacity follows the render quality tier (read once here; fewer instances on low-end).
+      // AmbientLayer's runtime pool is vehiclePoolFor(density, quality) <= VEHICLE_POOL[quality],
+      // so the capacity always covers the live pool; addVehicle still guards against overflow.
+      const quality = useGraphicsSettings.getState().settings.quality;
+      return VEHICLE_IDS.map((_, index) => {
+        const capacity = vehicleBatchCapacity(index === BUS, quality);
+        return { ...buildBatch(gltfs[index]?.scene ?? new Object3D(), capacity), capacity };
+      });
+    },
     [gltfs],
   );
 
@@ -202,7 +214,11 @@ export function AmbientLayer({ busStops }: { busStops: readonly BusStop[] }) {
     return { pole: pole as InstancedMesh | null, poleMatrix, lens: lens as InstancedMesh | null, lenses };
   }, [gltfs]);
 
-  const riders = useMemo(() => buildRiders(gltfs[VEHICLE_IDS.length + 1]?.scene ?? new Object3D(), VEHICLE_POOL.high), [gltfs]);
+  const ridersCapacity = vehicleBatchCapacity(false, useGraphicsSettings.getState().settings.quality);
+  const riders = useMemo(
+    () => buildRiders(gltfs[VEHICLE_IDS.length + 1]?.scene ?? new Object3D(), ridersCapacity),
+    [gltfs, ridersCapacity],
+  );
 
   const root = useMemo(() => new Object3D(), []);
   const traffic = useMemo(() => createTraffic(), []);
@@ -291,7 +307,16 @@ export function AmbientLayer({ busStops }: { busStops: readonly BusStop[] }) {
       if (sim.tick % TICK_HZ_NEAR === 0) {
         camera.getWorldDirection(VIEW_DIR);
         const halfFov = Math.atan(Math.tan(((camera.fov ?? 45) * Math.PI) / 360) * (camera.aspect ?? 1));
-        updateSpawns(graph, traffic, { x: camera.position.x, z: camera.position.z, dirX: VIEW_DIR.x, dirZ: VIEW_DIR.z, halfFov }, density, Math.random, () => sim.nextId++);
+        updateSpawns(
+          graph,
+          traffic,
+          { x: camera.position.x, z: camera.position.z, dirX: VIEW_DIR.x, dirZ: VIEW_DIR.z, halfFov },
+          density,
+          Math.random,
+          () => sim.nextId++,
+          11,
+          useGraphicsSettings.getState().settings.quality,
+        );
       }
     }
 
@@ -327,13 +352,14 @@ export function AmbientLayer({ busStops }: { busStops: readonly BusStop[] }) {
       const pose = lerpPose(previous.get(vehicle), vehiclePose(graph, vehicle), alpha);
       agents.push({ ...pose, speed: vehicle.speed });
       const groundY = groundHeightAt(pose.x, pose.z);
-      addVehicle(batch.parts, pose.x, groundY, pose.z, pose.dirX, pose.dirZ, -extra.distance / batch.wheelRadius);
+      addVehicle(batch.parts, pose.x, groundY, pose.z, pose.dirX, pose.dirZ, -extra.distance / batch.wheelRadius, batch.capacity);
       if (extra.type === MOTO) {
         // Pengendara memakai matriks motor yang sama (aset dimodelkan di ruang model motor).
         const rider = motoRiderPose(pose, groundY);
         BASE.compose(POS.set(rider.x, rider.y, rider.z), QUAT.setFromAxisAngle(UP, rider.heading), ONE);
         TINT.set(riderTint(vehicle.id));
         for (const part of riders) {
+          if (!hasInstanceRoom(part.mesh.count, ridersCapacity)) continue;
           const index = part.mesh.count++;
           part.mesh.setMatrixAt(index, SCRATCH.multiplyMatrices(BASE, part.node));
           if (part.tinted) part.mesh.setColorAt(index, TINT);
@@ -369,7 +395,7 @@ export function AmbientLayer({ busStops }: { busStops: readonly BusStop[] }) {
     if (busBatch && route.edges.length > 0) {
       const pose = lerpPose(busPrevious.current, busPose(graph, route, bus), alpha);
       const busY = groundHeightAt(pose.x, pose.z);
-      addVehicle(busBatch.parts, pose.x, busY, pose.z, pose.dirX, pose.dirZ, -sim.busDistance / busBatch.wheelRadius);
+      addVehicle(busBatch.parts, pose.x, busY, pose.z, pose.dirX, pose.dirZ, -sim.busDistance / busBatch.wheelRadius, busBatch.capacity);
       busTrip.pose = pose;
       const active = busTrip.ride;
       if (active && rideOnBoard(active)) {

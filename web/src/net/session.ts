@@ -16,6 +16,13 @@ import {
   type PlayerSnapshot,
   type VehicleStateMessage,
 } from './protocol';
+import {
+  releaseSpot,
+  reserveSpot,
+  staleSpotsOf,
+  type FishingSpotReservations,
+  type SpotReservation,
+} from '../fishing/fishingSpots';
 import type { HostTransport, IncomingMessage, PeerEvent, PeerId, Transport, Unsubscribe } from './transport';
 
 /* ------------------------------------------------------------------------------------------------
@@ -42,6 +49,8 @@ export const MAX_PLAYER_SPEED = 18 * 1.4;
 export const SPEED_SLACK_M = 2;
 /** Jarak maksimum pemain ke kendaraan saat klaim naik (m). */
 export const VEHICLE_REACH = 6;
+/** Fishing claims are refreshed by reserve and expire without a heartbeat. */
+export const FISHING_SPOT_TTL_MS = 5_000;
 
 /** AOI (4.1): dekat 15 Hz, menengah 3 Hz, jauh posisi kasar tiap 2 detik. */
 export const AOI_NEAR_RADIUS = 120;
@@ -180,6 +189,7 @@ export type RejectReason =
   | 'vehicle-unknown'
   | 'vehicle-far'
   | 'not-owner'
+  | 'spot-taken'
   | 'unexpected';
 
 export interface RejectEvent {
@@ -215,6 +225,13 @@ interface HostPlayer {
   lastSent: Map<PlayerId, number>;
 }
 
+export interface FishingSpotEvent {
+  type: 'fishingReserve' | 'fishingRelease';
+  spotId: string;
+  /** Host-originated expiry/disconnect release has no player identity. */
+  fromId: PlayerId;
+}
+
 export interface HostOptions {
   /** Waktu (ms); default Date.now. Test memakai jam palsu. */
   now?: () => number;
@@ -225,8 +242,12 @@ export interface HostOptions {
   localPlayer?: { username: string; appearance: Appearance };
   /** Dipanggil saat host menolak pesan (logging dan test). */
   onReject?: (event: RejectEvent) => void;
-  /** Chat yang terlihat oleh pemain lokal host. */
+  /** Chat that is visible to the local host player. */
   onLocalChat?: (entry: ChatEntry) => void;
+  /** Fishing state received from a client and stamped by the host. */
+  onFishingState?: (playerId: PlayerId, sequence: number, payload: Uint8Array) => void;
+  /** Reservation changes received from remote clients. */
+  onFishingSpotEvent?: (event: FishingSpotEvent) => void;
 }
 
 /**
@@ -238,6 +259,7 @@ export class HostSession {
   private readonly players = new Map<PlayerId, HostPlayer>();
   private readonly byPeer = new Map<PeerId, PlayerId>();
   private readonly vehicles = new Map<string, VehicleInfo>();
+  private fishingReservations: FishingSpotReservations = {};
   private readonly history: Record<ChatChannel, ChatEntry[]> = { session: [], nearby: [] };
   private readonly unsubscribe: Unsubscribe[] = [];
   private readonly now: () => number;
@@ -277,6 +299,14 @@ export class HostSession {
     return this.vehicles.get(vehicleId);
   }
 
+  /** Owner id of a fishing spot reservation, or null when free (FISHING.md 8). */
+  fishingSpotOwner(spotId: string): PlayerId | null {
+    const owner = this.fishingReservations[spotId]?.playerId;
+    if (owner === undefined) return null;
+    const id = Number(owner);
+    return Number.isInteger(id) && id > 0 && id <= 0xffff ? id : null;
+  }
+
   chatHistory(channel: ChatChannel): readonly ChatEntry[] {
     return this.history[channel];
   }
@@ -297,9 +327,30 @@ export class HostSession {
     return player ? this.relayChat(player, channel, text) : false;
   }
 
+  /** Reserves a spot for the local host player without going through the transport. */
+  reserveLocalFishingSpot(spotId: string): boolean {
+    if (this.localPlayerId === null) return false;
+    const player = this.players.get(this.localPlayerId);
+    return player ? this.handleFishingReservation(player, 'reserve', spotId) : false;
+  }
+
+  /** Releases a spot owned by the local host player. */
+  releaseLocalFishingSpot(spotId: string): boolean {
+    if (this.localPlayerId === null) return false;
+    const player = this.players.get(this.localPlayerId);
+    return player ? this.handleFishingReservation(player, 'release', spotId) : false;
+  }
+
+  /** Publishes local-host fishing state to remote clients and local observers. */
+  publishLocalFishingState(sequence: number, payload: Uint8Array): boolean {
+    if (this.localPlayerId === null) return false;
+    this.broadcast({ type: 'fishingState', playerId: this.localPlayerId, sequence, payload });
+    this.options.onFishingState?.(this.localPlayerId, sequence, payload);
+    return true;
+  }
+
   /**
-   * Dipanggil 15 Hz dari game loop: mengirim snapshot posisi per penerima sesuai AOI dan
-   * jam siang-malam tiap 10 detik.
+   * Called 15 Hz from the game loop: sends AOI position snapshots and the clock.
    */
   tick(): void {
     const nowMs = this.now();
@@ -320,6 +371,12 @@ export class HostSession {
     if (nowMs - this.lastClockMs >= CLOCK_INTERVAL_MS) {
       this.lastClockMs = nowMs;
       this.broadcast({ type: 'clock', timeOfDay: this.getTimeOfDay(), timeMs: nowMs >>> 0 });
+    }
+    // Reservasi titik pancing tanpa detak jantung dialokasikan lagi (FISHING.md 8).
+    for (const spotId of staleSpotsOf(this.fishingReservations, nowMs, FISHING_SPOT_TTL_MS)) {
+      this.fishingReservations = releaseSpot(this.fishingReservations, spotId);
+      this.broadcast({ type: 'fishingRelease', playerId: 0, spotId });
+      this.options.onFishingSpotEvent?.({ type: 'fishingRelease', spotId, fromId: 0 });
     }
   }
 
@@ -363,6 +420,13 @@ export class HostSession {
     this.byPeer.delete(event.peer);
     this.players.delete(id);
     for (const player of this.players.values()) player.lastSent.delete(id);
+    // Titik pancing yang direservasi pemain ini dikembalikan.
+    for (const spotId of Object.keys(this.fishingReservations)) {
+      if ((this.fishingReservations[spotId] as SpotReservation).playerId !== String(id)) continue;
+      this.fishingReservations = releaseSpot(this.fishingReservations, spotId);
+      this.broadcast({ type: 'fishingRelease', playerId: id, spotId });
+      this.options.onFishingSpotEvent?.({ type: 'fishingRelease', spotId, fromId: id });
+    }
     // Kendaraan yang sedang dinaiki kembali terparkir di posisi terakhir pemain.
     for (const vehicle of this.vehicles.values()) {
       if (vehicle.ownerId !== id) continue;
@@ -402,6 +466,21 @@ export class HostSession {
         return;
       case 'vehicleClaim':
         this.handleVehicleClaim(player, message.vehicleId, message.action, message.x, message.z, message.yaw);
+        return;
+      case 'fishingReserve':
+        this.handleFishingReservation(player, 'reserve', message.spotId);
+        return;
+      case 'fishingRelease':
+        this.handleFishingReservation(player, 'release', message.spotId);
+        return;
+      case 'fishingState':
+        // Id dari klien diabaikan: host yang menentukan siapa pengirimnya. Payload diteruskan
+        // tanpa diubah (sudah tervalidasi panjangnya oleh decodeMessage).
+        this.broadcast(
+          { type: 'fishingState', playerId: player.info.id, sequence: message.sequence, payload: message.payload },
+          player,
+        );
+        this.options.onFishingState?.(player.info.id, message.sequence, message.payload);
         return;
       case 'ping':
         this.sendTo(player, { type: 'pong', nonce: message.nonce });
@@ -524,6 +603,40 @@ export class HostSession {
   private vehicleMessage(vehicle: VehicleInfo): VehicleStateMessage {
     return { type: 'vehicleState', vehicleId: vehicle.vehicleId, ownerId: vehicle.ownerId, x: vehicle.x, z: vehicle.z, yaw: vehicle.yaw };
   }
+
+  /**
+   * Reservasi titik pancing (FISHING.md 8): klaim pertama menang; klaim kedua ditolak dan
+   * pengirim diberi tahu pemilik sekarang lewat `fishingReserve` versi host. Lepas hanya
+   * boleh oleh pemilik. Pemilik bisa mengulang `fishingReserve` sebagai detak jantung.
+   */
+  private handleFishingReservation(player: HostPlayer, action: 'reserve' | 'release', spotId: string): boolean {
+    const peer = player.peer ?? 'host';
+    if (action === 'reserve') {
+      const ownerId = this.fishingSpotOwner(spotId);
+      if (ownerId !== null && ownerId !== player.info.id) {
+        this.reject(peer, 'spot-taken');
+        return false;
+      }
+      const next = reserveSpot(this.fishingReservations, spotId, String(player.info.id), this.now());
+      if (next === this.fishingReservations) {
+        this.reject(peer, 'spot-taken');
+        return false;
+      }
+      this.fishingReservations = next;
+      this.broadcast({ type: 'fishingReserve', playerId: player.info.id, spotId }, player);
+      this.options.onFishingSpotEvent?.({ type: 'fishingReserve', spotId, fromId: player.info.id });
+      return true;
+    }
+    const ownerId = this.fishingSpotOwner(spotId);
+    if (ownerId !== player.info.id) {
+      this.reject(peer, 'not-owner');
+      return false;
+    }
+    this.fishingReservations = releaseSpot(this.fishingReservations, spotId);
+    this.broadcast({ type: 'fishingRelease', playerId: player.info.id, spotId }, player);
+    this.options.onFishingSpotEvent?.({ type: 'fishingRelease', spotId, fromId: player.info.id });
+    return true;
+  }
 }
 
 /* ------------------------------------------------------------------------------------------------
@@ -539,6 +652,9 @@ export interface ClientEvents {
   onChat?: (entry: ChatEntry) => void;
   onClock?: (timeOfDay: number) => void;
   onVehicle?: (vehicle: VehicleInfo) => void;
+  onFishingSpotEvent?: (event: FishingSpotEvent) => void;
+  /** Payload adalah byte fishingSync versi-1; pemanggil mendekode dengan `decodeFishingSync`. */
+  onFishingState?: (playerId: PlayerId, sequence: number, payload: Uint8Array) => void;
   onPing?: (rttMs: number) => void;
   onDisconnect?: () => void;
   onReject?: (error: DecodeError) => void;
@@ -586,6 +702,16 @@ export class ClientSession {
 
   claimVehicle(vehicleId: string, action: 'mount' | 'release', pose: { x: number; z: number; yaw: number }): void {
     this.send({ type: 'vehicleClaim', vehicleId, action, ...pose });
+  }
+
+  /** Reservasi/lepas titik pancing di host (FISHING.md 8). */
+  claimFishingSpot(spotId: string, action: 'reserve' | 'release'): void {
+    this.send({ type: action === 'reserve' ? 'fishingReserve' : 'fishingRelease', playerId: 0, spotId });
+  }
+
+  /** Menyiarkan state pancing (payload fishingSync versi-1) dengan nomor urut sendiri. */
+  sendFishingState(sequence: number, payload: Uint8Array): void {
+    this.send({ type: 'fishingState', playerId: 0, sequence, payload });
   }
 
   ping(): void {
@@ -665,6 +791,14 @@ export class ClientSession {
         return;
       case 'vehicleState':
         this.events.onVehicle?.({ vehicleId: message.vehicleId, ownerId: message.ownerId, x: message.x, z: message.z, yaw: message.yaw });
+        return;
+      case 'fishingReserve':
+      case 'fishingRelease':
+        this.events.onFishingSpotEvent?.({ type: message.type, spotId: message.spotId, fromId: message.playerId });
+        return;
+      case 'fishingState':
+        if (message.playerId === this.playerId) return;
+        this.events.onFishingState?.(message.playerId, message.sequence, message.payload);
         return;
       case 'pong': {
         const sentAt = this.pendingPings.get(message.nonce);

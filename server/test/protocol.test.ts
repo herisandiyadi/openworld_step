@@ -44,6 +44,7 @@ describe('kompatibilitas byte-per-byte dengan klien', () => {
     expect(MSG).toEqual({
       hello: 1, welcome: 2, state: 3, appearance: 4, vehicleClaim: 5, vehicleState: 6,
       clock: 7, chat: 8, playerJoin: 9, playerLeave: 10, ping: 11, pong: 12,
+      fishingReserve: 13, fishingRelease: 14, fishingState: 15,
     });
     expect(STATE_ENTRY_BYTES).toBe(12);
   });

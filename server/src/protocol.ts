@@ -39,6 +39,9 @@ export const MSG = {
   playerLeave: 10,
   ping: 11,
   pong: 12,
+  fishingReserve: 13,
+  fishingRelease: 14,
+  fishingState: 15,
 } as const;
 export type MsgId = (typeof MSG)[keyof typeof MSG];
 
@@ -54,6 +57,8 @@ export const MIN_Y = -32;
 export const MAX_Y = 224;
 /** Maksimum pemain dalam satu snapshot (50 per room, 4.1). */
 export const MAX_PLAYERS_PER_SNAPSHOT = 64;
+export const FISHING_STATE_BYTES = 8;
+export const FISHING_SPOT_ID_BYTES_MAX = 80;
 
 export type PlayerId = number;
 
@@ -170,6 +175,19 @@ export interface PongMessage {
   nonce: number;
 }
 
+export interface FishingReservationMessage {
+  type: 'fishingReserve' | 'fishingRelease';
+  playerId: PlayerId;
+  spotId: string;
+}
+
+export interface FishingStateMessage {
+  type: 'fishingState';
+  playerId: PlayerId;
+  sequence: number;
+  payload: Uint8Array;
+}
+
 export type NetMessage =
   | HelloMessage
   | WelcomeMessage
@@ -182,7 +200,9 @@ export type NetMessage =
   | PlayerJoinMessage
   | PlayerLeaveMessage
   | PingMessage
-  | PongMessage;
+  | PongMessage
+  | FishingReservationMessage
+  | FishingStateMessage;
 
 /** Pesan `state` dikirim unreliable, sisanya reliable (MULTIPLAYER.md bagian 3). */
 export const isReliable = (type: NetMessage['type']): boolean => type !== 'state';
@@ -335,6 +355,12 @@ class Reader {
   f32(): number {
     const value = this.view.getFloat32(this.offset);
     this.offset += 4;
+    return value;
+  }
+
+  raw(length: number): Uint8Array {
+    const value = this.bytes.slice(this.offset, this.offset + length);
+    this.offset += length;
     return value;
   }
 
@@ -507,6 +533,27 @@ export function encodeMessage(message: NetMessage): Uint8Array {
       writer.u32(message.nonce);
       return writer.finish();
     }
+    case 'fishingReserve':
+    case 'fishingRelease': {
+      const id = utf8(message.spotId);
+      if (id.length > FISHING_SPOT_ID_BYTES_MAX) throw new RangeError('Id titik pancing terlalu panjang.');
+      const writer = new Writer(HEADER_BYTES + 2 + 1 + id.length);
+      writer.u8(PROTOCOL_VERSION);
+      writer.u8(message.type === 'fishingReserve' ? MSG.fishingReserve : MSG.fishingRelease);
+      writer.u16(message.playerId);
+      writer.str8(id);
+      return writer.finish();
+    }
+    case 'fishingState': {
+      if (message.payload.length !== FISHING_STATE_BYTES) throw new RangeError('Payload state pancing tidak valid.');
+      const writer = new Writer(HEADER_BYTES + 2 + 4 + FISHING_STATE_BYTES);
+      writer.u8(PROTOCOL_VERSION);
+      writer.u8(MSG.fishingState);
+      writer.u16(message.playerId);
+      writer.u32(message.sequence);
+      writer.raw(message.payload);
+      return writer.finish();
+    }
   }
 }
 
@@ -657,6 +704,23 @@ export function decodeMessage(data: Uint8Array): DecodeResult {
       if (reader.remaining !== 4) return fail('length');
       const nonce = reader.u32();
       return { ok: true, message: type === MSG.ping ? { type: 'ping', nonce } : { type: 'pong', nonce } };
+    }
+    case MSG.fishingReserve:
+    case MSG.fishingRelease: {
+      if (!reader.need(3)) return fail('length');
+      const playerId = reader.u16();
+      const spotId = reader.text(1, FISHING_SPOT_ID_BYTES_MAX);
+      if (spotId === null) return fail('text');
+      if (!reader.atEnd) return fail('length');
+      return { ok: true, message: { type: type === MSG.fishingReserve ? 'fishingReserve' : 'fishingRelease', playerId, spotId } };
+    }
+    case MSG.fishingState: {
+      if (reader.remaining !== 2 + 4 + FISHING_STATE_BYTES) return fail('length');
+      const playerId = reader.u16();
+      const sequence = reader.u32();
+      const payload = reader.raw(FISHING_STATE_BYTES);
+      if (!reader.atEnd) return fail('length');
+      return { ok: true, message: { type: 'fishingState', playerId, sequence, payload } };
     }
     default:
       return fail('unknown-type');

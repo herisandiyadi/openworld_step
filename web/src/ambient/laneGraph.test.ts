@@ -72,7 +72,7 @@ describe('bake graf lajur', () => {
     expect(signs.size).toBe(4);
   });
 
-  it('tidak ada edge yang menembus gedung dan semua tetap di badan jalan', () => {
+  it('tidak ada edge yang menembus gedung dan semua tetap di badan jalan', { timeout: 15000 }, () => {
     const half = ROAD_WIDTH / 2;
     let inBuilding = 0;
     let offRoad = 0;

@@ -1,0 +1,457 @@
+[
+  {
+    "id": "npc_budi",
+    "name": "Pak Budi",
+    "asset": "npc_vendor",
+    "x": 5,
+    "z": 10,
+    "yaw": 1.5707963267948966,
+    "region": "downtown",
+    "schedule": [
+      {
+        "from": 6,
+        "to": 12,
+        "x": 5,
+        "z": 10
+      },
+      {
+        "from": 12,
+        "to": 14,
+        "x": 10,
+        "z": 5
+      },
+      {
+        "from": 14,
+        "to": 20,
+        "x": 5,
+        "z": 10
+      }
+    ],
+    "dialogue": "dialogue/npc_budi.json",
+    "questGiver": [
+      "q_kenalan",
+      "q_eksplorasi_industri"
+    ]
+  },
+  {
+    "id": "npc_sari",
+    "name": "Bu Sari",
+    "asset": "npc_vendor",
+    "x": -187,
+    "z": -170,
+    "yaw": 1.5707963267948966,
+    "region": "residential",
+    "schedule": [
+      {
+        "from": 7,
+        "to": 11,
+        "x": -187,
+        "z": -170
+      },
+      {
+        "from": 11,
+        "to": 13,
+        "x": -180,
+        "z": -165
+      },
+      {
+        "from": 13,
+        "to": 19,
+        "x": -187,
+        "z": -170
+      }
+    ],
+    "dialogue": "dialogue/npc_sari.json",
+    "questGiver": [
+      "q_antar_paket"
+    ]
+  },
+  {
+    "id": "npc_rina",
+    "name": "Mbak Rina",
+    "asset": "npc_vendor",
+    "x": 69,
+    "z": -54,
+    "yaw": 1.5707963267948966,
+    "region": "downtown",
+    "schedule": [
+      {
+        "from": 8,
+        "to": 12,
+        "x": 69,
+        "z": -54
+      },
+      {
+        "from": 12,
+        "to": 13,
+        "x": 74,
+        "z": -48
+      },
+      {
+        "from": 13,
+        "to": 17,
+        "x": 69,
+        "z": -54
+      }
+    ],
+    "dialogue": "dialogue/npc_rina.json",
+    "questGiver": []
+  },
+  {
+    "id": "npc_dewi",
+    "name": "Bu Dewi",
+    "asset": "npc_vendor",
+    "x": -123,
+    "z": 74,
+    "yaw": 1.5707963267948966,
+    "region": "residential",
+    "schedule": [
+      {
+        "from": 7,
+        "to": 12,
+        "x": -123,
+        "z": 74
+      },
+      {
+        "from": 12,
+        "to": 13,
+        "x": -118,
+        "z": 79
+      },
+      {
+        "from": 13,
+        "to": 17,
+        "x": -123,
+        "z": 74
+      }
+    ],
+    "dialogue": "dialogue/npc_dewi.json",
+    "questGiver": []
+  },
+  {
+    "id": "npc_joko",
+    "name": "Mas Joko",
+    "asset": "npc_vendor",
+    "x": 165,
+    "z": 138,
+    "yaw": 1.5707963267948966,
+    "region": "industrial",
+    "schedule": [
+      {
+        "from": 6,
+        "to": 14,
+        "x": 165,
+        "z": 138
+      },
+      {
+        "from": 14,
+        "to": 15,
+        "x": 172,
+        "z": 130
+      },
+      {
+        "from": 15,
+        "to": 22,
+        "x": 165,
+        "z": 138
+      }
+    ],
+    "dialogue": "dialogue/npc_joko.json",
+    "questGiver": []
+  },
+  {
+    "id": "npc_agus",
+    "name": "Pak Agus",
+    "asset": "npc_vendor",
+    "x": 210,
+    "z": -40,
+    "yaw": 1.5707963267948966,
+    "region": "industrial",
+    "schedule": [
+      {
+        "from": 6,
+        "to": 12,
+        "x": 210,
+        "z": -40
+      },
+      {
+        "from": 12,
+        "to": 14,
+        "x": 200,
+        "z": -35
+      },
+      {
+        "from": 14,
+        "to": 20,
+        "x": 210,
+        "z": -40
+      }
+    ],
+    "dialogue": "dialogue/npc_agus.json",
+    "questGiver": [
+      "q_bengkel_kilat"
+    ]
+  },
+  {
+    "id": "npc_darto",
+    "name": "Pak Darto",
+    "asset": "npc_vendor",
+    "x": -60,
+    "z": 200,
+    "yaw": 1.5707963267948966,
+    "region": "residential",
+    "schedule": [
+      {
+        "from": 5,
+        "to": 13,
+        "x": -60,
+        "z": 200
+      },
+      {
+        "from": 13,
+        "to": 15,
+        "x": -55,
+        "z": 195
+      },
+      {
+        "from": 15,
+        "to": 21,
+        "x": -60,
+        "z": 200
+      }
+    ],
+    "dialogue": "dialogue/npc_darto.json",
+    "questGiver": [
+      "q_belajar_mancing",
+      "q_mancing_mahir"
+    ]
+  },
+  {
+    "id": "npc_tini",
+    "name": "Bu Tini",
+    "asset": "npc_vendor",
+    "x": -30,
+    "z": -80,
+    "yaw": 1.5707963267948966,
+    "region": "downtown",
+    "schedule": [
+      {
+        "from": 8,
+        "to": 12,
+        "x": -30,
+        "z": -80
+      },
+      {
+        "from": 12,
+        "to": 13,
+        "x": -25,
+        "z": -75
+      },
+      {
+        "from": 13,
+        "to": 18,
+        "x": -30,
+        "z": -80
+      }
+    ],
+    "dialogue": "dialogue/npc_tini.json",
+    "questGiver": [
+      "q_ojek_cepat"
+    ]
+  },
+  {
+    "id": "npc_hasan",
+    "name": "Bang Hasan",
+    "asset": "npc_vendor",
+    "x": 40,
+    "z": 90,
+    "yaw": 1.5707963267948966,
+    "region": "downtown",
+    "schedule": [
+      {
+        "from": 9,
+        "to": 17,
+        "x": 40,
+        "z": 90
+      },
+      {
+        "from": 17,
+        "to": 19,
+        "x": 35,
+        "z": 95
+      }
+    ],
+    "dialogue": "dialogue/npc_hasan.json",
+    "questGiver": []
+  },
+  {
+    "id": "npc_sri",
+    "name": "Ibu Sri",
+    "asset": "npc_vendor",
+    "x": -100,
+    "z": -110,
+    "yaw": 1.5707963267948966,
+    "region": "residential",
+    "schedule": [
+      {
+        "from": 7,
+        "to": 11,
+        "x": -100,
+        "z": -110
+      },
+      {
+        "from": 11,
+        "to": 13,
+        "x": -95,
+        "z": -105
+      },
+      {
+        "from": 13,
+        "to": 20,
+        "x": -100,
+        "z": -110
+      }
+    ],
+    "dialogue": "dialogue/npc_sri.json",
+    "questGiver": []
+  },
+  {
+    "id": "npc_wahyu",
+    "name": "Mas Wahyu",
+    "asset": "npc_vendor",
+    "x": 190,
+    "z": 60,
+    "yaw": 1.5707963267948966,
+    "region": "industrial",
+    "schedule": [
+      {
+        "from": 7,
+        "to": 15,
+        "x": 190,
+        "z": 60
+      },
+      {
+        "from": 15,
+        "to": 17,
+        "x": 185,
+        "z": 65
+      }
+    ],
+    "dialogue": "dialogue/npc_wahyu.json",
+    "questGiver": [
+      "q_kurir_pabrik"
+    ]
+  },
+  {
+    "id": "npc_fitri",
+    "name": "Mbak Fitri",
+    "asset": "npc_vendor",
+    "x": 20,
+    "z": -30,
+    "yaw": 1.5707963267948966,
+    "region": "downtown",
+    "schedule": [
+      {
+        "from": 8,
+        "to": 12,
+        "x": 20,
+        "z": -30
+      },
+      {
+        "from": 12,
+        "to": 14,
+        "x": 25,
+        "z": -35
+      },
+      {
+        "from": 14,
+        "to": 18,
+        "x": 20,
+        "z": -30
+      }
+    ],
+    "dialogue": "dialogue/npc_fitri.json",
+    "questGiver": []
+  },
+  {
+    "id": "npc_rudi",
+    "name": "Kang Rudi",
+    "asset": "npc_vendor",
+    "x": -150,
+    "z": 120,
+    "yaw": 1.5707963267948966,
+    "region": "residential",
+    "schedule": [
+      {
+        "from": 9,
+        "to": 17,
+        "x": -150,
+        "z": 120
+      },
+      {
+        "from": 17,
+        "to": 21,
+        "x": -145,
+        "z": 115
+      }
+    ],
+    "dialogue": "dialogue/npc_rudi.json",
+    "questGiver": []
+  },
+  {
+    "id": "npc_yanti",
+    "name": "Bu Yanti",
+    "asset": "npc_vendor",
+    "x": 90,
+    "z": -90,
+    "yaw": 1.5707963267948966,
+    "region": "downtown",
+    "schedule": [
+      {
+        "from": 8,
+        "to": 12,
+        "x": 90,
+        "z": -90
+      },
+      {
+        "from": 12,
+        "to": 13,
+        "x": 85,
+        "z": -85
+      },
+      {
+        "from": 13,
+        "to": 18,
+        "x": 90,
+        "z": -90
+      }
+    ],
+    "dialogue": "dialogue/npc_yanti.json",
+    "questGiver": []
+  },
+  {
+    "id": "npc_pak_gun",
+    "name": "Pak Gun",
+    "asset": "npc_vendor",
+    "x": 240,
+    "z": 100,
+    "yaw": 1.5707963267948966,
+    "region": "industrial",
+    "schedule": [
+      {
+        "from": 6,
+        "to": 14,
+        "x": 240,
+        "z": 100
+      },
+      {
+        "from": 14,
+        "to": 16,
+        "x": 235,
+        "z": 95
+      }
+    ],
+    "dialogue": "dialogue/npc_pak_gun.json",
+    "questGiver": []
+  }
+]

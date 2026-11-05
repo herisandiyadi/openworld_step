@@ -6,10 +6,11 @@ import { markExplored } from './exploration';
 import { BUS_DISTANCE, MODE_RADIUS, TALK_DISTANCE, USE_DISTANCE, jumpState, playerState } from './runtime';
 import { findNearestFreeSeat } from './seating';
 import { useGameStore } from '../state/gameStore';
-import { chunkAt, worldState } from '../world/worldState';
+import { chunkAt, worldState, type ChunkRecord } from '../world/worldState';
 import { currentMode } from '../net/netRuntime';
 import { useNetStore } from '../net/netStore';
 import { isClaimable, useSharedVehicles, vehicleOwner } from './sharedVehicles';
+import { routeReachSignal } from './questSignals';
 
 const INTERVAL = 0.15;
 
@@ -25,11 +26,14 @@ export function Proximity() {
     if (timer.current < INTERVAL) return;
     timer.current = 0;
     markExplored(playerState.x, playerState.z);
+    routeReachSignal(playerState.x, playerState.z);
     const state = useGameStore.getState();
     const onFoot = state.mode === 'walk';
+    const fishingActive = state.fishing !== null;
+
 
     let vehicleId: string | null = null;
-    if (onFoot) {
+    if (onFoot && !fishingActive) {
       let best = Infinity;
       const inSession = currentMode() !== null;
       const owners = useSharedVehicles.getState().owners;
@@ -74,6 +78,42 @@ export function Proximity() {
       }
     }
 
+    let shopId: string | null = null;
+    let fishingSpotId: string | null = null;
+    let trashBinId: string | null = null;
+    let fishStallId: string | null = null;
+    if (onFoot && !fishingActive) {
+      const index = worldState.index as (typeof worldState.index & {
+        shops?: { id: string; x: number; z: number }[];
+        fishingSpots?: { id: string; x: number; z: number }[];
+        trashBins?: { id: string; x: number; z: number }[];
+        fishStalls?: { id: string; x: number; z: number }[];
+      }) | null;
+      const streamed = [...worldState.chunks.values()] as (ChunkRecord & {
+        shops?: { id: string; x: number; z: number }[];
+        fishingSpots?: { id: string; x: number; z: number }[];
+        trashBins?: { id: string; x: number; z: number }[];
+        fishStalls?: { id: string; x: number; z: number }[];
+      })[];
+      const collect = (key: 'shops' | 'fishingSpots' | 'trashBins' | 'fishStalls'): { id: string; x: number; z: number }[] => [
+        ...(index?.[key] ?? []),
+        ...streamed.flatMap((chunk) => chunk[key] ?? []),
+      ];
+      const nearest = <T extends { id: string; x: number; z: number }>(items: readonly T[], radius: number): string | null => {
+        let best = radius;
+        let found: string | null = null;
+        for (const item of items ?? []) {
+          const distance = Math.hypot(item.x - playerState.x, item.z - playerState.z);
+          if (distance < best) { best = distance; found = item.id; }
+        }
+        return found;
+      };
+      shopId = nearest(collect('shops'), 3.5);
+      fishingSpotId = nearest(collect('fishingSpots'), 3.5);
+      trashBinId = nearest(collect('trashBins'), 3.5);
+      fishStallId = nearest(collect('fishStalls'), 3.5);
+    }
+
     // Kursi bangku: hanya saat jalan kaki, tidak di udara, dan belum duduk.
     const airborne = jumpState.y > 0 || jumpState.vy !== 0;
     const seatId =
@@ -82,8 +122,17 @@ export function Proximity() {
         : null;
 
     const current = state.nearby;
-    if (vehicleId !== current.vehicleId || npcId !== current.npcId || busStopId !== current.busStopId || seatId !== current.seatId) {
-      state.setNearby({ npcId, vehicleId, busStopId, seatId });
+    if (
+      vehicleId !== current.vehicleId ||
+      npcId !== current.npcId ||
+      busStopId !== current.busStopId ||
+      seatId !== current.seatId ||
+      shopId !== current.shopId ||
+      fishingSpotId !== current.fishingSpotId ||
+      trashBinId !== current.trashBinId ||
+      fishStallId !== current.fishStallId
+    ) {
+      state.setNearby({ npcId, vehicleId, busStopId, seatId, shopId, fishingSpotId, trashBinId, fishStallId });
     }
   });
 

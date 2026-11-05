@@ -56,6 +56,9 @@ function build(key: string, data: ChunkData, started: number): BuiltChunk {
     buildingMatrices,
     buildingColors,
     props,
+    fishingSpots: data.fishingSpots,
+    trashBins: data.trashBins,
+    fishStalls: data.fishStalls,
     colliders: data.colliders,
     workerMs: performance.now() - started,
   };

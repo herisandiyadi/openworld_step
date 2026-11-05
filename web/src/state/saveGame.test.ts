@@ -7,6 +7,7 @@ const { applySave, captureSave, MAX_RESIDENT_CHATS, parseSave, recordResidentCha
 const { playerState } = await import('../game/runtime');
 const { useGameStore } = await import('./gameStore');
 const { exploredRatio, markExplored } = await import('../game/exploration');
+const { useContentProgress } = await import('./contentProgress');
 
 describe('save game', () => {
   it('round-trips position, quest progress and explored map', () => {
@@ -72,5 +73,53 @@ describe('save game', () => {
     const parsed = parseSave(JSON.stringify(broken));
     expect(parsed?.chats).toEqual([['res_01', [{ role: 'user', content: 'ok' }]]]);
     expect(parsed?.talked).toEqual(['res_01']);
+  });
+
+  it('round-trips v2 content progress (coins, bag, ledger, market)', () => {
+    resetGame();
+    const content = useContentProgress.getState();
+    content.directCredit(30, 'test');
+    content.addFishToBag({ id: 'fish-1', kind: 'fish', species: 'nila', weight: 0.8, qty: 1 });
+    content.setContentVersion('v-test');
+    const text = JSON.stringify(captureSave());
+    resetGame();
+    expect(useContentProgress.getState().coins).toBe(0);
+    const parsed = parseSave(text);
+    expect(parsed?.version).toBe(2);
+    expect(parsed?.coins).toBe(30);
+    expect(parsed?.bag.items).toHaveLength(1);
+    expect(parsed?.ledger).toHaveLength(1);
+    expect(parsed?.contentVersion).toBe('v-test');
+    if (parsed) applySave(parsed);
+    expect(useContentProgress.getState().coins).toBe(30);
+    expect(useContentProgress.getState().bag.items[0]?.species).toBe('nila');
+  });
+
+  it('migrates a legacy v1 save to v2 and seeds q_kenalan from met', () => {
+    const v1 = { version: 1, x: 5, z: 6, heading: 0, riding: null, vehicles: [], met: ['npc_budi', 'npc_sari'], explored: '', time: 0.2 };
+    const parsed = parseSave(JSON.stringify(v1));
+    expect(parsed?.version).toBe(2);
+    expect(parsed?.met).toEqual(['npc_budi', 'npc_sari']);
+    expect(parsed?.quests[0]?.questId).toBe('q_kenalan');
+    expect(parsed?.quests[0]?.step).toBe(2);
+    expect(parsed?.coins).toBe(0);
+  });
+
+  it('sanitises malformed v2 field values instead of trusting storage', () => {
+    const v2 = {
+      version: 2, x: 0, z: 0, heading: 0, riding: null, vehicles: [], met: [1, 'npc_x'], explored: '', time: 0.3,
+      coins: -50, ledger: [{ bad: true }, { amount: 3, balance: 3 }], quests: [{ questId: 5 }],
+      inventory: null, jobs: 4, bag: { capacity: 'x', items: [{ id: 'ok', kind: 'fish', qty: -2 }] }, contentVersion: 9, market: null,
+    };
+    const parsed = parseSave(JSON.stringify(v2));
+    expect(parsed?.coins).toBe(0);
+    expect(parsed?.met).toEqual(['npc_x']);
+    expect(parsed?.ledger).toHaveLength(1);
+    expect(parsed?.quests).toEqual([]);
+    expect(parsed?.inventory).toEqual({ owned: [], equipped: {} });
+    expect(parsed?.bag.capacity).toBe(8);
+    expect(parsed?.bag.items[0]?.qty).toBe(1);
+    expect(parsed?.contentVersion).toBe('');
+    expect(parsed?.market).toEqual({ dayIndex: 0, salesBySpecies: {} });
   });
 });

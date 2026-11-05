@@ -1,5 +1,7 @@
 import { useRef, useState, type PointerEvent as ReactPointerEvent } from 'react';
 import { joystickInput } from '../game/runtime';
+import { filteredRawInput } from '../game/inputLock';
+import { useGameStore } from '../state/gameStore';
 
 const RADIUS = 56;
 
@@ -23,8 +25,11 @@ export function Joystick() {
       dx = (dx / distance) * RADIUS;
       dy = (dy / distance) * RADIUS;
     }
-    joystickInput.x = dx / RADIUS;
-    joystickInput.z = dy / RADIUS;
+    // Fishing hard-locks movement: the knob still moves visually, locomotion stays zeroed.
+    const fishing = useGameStore.getState().fishing !== null;
+    const gate = filteredRawInput(fishing, { x: dx / RADIUS, z: dy / RADIUS });
+    joystickInput.x = gate.x;
+    joystickInput.z = gate.z;
     setKnob({ x: dx, y: dy });
   };
 

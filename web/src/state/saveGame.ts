@@ -6,9 +6,15 @@ import { dayClock, jumpState, playerState } from '../game/runtime';
 import { clearSeatReservations, playerSeat } from '../game/seating';
 import { INITIAL_VEHICLES, type ParkedVehicle } from '../game/vehicles';
 import { NO_NEARBY, useGameStore } from './gameStore';
+import { type QuestState } from '../quest/questEngine';
+import { createInventory, type EquipSlot, type Inventory, type OwnedItem, type ItemCategory } from '../economy/inventory';
+import { type DailyJobs } from '../economy/dailyJobs';
+import { type Bag, type BagItem, type BagItemKind } from '../economy/bag';
+import { type LedgerEntry } from '../economy/wallet';
+import { useContentProgress } from './contentProgress';
 
 const SAVE_KEY = 'save_v1';
-const SAVE_VERSION = 1;
+export const SAVE_VERSION = 2;
 
 /** Riwayat chat warga di save game: 10 giliran terakhir per warga, maks 30 warga (LRU). */
 export const MAX_RESIDENT_CHATS = 30;
@@ -74,10 +80,213 @@ export interface SaveData {
   /** Opsional supaya save lama tetap terbaca. */
   chats?: ResidentChats;
   talked?: string[];
+  /** Content-progress fields (v2). */
+  coins: number;
+  ledger: LedgerEntry[];
+  quests: QuestState[];
+  inventory: Inventory;
+  jobs: DailyJobs;
+  bag: Bag;
+  contentVersion: string;
+  market: { dayIndex: number; salesBySpecies: Record<string, number> };
+  bonusDate: string;
+  disposeCoinsToday: number;
+}
+
+const emptyInventory = (): Inventory => createInventory();
+const emptyJobs = (): DailyJobs => ({ date: '', completed: {} });
+const emptyBag = (): Bag => ({ capacity: 8, trashStackSize: 5, items: [] });
+
+const finiteNumber = (value: unknown, fallback: number): number => (typeof value === 'number' && Number.isFinite(value) ? value : fallback);
+
+const wholeNumber = (value: unknown, fallback: number, min = 0): number => {
+  if (typeof value !== 'number' || !Number.isFinite(value)) return fallback;
+  return Math.max(min, Math.floor(value));
+};
+
+function parseLedger(value: unknown): LedgerEntry[] {
+  if (!Array.isArray(value)) return [];
+  const out: LedgerEntry[] = [];
+  for (const entry of value) {
+    if (typeof entry !== 'object' || entry === null) continue;
+    const e = entry as Partial<LedgerEntry>;
+    if (typeof e.amount !== 'number' || typeof e.balance !== 'number') continue;
+    out.push({
+      id: typeof e.id === 'string' ? e.id : `tx-${out.length}`,
+      amount: e.amount,
+      balance: e.balance,
+      reason: typeof e.reason === 'string' ? e.reason : '',
+      timestamp: typeof e.timestamp === 'number' ? e.timestamp : 0,
+    });
+  }
+  return out.slice(-100);
+}
+
+function parseQuests(value: unknown): QuestState[] {
+  if (!Array.isArray(value)) return [];
+  const out: QuestState[] = [];
+  for (const entry of value) {
+    if (typeof entry !== 'object' || entry === null) continue;
+    const q = entry as Partial<QuestState>;
+    if (typeof q.questId !== 'string') continue;
+    if (q.status !== 'locked' && q.status !== 'active' && q.status !== 'completed') continue;
+    out.push({
+      questId: q.questId,
+      status: q.status,
+      step: wholeNumber(q.step, 0),
+      progress: Array.isArray(q.progress)
+        ? q.progress.map((p) => ({ current: wholeNumber(p?.current, 0), required: Math.max(1, wholeNumber(p?.required, 1, 1)) }))
+        : [],
+      completions: wholeNumber(q.completions, 0),
+    });
+  }
+  return out;
+}
+
+function parseInventory(value: unknown): Inventory {
+  if (typeof value !== 'object' || value === null) return emptyInventory();
+  const inv = value as { owned?: unknown; equipped?: unknown };
+  const owned: OwnedItem[] = [];
+  if (Array.isArray(inv.owned)) {
+    for (const entry of inv.owned) {
+      if (typeof entry !== 'object' || entry === null) continue;
+      const item = entry as Partial<OwnedItem>;
+      if (typeof item.id !== 'string' || typeof item.category !== 'string') continue;
+      owned.push({ id: item.id, category: item.category as ItemCategory, retired: item.retired === true });
+    }
+  }
+  const equipped: Partial<Record<EquipSlot, string>> = {};
+  if (typeof inv.equipped === 'object' && inv.equipped !== null) {
+    for (const [slot, itemId] of Object.entries(inv.equipped as Record<string, unknown>)) {
+      if (typeof itemId === 'string') equipped[slot as EquipSlot] = itemId;
+    }
+  }
+  return { owned, equipped };
+}
+
+function parseJobs(value: unknown): DailyJobs {
+  if (typeof value !== 'object' || value === null) return emptyJobs();
+  const jobs = value as { date?: unknown; completed?: unknown };
+  const completed: Record<string, number> = {};
+  if (typeof jobs.completed === 'object' && jobs.completed !== null) {
+    for (const [id, count] of Object.entries(jobs.completed as Record<string, unknown>)) {
+      const n = wholeNumber(count, -1, -1);
+      if (n >= 0) completed[id] = n;
+    }
+  }
+  return { date: typeof jobs.date === 'string' ? jobs.date : '', completed };
+}
+
+function parseBag(value: unknown): Bag {
+  if (typeof value !== 'object' || value === null) return emptyBag();
+  const bag = value as { capacity?: unknown; trashStackSize?: unknown; items?: unknown };
+  const items: BagItem[] = [];
+  if (Array.isArray(bag.items)) {
+    for (const entry of bag.items) {
+      if (typeof entry !== 'object' || entry === null) continue;
+      const item = entry as Partial<BagItem>;
+      if (typeof item.id !== 'string' || typeof item.kind !== 'string') continue;
+      items.push({
+        id: item.id,
+        kind: item.kind as BagItemKind,
+        ...(typeof item.species === 'string' ? { species: item.species } : {}),
+        ...(typeof item.weight === 'number' ? { weight: item.weight } : {}),
+        ...(typeof item.trashType === 'string' ? { trashType: item.trashType } : {}),
+        qty: wholeNumber(item.qty, 1, 1),
+      });
+    }
+  }
+  return { capacity: wholeNumber(bag.capacity, 8, 1), trashStackSize: wholeNumber(bag.trashStackSize, 5, 1), items };
+}
+
+/**
+ * Chains the stored version forward to the current format.
+ * v1 → v2 fills the content-progress fields with empty defaults and preserves
+ * everything the v1 save held (position, vehicles, met, chats, explored, time).
+ * Unknown/corrupt versions return null instead of throwing.
+ */
+export function migrateSave(data: unknown): SaveData | null {
+  if (typeof data !== 'object' || data === null) return null;
+  const raw = data as Record<string, unknown>;
+  const version = raw.version;
+  if (version !== 1 && version !== 2) return null;
+  if (typeof raw.x !== 'number' || typeof raw.z !== 'number') return null;
+
+  const base = {
+    version: SAVE_VERSION,
+    x: raw.x,
+    z: raw.z,
+    heading: finiteNumber(raw.heading, 0),
+    riding: (raw.riding as ParkedVehicle | null) ?? null,
+    vehicles: Array.isArray(raw.vehicles) ? (raw.vehicles as ParkedVehicle[]) : [],
+    met: Array.isArray(raw.met) ? raw.met.filter((id): id is string => typeof id === 'string') : [],
+    explored: typeof raw.explored === 'string' ? raw.explored : '',
+    time: finiteNumber(raw.time, 0.32) % 1,
+    chats: parseChats(raw.chats),
+    talked: Array.isArray(raw.talked)
+      ? [...new Set(raw.talked.filter((id): id is string => typeof id === 'string'))].slice(0, 200)
+      : [],
+  };
+
+  if (version === 1) {
+    return {
+      ...base,
+      coins: 0,
+      ledger: [],
+      quests: (() => {
+        const met = Array.isArray(raw.met) ? raw.met.filter((id): id is string => typeof id === 'string') : [];
+        const steps = ['npc_budi', 'npc_sari', 'npc_rina', 'npc_dewi', 'npc_joko'];
+        if (met.length === 0) return [];
+        const progress = steps.map((npc) => ({ current: met.includes(npc) ? 1 : 0, required: 1 }));
+        const step = progress.findIndex((item) => item.current < item.required);
+        return [{
+          questId: 'q_kenalan',
+          status: step < 0 ? 'completed' : 'active',
+          step: step < 0 ? steps.length : step,
+          progress,
+          completions: 0,
+        }];
+      })(),
+      inventory: emptyInventory(),
+      jobs: emptyJobs(),
+      bag: emptyBag(),
+      contentVersion: '',
+      market: { dayIndex: 0, salesBySpecies: {} },
+      bonusDate: '',
+      disposeCoinsToday: 0,
+    };
+  }
+
+  return {
+    ...base,
+    coins: wholeNumber(raw.coins, 0),
+    ledger: parseLedger(raw.ledger),
+    quests: parseQuests(raw.quests),
+    inventory: parseInventory(raw.inventory),
+    jobs: parseJobs(raw.jobs),
+    bag: parseBag(raw.bag),
+    contentVersion: typeof raw.contentVersion === 'string' ? raw.contentVersion : '',
+    market: typeof raw.market === 'object' && raw.market !== null && typeof (raw.market as any).dayIndex === 'number'
+      ? { dayIndex: (raw.market as any).dayIndex, salesBySpecies: typeof (raw.market as any).salesBySpecies === 'object' ? (raw.market as any).salesBySpecies : {} }
+      : { dayIndex: 0, salesBySpecies: {} },
+    bonusDate: typeof raw.bonusDate === 'string' ? raw.bonusDate : '',
+    disposeCoinsToday: wholeNumber(raw.disposeCoinsToday, 0),
+  };
+}
+
+/** Returns null for missing or incompatible data instead of throwing. */
+export function parseSave(text: string | null): SaveData | null {
+  if (!text) return null;
+  try {
+    return migrateSave(JSON.parse(text));
+  } catch {
+    return null;
+  }
 }
 
 export function captureSave(): SaveData {
   const state = useGameStore.getState();
+  const content = useContentProgress.getState();
   return {
     version: SAVE_VERSION,
     x: Math.round(playerState.x * 100) / 100,
@@ -90,32 +299,17 @@ export function captureSave(): SaveData {
     time: Math.round(dayClock.t * 10000) / 10000,
     chats: useResidentChats.getState().chats,
     talked: useResidentChats.getState().talked,
+    coins: content.coins,
+    ledger: [...content.ledger],
+    quests: [...content.quests],
+    inventory: content.inventory,
+    jobs: content.jobs,
+    bag: content.bag,
+    contentVersion: content.contentVersion,
+    market: { dayIndex: content.market.dayIndex, salesBySpecies: { ...content.market.salesBySpecies } },
+    bonusDate: content.bonusDate,
+    disposeCoinsToday: content.disposeCoinsToday,
   };
-}
-
-/** Returns null for missing or incompatible data instead of throwing. */
-export function parseSave(text: string | null): SaveData | null {
-  if (!text) return null;
-  try {
-    const data = JSON.parse(text) as Partial<SaveData>;
-    if (data.version !== SAVE_VERSION || typeof data.x !== 'number' || typeof data.z !== 'number') return null;
-    if (!Array.isArray(data.vehicles) || !Array.isArray(data.met)) return null;
-    return {
-      version: SAVE_VERSION,
-      x: data.x,
-      z: data.z,
-      heading: typeof data.heading === 'number' ? data.heading : 0,
-      riding: data.riding ?? null,
-      vehicles: data.vehicles,
-      met: data.met.filter((id): id is string => typeof id === 'string'),
-      explored: typeof data.explored === 'string' ? data.explored : '',
-      time: typeof data.time === 'number' ? data.time % 1 : 0.32,
-      chats: parseChats(data.chats),
-      talked: Array.isArray(data.talked) ? [...new Set(data.talked.filter((id): id is string => typeof id === 'string'))].slice(0, 200) : [],
-    };
-  } catch {
-    return null;
-  }
 }
 
 function resetRuntime(x: number, z: number, heading: number): void {
@@ -145,6 +339,18 @@ export function applySave(data: SaveData): void {
     nearby: NO_NEARBY,
     seated: false,
   });
+  useContentProgress.setState({
+    coins: data.coins,
+    ledger: [...data.ledger],
+    quests: [...data.quests],
+    inventory: data.inventory,
+    jobs: data.jobs,
+    bag: data.bag,
+    contentVersion: data.contentVersion,
+    market: data.market,
+    bonusDate: data.bonusDate,
+    disposeCoinsToday: data.disposeCoinsToday,
+  });
 }
 
 export function resetGame(): void {
@@ -153,6 +359,18 @@ export function resetGame(): void {
   dayClock.t = 0.32;
   useResidentChats.setState({ chats: [], talked: [] });
   useGameStore.setState({ mode: 'walk', riding: null, vehicles: [...INITIAL_VEHICLES], met: [], nearby: NO_NEARBY, seated: false });
+  useContentProgress.setState({
+    coins: 0,
+    ledger: [],
+    quests: [],
+    inventory: emptyInventory(),
+    jobs: emptyJobs(),
+    bag: emptyBag(),
+    contentVersion: '',
+    market: { dayIndex: 0, salesBySpecies: {} },
+    bonusDate: '',
+    disposeCoinsToday: 0,
+  });
 }
 
 export async function loadSave(): Promise<SaveData | null> {

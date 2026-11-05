@@ -141,6 +141,8 @@ export interface CharacterPart {
   builder: MeshBuilder;
   /** Slot material; tanpa slot = material palet biasa. */
   slot?: Slot;
+  /** Dedicated PBR material for parts that must not share the palette material. */
+  pbr?: { metallic: number; roughness: number };
   /** Atribut `_TINT` per vertex (lihat lib/gltf.ts tintRegions). */
   tint?: number[];
 }
@@ -300,6 +302,33 @@ function trinketPart(gender: Gender): MeshBuilder {
     const head = boneIndex('head');
     for (const x of [0.118, -0.118]) b.box([0.016, 0.03, 0.016], { at: [x, 1.585, 0.005], color: PALETTE.gold, bone: head });
   }
+  return b;
+}
+
+/**
+ * Kalung rantai emas (Notion 11.1/11.3): rantai berbentuk U di depan dada + liontin, 11 tautan kecil
+ * di sepanjang sternum. Semua z < -0.12 supaya tampil di depan permukaan baju (dada pria depan
+ * ~ -0.115, tambah pad baju). Nempel kaku di tulang chest, seperti bagian lain. Warnanya dari
+ * PALETTE.gold; materialnya PBR metalik terpisah (lihat `pbr` di CharacterPart) yang tetap terlihat
+ * karena runtime meng-EKSKLUSI node ini dari penggabungan (HeroAppearance.applyAppearance).
+ */
+function goldChainPart(gender: Gender): MeshBuilder {
+  const b = new MeshBuilder();
+  const chest = boneIndex('chest');
+  const frontZ = gender === 'f' ? -0.135 : -0.14;
+  const linkY = 1.4;
+  const pendant: Vec3 = [0, 1.28, -0.142];
+
+  // Rantai berbentuk U: turun dari dua bahu ke titik liontin di tengah dada.
+  const links = 11;
+  for (let i = 0; i < links; i++) {
+    const t = i / (links - 1);
+    const x = -0.06 + 0.12 * t;
+    const y = linkY - 0.118 * 4 * t * (1 - t);
+    b.box([0.02, 0.02, 0.014], { at: [x, y, frontZ], color: PALETTE.gold, bone: chest });
+  }
+  // Liontin: permata kecil di ujung rantai.
+  b.box([0.032, 0.036, 0.018], { at: pendant, color: PALETTE.gold, bone: chest });
   return b;
 }
 
@@ -678,6 +707,7 @@ export function buildCustomCharacter(
   const base = baseBody(gender, body);
   const skin = skinPart(gender);
   const trinket = trinketPart(gender);
+  const goldChain = goldChainPart(gender);
   const hairs = hairParts(gender);
   const faces = [0, 1, 2].map((i) => facePart(i, gender, body.eye, PALETTE.lip));
   const accessories = accessoryParts(gender);
@@ -694,6 +724,9 @@ export function buildCustomCharacter(
   const parts: CharacterPart[] = [
     { name: id, builder: base },
     { name: 'skin', builder: skin, slot: 'skin' },
+    // Kalung selalu terlihat (Notion 11.1) dan di-EKSKLUSI dari penggabungan runtime supaya
+    // material PBR metaliknya tetap terpisah.
+    { name: 'gold_chain', builder: goldChain, pbr: { metallic: 0.85, roughness: 0.22 } },
     ...hairs.map((builder, i): CharacterPart => ({ name: `hair_${i}`, builder, slot: 'hair' })),
     ...shirts.map((s): CharacterPart => ({ name: s.name, builder: s.builder, slot: 'shirt' })),
     ...pants.map((p): CharacterPart => ({ name: p.name, builder: p.builder, slot: 'pants' })),
@@ -706,6 +739,7 @@ export function buildCustomCharacter(
   const visible =
     base.triangleCount +
     skin.triangleCount +
+    goldChain.triangleCount +
     biggest(hairs) +
     biggest(shirts.map((s) => s.builder)) +
     biggest(pants.map((p) => p.builder)) +
@@ -966,7 +1000,15 @@ export function buildRigDocument(
 ): Document {
   const { doc, material } = createBaseDocument();
   const slotMaterials = new Map<Slot, Material>();
-  const materialFor = (slot: Slot | undefined): Material => {
+  const materialFor = (part: CharacterPart): Material => {
+    const { slot, pbr } = part;
+    if (pbr) {
+      const name = `mat_${part.name}`;
+      return (
+        doc.getRoot().listMaterials().find((existing) => existing.getName() === name) ??
+        doc.createMaterial(name).setBaseColorFactor([1, 1, 1, 1]).setMetallicFactor(pbr.metallic).setRoughnessFactor(pbr.roughness)
+      );
+    }
     if (!slot) return material;
     let slotMaterial = slotMaterials.get(slot);
     if (!slotMaterial) {
@@ -1002,7 +1044,7 @@ export function buildRigDocument(
   // Skinned mesh nodes and skeleton sit at the scene root (glTF: parent transforms don't affect skinned meshes).
   const scene = doc.createScene(id).addChild(rootJoint);
   for (const part of parts) {
-    const mesh = addMesh(doc, part.name, [{ builder: part.builder, material: materialFor(part.slot), tint: part.tint }], true);
+    const mesh = addMesh(doc, part.name, [{ builder: part.builder, material: materialFor(part), tint: part.tint }], true);
     scene.addChild(doc.createNode(part.name).setMesh(mesh).setSkin(skin));
   }
   doc.getRoot().setDefaultScene(scene);

@@ -15,6 +15,7 @@ import {
   type RejectReason,
   type StrikeCounter,
 } from './validate.js';
+import { checkWorldVersion, WORLD_METADATA, WORLD_VERSION } from './worldVersion.js';
 
 /* ------------------------------------------------------------------------------------------------
  * Alur koneksi (protokol biner di wire TIDAK diubah, lihat NET_PROTOCOL.md):
@@ -96,7 +97,7 @@ const json = (res: ServerResponse, status: number, body: unknown): void => {
     // Klien game berjalan dari WebView/origin lain; endpoint ini tidak memakai cookie.
     'access-control-allow-origin': '*',
     'access-control-allow-methods': 'GET, POST, OPTIONS',
-    'access-control-allow-headers': 'content-type',
+    'access-control-allow-headers': 'content-type, x-world-version',
   });
   res.end(data);
 };
@@ -116,6 +117,7 @@ export function startServer(options: ServerOptions): Promise<RunningServer> {
     maxRooms: options.maxRooms ?? 100,
     maxPlayers: options.maxPlayersPerRoom ?? 50,
     emptyTtlMs: options.emptyRoomTtlMs,
+    worldVersion: WORLD_VERSION,
     onReject: (code, playerId, reason) => countReject(reason, code, playerId),
   });
   const createBuckets = new Map<string, RateBucket>();
@@ -166,6 +168,11 @@ export function startServer(options: ServerOptions): Promise<RunningServer> {
   function handleHttp(req: IncomingMessage, res: ServerResponse): void {
     try {
       const url = new URL(req.url ?? '/', 'http://localhost');
+      const requestedWorldVersion = (): string | null => {
+        const raw = req.headers['x-world-version'];
+        const value = Array.isArray(raw) ? raw[0] : raw;
+        return typeof value === 'string' && value.trim() !== '' ? value.trim() : null;
+      };
       if (req.method === 'OPTIONS') {
         json(res, 204, {});
         return;
@@ -175,6 +182,11 @@ export function startServer(options: ServerOptions): Promise<RunningServer> {
         return;
       }
       if (req.method === 'POST' && url.pathname === '/rooms') {
+        const compatibility = checkWorldVersion(requestedWorldVersion(), null);
+        if (compatibility) {
+          json(res, compatibility.status, compatibility);
+          return;
+        }
         const ip = clientIp(req);
         const now = Date.now();
         const bucket = createBuckets.get(ip) ?? newRateBucket(now, ROOM_CREATE_BURST);
@@ -198,6 +210,11 @@ export function startServer(options: ServerOptions): Promise<RunningServer> {
         const room = isRoomCode(code) ? rooms.get(code) : undefined;
         if (!room) {
           json(res, 404, { error: 'room-not-found' });
+          return;
+        }
+        const compatibility = checkWorldVersion(requestedWorldVersion(), room.worldVersion);
+        if (compatibility) {
+          json(res, compatibility.status, compatibility);
           return;
         }
         if (room.isFull) {

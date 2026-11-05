@@ -1,6 +1,8 @@
 import { useEffect } from 'react';
 import { keyboardInput } from './runtime';
 import { askNearby, jump, openBus, toggleSeat, toggleVehicle } from './actions';
+import { useGameStore } from '../state/gameStore';
+import { keyboardVectorDuringFishing } from './inputLock';
 
 const LEFT = ['KeyA', 'ArrowLeft'];
 const RIGHT = ['KeyD', 'ArrowRight'];
@@ -17,6 +19,11 @@ export function useKeyboardInput(): void {
     const any = (codes: string[]) => codes.some((code) => pressed.has(code));
 
     const update = () => {
+      const fishing = useGameStore.getState().fishing !== null;
+      if (fishing) {
+        keyboardVectorDuringFishing(true);
+        return;
+      }
       const x = (any(RIGHT) ? 1 : 0) - (any(LEFT) ? 1 : 0);
       const z = (any(DOWN) ? 1 : 0) - (any(UP) ? 1 : 0);
       const length = Math.hypot(x, z) || 1;
@@ -26,6 +33,11 @@ export function useKeyboardInput(): void {
     const onKeyDown = (event: KeyboardEvent) => {
       const target = event.target as HTMLElement | null;
       if (target && (target.tagName === 'INPUT' || target.tagName === 'TEXTAREA')) return;
+      if (useGameStore.getState().fishing) {
+        pressed.clear();
+        keyboardVectorDuringFishing(true);
+        return;
+      }
       if (!event.repeat) {
         if (event.code === 'Space') jump();
         if (event.code === 'KeyE') toggleVehicle();

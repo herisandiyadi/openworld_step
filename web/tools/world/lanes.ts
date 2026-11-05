@@ -54,7 +54,19 @@ function bezierLength(a: LaneNode, c: LaneNode, b: LaneNode): number {
   return length;
 }
 
-export function bakeLanes(): LanesData {
+/**
+ * `isWalkable(x, z)`: true hanya di permukaan yang boleh dilewati pejalan kaki (trotoar `sidewalk`
+ * dan zebra cross memakai surface yang sama; bukan pasir, bukan air). Dermaga tetap boleh: pemain
+ * dan pejalan kaki berjalan di atas modul dermaga yang terpasang di atas pasir.
+ *
+ * Lajur kendaraan dibatasi ke aspal; trotoar dibatasi ke permukaan berjalan. Hero pemain dan
+ * agen yang diarahkan skrip tidak diatur di sini.
+ */
+export function bakeLanes(
+  isWater: (x: number, z: number) => boolean = () => false,
+  isRoad: (x: number, z: number) => boolean = () => true,
+  isWalkable: (x: number, z: number) => boolean = () => true,
+): LanesData {
   const nodes: LaneNode[] = [];
   const nodeIds = new Map<string, number>();
   const nodeId = (point: LaneNode): number => {
@@ -173,5 +185,19 @@ export function bakeLanes(): LanesData {
     }
   }
 
-  return { version: WORLD_DATA_VERSION, nodes, edges, intersections, walkNodes, walkEdges };
+  // Lajur kendaraan: hanya di aspal. Trotoar: hanya di permukaan berjalan (bukan pasir/air).
+  const wet = (node: LaneNode) => isWater(node.x, node.z);
+  const offRoad = (node: LaneNode) => !isRoad(node.x, node.z);
+  const offWalk = (node: LaneNode) => !isWalkable(node.x, node.z);
+  const keepEdges = edges.filter((e) => {
+    const a = nodes[e.a] as LaneNode;
+    const b = nodes[e.b] as LaneNode;
+    return !wet(a) && !wet(b) && !offRoad(a) && !offRoad(b);
+  });
+  const keepWalk = walkEdges.filter((e) => {
+    const a = walkNodes[e.a] as LaneNode;
+    const b = walkNodes[e.b] as LaneNode;
+    return !wet(a) && !wet(b) && !offWalk(a) && !offWalk(b);
+  });
+  return { version: WORLD_DATA_VERSION, nodes, edges: keepEdges, intersections, walkNodes, walkEdges: keepWalk };
 }
